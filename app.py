@@ -887,6 +887,99 @@ def pagina_amministrazione():
         f"Accesso amministratore: {st.session_state.username}"
     )
 
+    # ============================================================
+    # CAMBIO PASSWORD
+    # ============================================================
+
+    st.subheader("🔐 Cambia Password")
+
+    with st.form("form_cambio_password"):
+
+        password_attuale = st.text_input(
+            "Password attuale",
+            type="password"
+        )
+
+        nuova_password = st.text_input(
+            "Nuova password",
+            type="password"
+        )
+
+        conferma_password = st.text_input(
+            "Conferma nuova password",
+            type="password"
+        )
+
+        cambia_password = st.form_submit_button(
+            "🔒 Cambia Password",
+            use_container_width=True
+        )
+
+    if cambia_password:
+
+        if not password_attuale or not nuova_password or not conferma_password:
+
+            st.warning("⚠️ Compila tutti i campi.")
+
+        elif nuova_password != conferma_password:
+
+            st.error("❌ Le nuove password non coincidono.")
+
+        elif len(nuova_password) < 6:
+
+            st.error(
+                "❌ La nuova password deve contenere almeno 6 caratteri."
+            )
+
+        else:
+
+            try:
+
+                # Verifica della password attuale
+                risposta = (
+                    supabase
+                    .table("utenti")
+                    .select("id, username")
+                    .eq("username", st.session_state.username)
+                    .eq("password", password_attuale)
+                    .execute()
+                )
+
+                if not risposta.data:
+
+                    st.error("❌ La password attuale non è corretta.")
+
+                else:
+
+                    (
+                        supabase
+                        .table("utenti")
+                        .update({
+                            "password": nuova_password
+                        })
+                        .eq(
+                            "username",
+                            st.session_state.username
+                        )
+                        .execute()
+                    )
+
+                    st.success(
+                        "✅ Password modificata correttamente!"
+                    )
+
+            except Exception as e:
+
+                st.error(
+                    f"Errore durante la modifica della password: {e}"
+                )
+
+    st.divider()
+
+    # ============================================================
+    # UTENTI
+    # ============================================================
+
     st.subheader("👥 Utenti")
 
     try:
@@ -902,8 +995,18 @@ def pagina_amministrazione():
 
         if utenti:
 
+            # Non mostrare mai la password nella tabella
+            utenti_sicuri = [
+                {
+                    chiave: valore
+                    for chiave, valore in utente.items()
+                    if chiave != "password"
+                }
+                for utente in utenti
+            ]
+
             st.dataframe(
-                utenti,
+                utenti_sicuri,
                 use_container_width=True
             )
 
@@ -914,8 +1017,6 @@ def pagina_amministrazione():
     except Exception as e:
 
         st.error(f"Errore caricamento utenti: {e}")
-
-
 # ============================================================
 # MENU PRINCIPALE
 # ============================================================
