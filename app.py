@@ -53,19 +53,6 @@ RUOLI = [
     "Tecnico",
 ]
 
-# Se conosci l'ID di una cartella Drive principale,
-# puoi inserirlo qui.
-#
-# Se rimane vuoto, l'app cercherà di creare:
-#
-# Gestione Ticket
-# ├── Da gestire
-# │   ├── tecnico1
-# │   └── ...
-# └── Gestiti
-#     ├── tecnico1
-#     └── ...
-#
 DRIVE_ROOT_FOLDER_ID = "1wZrLqf518oh7Rp43bIToiw_779J8BtPj"
 
 
@@ -172,10 +159,31 @@ def init_database():
             stato TEXT NOT NULL,
             note_tecnico TEXT DEFAULT '',
             creato_il TEXT NOT NULL,
-            modificato_il TEXT NOT NULL
+            modificato_il TEXT NOT NULL,
+            foto BLOB
         )
         """
     )
+
+    # Migrazione automatica per database già esistenti
+    columns = execute(
+        "PRAGMA table_info(ticket)",
+        fetchall=True,
+    )
+
+    column_names = [
+        column[1]
+        for column in columns
+    ]
+
+    if "foto" not in column_names:
+
+        execute(
+            """
+            ALTER TABLE ticket
+            ADD COLUMN foto BLOB
+            """
+        )
 
     execute(
         """
@@ -211,6 +219,7 @@ def init_database():
 
 
 init_database()
+
 
 # ============================================================
 # UTENTI DEFAULT
@@ -810,7 +819,8 @@ def get_tickets():
             stato,
             note_tecnico,
             creato_il,
-            modificato_il
+            modificato_il,
+            foto
         FROM ticket
         ORDER BY id DESC
         """,
@@ -832,7 +842,8 @@ def get_technician_tickets(
             priorita,
             stato,
             note_tecnico,
-            assegnato_a
+            assegnato_a,
+            foto
         FROM ticket
         WHERE assegnato_a = ?
         ORDER BY id DESC
@@ -865,6 +876,7 @@ def create_ticket(
     priorita,
     assegnato_a,
     creato_da,
+    foto=None,
 ):
 
     now = datetime.now().isoformat(
@@ -884,9 +896,10 @@ def create_ticket(
             stato,
             note_tecnico,
             creato_il,
-            modificato_il
+            modificato_il,
+            foto
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data,
@@ -899,6 +912,7 @@ def create_ticket(
             "",
             now,
             now,
+            foto,
         ),
     )
 
@@ -920,6 +934,8 @@ def update_ticket_admin(
     assegnato_a,
     stato,
     note_tecnico,
+    foto=None,
+    rimuovi_foto=False,
 ):
 
     old_ticket = execute(
@@ -942,32 +958,95 @@ def update_ticket_admin(
         timespec="seconds"
     )
 
-    execute(
-        """
-        UPDATE ticket
-        SET
-            data = ?,
-            ambiente = ?,
-            descrizione = ?,
-            priorita = ?,
-            assegnato_a = ?,
-            stato = ?,
-            note_tecnico = ?,
-            modificato_il = ?
-        WHERE id = ?
-        """,
-        (
-            data,
-            ambiente.strip(),
-            descrizione.strip(),
-            priorita,
-            assegnato_a,
-            stato,
-            note_tecnico.strip(),
-            now,
-            ticket_id,
-        ),
-    )
+    if rimuovi_foto:
+
+        execute(
+            """
+            UPDATE ticket
+            SET
+                data = ?,
+                ambiente = ?,
+                descrizione = ?,
+                priorita = ?,
+                assegnato_a = ?,
+                stato = ?,
+                note_tecnico = ?,
+                modificato_il = ?,
+                foto = NULL
+            WHERE id = ?
+            """,
+            (
+                data,
+                ambiente.strip(),
+                descrizione.strip(),
+                priorita,
+                assegnato_a,
+                stato,
+                note_tecnico.strip(),
+                now,
+                ticket_id,
+            ),
+        )
+
+    elif foto is not None:
+
+        execute(
+            """
+            UPDATE ticket
+            SET
+                data = ?,
+                ambiente = ?,
+                descrizione = ?,
+                priorita = ?,
+                assegnato_a = ?,
+                stato = ?,
+                note_tecnico = ?,
+                modificato_il = ?,
+                foto = ?
+            WHERE id = ?
+            """,
+            (
+                data,
+                ambiente.strip(),
+                descrizione.strip(),
+                priorita,
+                assegnato_a,
+                stato,
+                note_tecnico.strip(),
+                now,
+                foto,
+                ticket_id,
+            ),
+        )
+
+    else:
+
+        execute(
+            """
+            UPDATE ticket
+            SET
+                data = ?,
+                ambiente = ?,
+                descrizione = ?,
+                priorita = ?,
+                assegnato_a = ?,
+                stato = ?,
+                note_tecnico = ?,
+                modificato_il = ?
+            WHERE id = ?
+            """,
+            (
+                data,
+                ambiente.strip(),
+                descrizione.strip(),
+                priorita,
+                assegnato_a,
+                stato,
+                note_tecnico.strip(),
+                now,
+                ticket_id,
+            ),
+        )
 
     refresh_technician_drive_file(
         assegnato_a
@@ -1229,8 +1308,6 @@ def refresh_technician_drive_file(
 
     except Exception as e:
 
-        # Non blocchiamo il salvataggio del ticket
-        # se Drive non è disponibile.
         print(
             "Errore sincronizzazione Drive:",
             e,
@@ -1319,10 +1396,6 @@ def process_delivery_file(
 
         return False, errors
 
-    # --------------------------------------------------------
-    # CONTROLLO TECNICO
-    # --------------------------------------------------------
-
     if not all(
         df["assegnato_a"]
         .astype(str)
@@ -1336,10 +1409,6 @@ def process_delivery_file(
         )
 
         return False, errors
-
-    # --------------------------------------------------------
-    # CONTROLLO ID E STATI
-    # --------------------------------------------------------
 
     for _, row in df.iterrows():
 
@@ -1399,10 +1468,6 @@ def process_delivery_file(
     if errors:
         return False, errors
 
-    # --------------------------------------------------------
-    # AGGIORNA DATABASE
-    # --------------------------------------------------------
-
     updated = 0
 
     for _, row in df.iterrows():
@@ -1434,10 +1499,6 @@ def process_delivery_file(
         )
 
         updated += 1
-
-    # --------------------------------------------------------
-    # ARCHIVIO DRIVE
-    # --------------------------------------------------------
 
     if drive_available():
 
@@ -1478,7 +1539,6 @@ def process_delivery_file(
                     folders["gestiti"],
                 )
 
-            # Genera il nuovo file di lavoro
             sync_technician_file_to_drive(
                 username,
                 increment_version=True,
@@ -1678,11 +1738,11 @@ def filter_tickets(df, key_prefix=""):
 
     with col1:
 
-      search = st.text_input(
-    "🔎 Cerca",
-    placeholder="Descrizione o ambiente",
-    key=f"{key_prefix}_search"
-)
+        search = st.text_input(
+            "🔎 Cerca",
+            placeholder="Descrizione o ambiente",
+            key=f"{key_prefix}_search",
+        )
 
     with col2:
 
@@ -1880,6 +1940,20 @@ def new_ticket_section(
                 users,
             )
 
+            foto = st.file_uploader(
+                "📷 Foto",
+                type=["jpg", "jpeg", "png"],
+                help="Carica una foto relativa al problema",
+            )
+
+            if foto:
+
+                st.image(
+                    foto,
+                    caption="Anteprima foto",
+                    use_container_width=True,
+                )
+
         submit = st.form_submit_button(
             "🎫 CREA TICKET",
             type="primary",
@@ -1904,6 +1978,12 @@ def new_ticket_section(
 
                 return
 
+            foto_bytes = (
+                foto.getvalue()
+                if foto is not None
+                else None
+            )
+
             create_ticket(
                 data.isoformat(),
                 ambiente,
@@ -1911,6 +1991,7 @@ def new_ticket_section(
                 priorita,
                 assegnato_a,
                 st.session_state.username,
+                foto_bytes,
             )
 
             st.success(
@@ -1950,6 +2031,14 @@ def admin_edit_section(
     row = df[
         df["id"] == ticket_id
     ].iloc[0]
+
+    if row["foto"] is not None:
+
+        st.image(
+            row["foto"],
+            caption="📷 Foto attuale",
+            use_container_width=True,
+        )
 
     with st.form(
         "edit_admin"
@@ -2036,6 +2125,17 @@ def admin_edit_section(
                 height=100,
             )
 
+        nuova_foto = st.file_uploader(
+            "📷 Sostituisci foto",
+            type=["jpg", "jpeg", "png"],
+            help="Lascia vuoto per mantenere la foto attuale",
+        )
+
+        rimuovi_foto = st.checkbox(
+            "🗑️ Rimuovi foto attuale",
+            value=False,
+        )
+
         save = st.form_submit_button(
             "💾 SALVA",
             type="primary",
@@ -2043,6 +2143,12 @@ def admin_edit_section(
         )
 
         if save:
+
+            foto_bytes = (
+                nuova_foto.getvalue()
+                if nuova_foto is not None
+                else None
+            )
 
             update_ticket_admin(
                 ticket_id,
@@ -2053,6 +2159,8 @@ def admin_edit_section(
                 assegnato_a,
                 stato,
                 note,
+                foto_bytes,
+                rimuovi_foto,
             )
 
             st.success(
@@ -2103,6 +2211,7 @@ def admin_delete_section(
 
         st.rerun()
 
+
 # ============================================================
 # SCHEDA TECNICO - I MIEI TICKET
 # ============================================================
@@ -2120,10 +2229,6 @@ def technician_section():
         st.info("Non hai ticket assegnati.")
 
         return
-
-    # ========================================================
-    # KPI
-    # ========================================================
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -2155,10 +2260,6 @@ def technician_section():
 
     st.divider()
 
-    # ========================================================
-    # TABELLA TICKET
-    # ========================================================
-
     display = df[
         [
             "id",
@@ -2189,10 +2290,6 @@ def technician_section():
 
     st.divider()
 
-    # ========================================================
-    # AGGIORNA TICKET
-    # ========================================================
-
     st.subheader("🔧 Aggiorna Ticket")
 
     ticket_ids = df["id"].tolist()
@@ -2213,9 +2310,13 @@ def technician_section():
         f"**Descrizione:** {ticket['descrizione']}"
     )
 
-    # ========================================================
-    # TICKET BLOCCATO
-    # ========================================================
+    if ticket["foto"] is not None:
+
+        st.image(
+            ticket["foto"],
+            caption="📷 Foto del problema",
+            use_container_width=True,
+        )
 
     if ticket["stato"] in ["Risolto", "Chiuso"]:
 
@@ -2240,10 +2341,6 @@ def technician_section():
             disabled=True,
             key="tecnico_note_bloccato",
         )
-
-    # ========================================================
-    # TICKET MODIFICABILE
-    # ========================================================
 
     else:
 
@@ -2290,7 +2387,8 @@ def technician_section():
             )
 
             st.rerun()
-    
+
+
 # ============================================================
 # SCHEDA CONSEGNA TICKET
 # ============================================================
@@ -2309,10 +2407,6 @@ def technician_delivery_section():
         "Scarica il file di lavoro, completa "
         "gli interventi e ricaricalo qui."
     )
-
-    # --------------------------------------------------------
-    # GOOGLE DRIVE NON CONFIGURATO
-    # --------------------------------------------------------
 
     if not drive_available():
 
@@ -2351,10 +2445,6 @@ def technician_delivery_section():
             )
         )
 
-        # ----------------------------------------------------
-        # INFORMAZIONI FILE
-        # ----------------------------------------------------
-
         current_info = get_file_info(
             username
         )
@@ -2374,10 +2464,6 @@ def technician_delivery_section():
                 f"**Generato:** {generated_at}  \n"
                 f"**File:** `{filename}`"
             )
-
-        # ----------------------------------------------------
-        # CREA FILE SE NON ESISTE
-        # ----------------------------------------------------
 
         if not current_info:
 
@@ -2410,10 +2496,6 @@ def technician_delivery_section():
 
                 return
 
-        # ----------------------------------------------------
-        # FILE SU DRIVE
-        # ----------------------------------------------------
-
         files = list_drive_files(
             folders["da_gestire"]
         )
@@ -2430,10 +2512,6 @@ def technician_delivery_section():
 
                 current_file = file
                 break
-
-        # ----------------------------------------------------
-        # DOWNLOAD
-        # ----------------------------------------------------
 
         if current_file:
 
@@ -2477,10 +2555,6 @@ def technician_delivery_section():
                 st.rerun()
 
         st.divider()
-
-        # ----------------------------------------------------
-        # UPLOAD
-        # ----------------------------------------------------
 
         st.write(
             "### 📤 Consegna il file completato"
@@ -2579,10 +2653,6 @@ def users_section():
         ]
     )
 
-    # --------------------------------------------------------
-    # CREA
-    # --------------------------------------------------------
-
     with tab1:
 
         with st.form(
@@ -2674,10 +2744,6 @@ def users_section():
 
                         st.rerun()
 
-    # --------------------------------------------------------
-    # PASSWORD
-    # --------------------------------------------------------
-
     with tab2:
 
         usernames = [
@@ -2738,10 +2804,6 @@ def users_section():
                     st.success(
                         "Password modificata."
                     )
-
-    # --------------------------------------------------------
-    # ELIMINA
-    # --------------------------------------------------------
 
     with tab3:
 
@@ -2879,14 +2941,10 @@ def admin_dashboard():
         ]
     )
 
-    # --------------------------------------------------------
-    # DASHBOARD
-    # --------------------------------------------------------
-
     with tab1:
 
         filtered = filter_tickets(df, "dashboard")
-         
+
         show_table(
             filtered
         )
@@ -2895,32 +2953,26 @@ def admin_dashboard():
             filtered
         )
 
-    # --------------------------------------------------------
-    # NUOVO TICKET
-    # --------------------------------------------------------
-
     with tab2:
 
         users = [
             row[0]
             for row in get_users()
+            if row[1] == "Tecnico"
         ]
 
         new_ticket_section(
             users
         )
 
-    # --------------------------------------------------------
-    # GESTIONE
-    # --------------------------------------------------------
-
     with tab3:
 
         filtered = filter_tickets(df, "gestione")
-        
+
         users = [
             row[0]
             for row in get_users()
+            if row[1] == "Tecnico"
         ]
 
         admin_edit_section(
@@ -2933,10 +2985,6 @@ def admin_dashboard():
         admin_delete_section(
             filtered
         )
-
-    # --------------------------------------------------------
-    # DRIVE
-    # --------------------------------------------------------
 
     with tab4:
 
@@ -2979,10 +3027,6 @@ def admin_dashboard():
                     st.error(
                         f"Errore: {e}"
                     )
-
-    # --------------------------------------------------------
-    # UTENTI
-    # --------------------------------------------------------
 
     with tab5:
 
