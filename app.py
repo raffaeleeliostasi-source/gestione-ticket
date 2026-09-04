@@ -1678,12 +1678,11 @@ def filter_tickets(df, key_prefix=""):
 
     with col1:
 
-        search = st.text_input(
-            "🔎 Cerca",
-            placeholder=(
-                "Descrizione o ambiente"
-                key=f"{key_prefix}_search",
-        )
+      search = st.text_input(
+    "🔎 Cerca",
+    placeholder="Descrizione o ambiente",
+    key=f"{key_prefix}_search"
+)
 
     with col2:
 
