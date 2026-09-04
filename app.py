@@ -2187,17 +2187,15 @@ def technician_section():
     # ========================================================
     # AGGIORNA TICKET
     # ========================================================
-
-    st.subheader("🔧 Aggiorna Ticket")
+ 
+st.subheader("🔧 Aggiorna Ticket")
 
     ticket_ids = df["id"].tolist()
 
     selected_id = st.selectbox(
         "Seleziona il ticket",
         ticket_ids,
-        format_func=lambda x: (
-            f"Ticket #{x}"
-        ),
+        format_func=lambda x: f"Ticket #{x}",
         key="tecnico_selected_ticket",
     )
 
@@ -2210,19 +2208,49 @@ def technician_section():
         f"**Descrizione:** {ticket['descrizione']}"
     )
 
+# ============================================================
+# BLOCCO TICKET RISOLTO O CHIUSO
+# ============================================================
+
+if ticket["stato"] in ["Risolto", "Chiuso"]:
+
+    st.success(
+        f"✅ Questo ticket è {ticket['stato']}."
+    )
+
+    st.info(
+        "🔒 Il ticket è stato completato e non può più essere modificato dal tecnico."
+    )
+
+    # Mostra comunque le note
+    if (
+        not pd.isna(ticket["note_tecnico"])
+        and ticket["note_tecnico"]
+    ):
+        st.text_area(
+            "📝 Note tecnico",
+            value=ticket["note_tecnico"],
+            disabled=True,
+            key="tecnico_note_bloccato",
+        )
+
+# ============================================================
+# TICKET ANCORA MODIFICABILE
+# ============================================================
+
+else:
+
     nuovo_stato = st.selectbox(
         "Stato",
         [
             "Aperto",
             "In Corso",
             "Risolto",
-            "Chiuso",
         ],
         index=[
             "Aperto",
             "In Corso",
             "Risolto",
-            "Chiuso",
         ].index(ticket["stato"]),
         key="tecnico_stato",
     )
@@ -2237,6 +2265,7 @@ def technician_section():
         placeholder="Descrivi l'intervento effettuato...",
         key="tecnico_note",
     )
+
     if st.button(
         "💾 Salva aggiornamento",
         type="primary",
