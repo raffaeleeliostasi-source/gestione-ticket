@@ -2318,8 +2318,6 @@ else:
 # TICKET ANCORA MODIFICABILE
 # ============================================================
 
-else:
-
     nuovo_stato = st.selectbox(
         "Stato",
         [
