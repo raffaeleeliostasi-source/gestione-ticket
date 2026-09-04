@@ -2110,49 +2110,31 @@ def admin_delete_section(
 
 def technician_section():
 
-    username = (
-        st.session_state.username
-    )
+    username = st.session_state.username
 
-    df = get_technician_tickets(
-        username
-    )
+    df = get_technician_tickets(username)
 
-    st.subheader(
-        "📋 I miei Ticket"
-    )
+    st.subheader("📋 I miei Ticket")
 
     if df.empty:
 
-        st.info(
-            "Non hai ticket assegnati."
-        )
+        st.info("Non hai ticket assegnati.")
 
         return
 
+    # KPI
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric(
-        "🎫 Totali",
-        len(df),
-    )
+    col1.metric("🎫 Totali", len(df))
 
     col2.metric(
         "🔴 Aperti",
-        len(
-            df[
-                df["stato"] == "Aperto"
-            ]
-        ),
+        len(df[df["stato"] == "Aperto"]),
     )
 
     col3.metric(
         "🟠 In Corso",
-        len(
-            df[
-                df["stato"] == "In Corso"
-            ]
-        ),
+        len(df[df["stato"] == "In Corso"]),
     )
 
     col4.metric(
@@ -2160,16 +2142,17 @@ def technician_section():
         len(
             df[
                 df["stato"].isin(
-                    [
-                        "Risolto",
-                        "Chiuso",
-                    ]
+                    ["Risolto", "Chiuso"]
                 )
             ]
         ),
     )
 
     st.divider()
+
+    # ========================================================
+    # TABELLA TICKET
+    # ========================================================
 
     display = df[
         [
@@ -2198,6 +2181,80 @@ def technician_section():
         use_container_width=True,
         hide_index=True,
     )
+
+    st.divider()
+
+    # ========================================================
+    # AGGIORNA TICKET
+    # ========================================================
+
+    st.subheader("🔧 Aggiorna Ticket")
+
+    ticket_ids = df["id"].tolist()
+
+    selected_id = st.selectbox(
+        "Seleziona il ticket",
+        ticket_ids,
+        format_func=lambda x: (
+            f"Ticket #{x}"
+        ),
+        key="tecnico_selected_ticket",
+    )
+
+    ticket = df[
+        df["id"] == selected_id
+    ].iloc[0]
+
+    st.info(
+        f"**Ambiente:** {ticket['ambiente']}\n\n"
+        f"**Descrizione:** {ticket['descrizione']}"
+    )
+
+    nuovo_stato = st.selectbox(
+        "Stato",
+        [
+            "Aperto",
+            "In Corso",
+            "Risolto",
+            "Chiuso",
+        ],
+        index=[
+            "Aperto",
+            "In Corso",
+            "Risolto",
+            "Chiuso",
+        ].index(ticket["stato"]),
+        key="tecnico_stato",
+    )
+
+    note = st.text_area(
+        "📝 Note tecnico",
+        value=(
+            ""
+            if pd.isna(ticket["note_tecnico"])
+            else ticket["note_tecnico"]
+        ),
+        placeholder="Descrivi l'intervento effettuato...",
+        key="tecnico_note",
+    )
+
+    if st.button(
+        "💾 Salva aggiornamento",
+        type="primary",
+        use_container_width=True,
+    ):
+
+        update_ticket(
+            selected_id,
+            nuovo_stato,
+            note,
+        )
+
+        st.success(
+            "✅ Ticket aggiornato correttamente!"
+        )
+
+        st.rerun()
 
 
 # ============================================================
