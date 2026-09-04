@@ -2188,7 +2188,7 @@ def technician_section():
     # AGGIORNA TICKET
     # ========================================================
  
-st.subheader("🔧 Aggiorna Ticket")
+    st.subheader("🔧 Aggiorna Ticket")
 
     ticket_ids = df["id"].tolist()
 
@@ -2207,6 +2207,74 @@ st.subheader("🔧 Aggiorna Ticket")
         f"**Ambiente:** {ticket['ambiente']}\n\n"
         f"**Descrizione:** {ticket['descrizione']}"
     )
+
+    # BLOCCO TICKET RISOLTO O CHIUSO
+    if ticket["stato"] in ["Risolto", "Chiuso"]:
+
+        st.success(
+            f"✅ Questo ticket è {ticket['stato']}."
+        )
+
+        st.info(
+            "🔒 Questo ticket è bloccato e non può più essere modificato dal tecnico."
+        )
+
+        st.text_area(
+            "📝 Note tecnico",
+            value=(
+                ""
+                if pd.isna(ticket["note_tecnico"])
+                else ticket["note_tecnico"]
+            ),
+            disabled=True,
+            key="tecnico_note_bloccato",
+        )
+
+    else:
+
+        nuovo_stato = st.selectbox(
+            "Stato",
+            [
+                "Aperto",
+                "In Corso",
+                "Risolto",
+            ],
+            index=[
+                "Aperto",
+                "In Corso",
+                "Risolto",
+            ].index(ticket["stato"]),
+            key="tecnico_stato",
+        )
+
+        note = st.text_area(
+            "📝 Note tecnico",
+            value=(
+                ""
+                if pd.isna(ticket["note_tecnico"])
+                else ticket["note_tecnico"]
+            ),
+            placeholder="Descrivi l'intervento effettuato...",
+            key="tecnico_note",
+        )
+
+        if st.button(
+            "💾 Salva aggiornamento",
+            type="primary",
+            use_container_width=True,
+        ):
+
+            update_ticket_technician(
+                selected_id,
+                nuovo_stato,
+                note,
+            )
+
+            st.success(
+                "✅ Ticket aggiornato correttamente!"
+            )
+
+            st.rerun()
 
 # ============================================================
 # BLOCCO TICKET RISOLTO O CHIUSO
