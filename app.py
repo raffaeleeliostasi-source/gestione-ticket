@@ -1672,7 +1672,7 @@ def show_kpi(df):
 # FILTRI
 # ============================================================
 
-def filter_tickets(df):
+def filter_tickets(df, key_prefix=""):
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -1682,7 +1682,7 @@ def filter_tickets(df):
             "🔎 Cerca",
             placeholder=(
                 "Descrizione o ambiente"
-            ),
+                key=f"{key_prefix}_search",
         )
 
     with col2:
@@ -1690,6 +1690,7 @@ def filter_tickets(df):
         stato = st.selectbox(
             "Stato",
             ["Tutti"] + STATI,
+            key=f"{key_prefix}_stato",
         )
 
     with col3:
@@ -1697,6 +1698,7 @@ def filter_tickets(df):
         priorita = st.selectbox(
             "Priorità",
             ["Tutte"] + PRIORITA,
+            key=f"{key_prefix}_priorita",
         )
 
     with col4:
@@ -1711,6 +1713,7 @@ def filter_tickets(df):
         tecnico = st.selectbox(
             "Assegnato a",
             ["Tutti"] + assigned,
+            key=f"{key_prefix}_tecnico",
         )
 
     result = df.copy()
@@ -2792,10 +2795,8 @@ def admin_dashboard():
 
     with tab1:
 
-        filtered = filter_tickets(
-            df
-        )
-
+        filtered = filter_tickets(df, "dashboard")
+         
         show_table(
             filtered
         )
@@ -2825,10 +2826,8 @@ def admin_dashboard():
 
     with tab3:
 
-        filtered = filter_tickets(
-            df
-        )
-
+        filtered = filter_tickets(df, "gestione")
+        
         users = [
             row[0]
             for row in get_users()
