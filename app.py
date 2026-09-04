@@ -2237,24 +2237,23 @@ def technician_section():
         placeholder="Descrivi l'intervento effettuato...",
         key="tecnico_note",
     )
-
-   if st.button(
-    "💾 Salva aggiornamento",
-    type="primary",
-    use_container_width=True,
+    if st.button(
+        "💾 Salva aggiornamento",
+        type="primary",
+        use_container_width=True,
     ):
 
-    update_ticket_technician(
-        selected_id,
-        nuovo_stato,
-        note,
-    )
+        update_ticket_technician(
+            selected_id,
+            nuovo_stato,
+            note,
+        )
 
-    st.success(
-        "✅ Ticket aggiornato correttamente!"
-    )
+        st.success(
+            "✅ Ticket aggiornato correttamente!"
+        )
 
-    st.rerun()
+        st.rerun()
 
 # ============================================================
 # SCHEDA CONSEGNA TICKET
