@@ -2280,27 +2280,28 @@ def technician_section():
 # BLOCCO TICKET RISOLTO O CHIUSO
 # ============================================================
 
-if ticket["stato"] in ["Risolto", "Chiuso"]:
+    if ticket["stato"] in ["Risolto", "Chiuso"]:
 
-    st.success(
-        f"✅ Questo ticket è {ticket['stato']}."
-    )
-
-    st.info(
-        "🔒 Il ticket è stato completato e non può più essere modificato dal tecnico."
-    )
-
-    # Mostra comunque le note
-    if (
-        not pd.isna(ticket["note_tecnico"])
-        and ticket["note_tecnico"]
-    ):
-        st.text_area(
-            "📝 Note tecnico",
-            value=ticket["note_tecnico"],
-            disabled=True,
-            key="tecnico_note_bloccato",
+        st.success(
+            f"✅ Questo ticket è {ticket['stato']}."
         )
+
+        st.info(
+            "🔒 Il ticket è stato completato e non può più essere modificato dal tecnico."
+        )
+
+        # Mostra comunque le note
+        if (
+            not pd.isna(ticket["note_tecnico"])
+            and ticket["note_tecnico"]
+        ):
+            st.text_area(
+                "📝 Note tecnico",
+                value=ticket["note_tecnico"],
+                disabled=True,
+                key="tecnico_note_bloccato",
+            )
+
 
 # ============================================================
 # TICKET ANCORA MODIFICABILE
