@@ -219,15 +219,20 @@ init_database()
 
 def migrate_database():
 
-    columns = execute(
-        "PRAGMA table_info(ticket)",
-        fetchall=True,
-    )
+  cursor = conn.cursor()
 
-    existing = {
-        column[1]
-        for column in columns
-    }
+try:
+    cursor.execute("PRAGMA table_info(ticket)")
+    columns = cursor.fetchall()
+
+finally:
+    cursor.close()
+
+existing = {
+    column[1]
+    for column in columns
+    if len(column) > 1
+}
 
     now = datetime.now().isoformat(
         timespec="seconds"
