@@ -2184,11 +2184,7 @@ def technician_section():
 
     st.divider()
 
-# ========================================================
-# AGGIORNA TICKET
-# ========================================================
-
-    # ============================================================
+# ============================================================
 # AGGIORNA TICKET
 # ============================================================
 
@@ -2213,7 +2209,7 @@ st.info(
 )
 
 # ============================================================
-# BLOCCO TICKET RISOLTO O CHIUSO
+# TICKET BLOCCATO
 # ============================================================
 
 if ticket["stato"] in ["Risolto", "Chiuso"]:
@@ -2226,24 +2222,26 @@ if ticket["stato"] in ["Risolto", "Chiuso"]:
         "🔒 Il ticket è stato completato e non può più essere modificato dal tecnico."
     )
 
+    note_esistente = (
+        ""
+        if pd.isna(ticket["note_tecnico"])
+        else ticket["note_tecnico"]
+    )
+
     st.text_area(
         "📝 Note tecnico",
-        value=(
-            ""
-            if pd.isna(ticket["note_tecnico"])
-            else ticket["note_tecnico"]
-        ),
+        value=note_esistente,
         disabled=True,
         key="tecnico_note_bloccato",
     )
 
 # ============================================================
-# TICKET ANCORA MODIFICABILE
+# TICKET MODIFICABILE
 # ============================================================
 
 else:
 
-    stati_modificabili = [
+    stati_disponibili = [
         "Aperto",
         "In Corso",
         "Risolto",
@@ -2251,10 +2249,8 @@ else:
 
     nuovo_stato = st.selectbox(
         "Stato",
-        stati_modificabili,
-        index=stati_modificabili.index(
-            ticket["stato"]
-        ),
+        stati_disponibili,
+        index=stati_disponibili.index(ticket["stato"]),
         key="tecnico_stato",
     )
 
