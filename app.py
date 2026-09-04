@@ -9,6 +9,16 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib import colors
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
 # Google Drive
 try:
     from google.oauth2 import service_account
@@ -1085,6 +1095,7 @@ def update_ticket_technician(
             modificato_il = ?
         WHERE id = ?
         AND assegnato_a = ?
+        AND stato != "Chiuso"
         """,
         (
             stato,
@@ -1116,6 +1127,7 @@ def delete_ticket(ticket_id):
         """
         DELETE FROM ticket
         WHERE id = ?
+        AND stato != "Chiuso"
         """,
         (ticket_id,),
     )
@@ -2848,6 +2860,227 @@ def users_section():
 
 
 # ============================================================
+# ARCHIVIO E PDF
+# ============================================================
+
+def get_archived_tickets():
+
+    return pd.read_sql_query(
+        """
+        SELECT
+            id,
+            data,
+            ambiente,
+            descrizione,
+            priorita,
+            assegnato_a,
+            creato_da,
+            stato,
+            note_tecnico,
+            creato_il,
+            modificato_il,
+            foto
+        FROM ticket
+        WHERE stato = 'Chiuso'
+        ORDER BY modificato_il DESC, id DESC
+        """,
+        conn,
+    )
+
+
+def archived_tickets_to_pdf(df):
+
+    if not REPORTLAB_AVAILABLE:
+        return None
+
+    output = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        rightMargin=1.2 * cm,
+        leftMargin=1.2 * cm,
+        topMargin=1.2 * cm,
+        bottomMargin=1.2 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(
+        Paragraph(
+            "Archivio Ticket Chiusi",
+            styles["Title"],
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"Generato il: {datetime.now():%d/%m/%Y %H:%M}",
+            styles["Normal"],
+        )
+    )
+
+    story.append(Spacer(1, 0.4 * cm))
+
+    for _, ticket in df.iterrows():
+
+        story.append(
+            Paragraph(
+                f"Ticket #{ticket['id']} - CHIUSO",
+                styles["Heading2"],
+            )
+        )
+
+        data = [
+            ["Data", str(ticket["data"])],
+            ["Ambiente", str(ticket["ambiente"])],
+            ["Priorità", str(ticket["priorita"])],
+            ["Assegnato a", str(ticket["assegnato_a"])],
+            ["Creato da", str(ticket["creato_da"])],
+            ["Descrizione", str(ticket["descrizione"])],
+            ["Note tecnico", str(ticket["note_tecnico"] or "")],
+        ]
+
+        table = Table(
+            data,
+            colWidths=[4 * cm, 13 * cm],
+        )
+
+        table.setStyle(
+            TableStyle(
+                [
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
+
+        story.append(table)
+
+        if ticket["foto"] is not None:
+            try:
+                image_buffer = io.BytesIO(ticket["foto"])
+                image = Image(
+                    image_buffer,
+                    width=10 * cm,
+                    height=7 * cm,
+                    kind="proportional",
+                )
+                story.append(Spacer(1, 0.25 * cm))
+                story.append(image)
+            except Exception:
+                story.append(
+                    Paragraph(
+                        "Foto presente ma non visualizzabile nel PDF.",
+                        styles["Italic"],
+                    )
+                )
+
+        story.append(Spacer(1, 0.6 * cm))
+
+    doc.build(story)
+    output.seek(0)
+    return output.getvalue()
+
+
+def archive_section():
+
+    if not is_admin():
+        st.warning("Area riservata agli amministratori.")
+        return
+
+    st.subheader("📦 Archivio Ticket")
+    st.caption("I ticket chiusi sono archiviati e non possono più essere modificati o eliminati.")
+
+    df = get_archived_tickets()
+
+    if df.empty:
+        st.info("Nessun ticket archiviato.")
+        return
+
+    display = df[
+        [
+            "id",
+            "data",
+            "ambiente",
+            "descrizione",
+            "priorita",
+            "assegnato_a",
+            "creato_da",
+            "stato",
+            "note_tecnico",
+            "modificato_il",
+        ]
+    ].copy()
+
+    display.columns = [
+        "ID",
+        "Data",
+        "Ambiente",
+        "Descrizione",
+        "Priorità",
+        "Assegnato a",
+        "Creato da",
+        "Stato",
+        "Note tecnico",
+        "Chiuso il",
+    ]
+
+    st.dataframe(
+        display,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.divider()
+
+    selected_id = st.selectbox(
+        "Visualizza ticket archiviato",
+        df["id"].tolist(),
+        format_func=lambda x: f"Ticket #{x}",
+        key="archivio_ticket",
+    )
+
+    ticket = df[df["id"] == selected_id].iloc[0]
+
+    st.success("🔒 Ticket archiviato - sola lettura")
+    st.markdown(f"**Ambiente:** {ticket['ambiente']}")
+    st.markdown(f"**Descrizione:** {ticket['descrizione']}")
+    st.markdown(f"**Priorità:** {ticket['priorita']}")
+    st.markdown(f"**Assegnato a:** {ticket['assegnato_a']}")
+    st.markdown(f"**Note tecnico:** {ticket['note_tecnico'] or ''}")
+
+    if ticket["foto"] is not None:
+        st.image(
+            ticket["foto"],
+            caption="📷 Foto del ticket",
+            use_container_width=True,
+        )
+
+    st.divider()
+
+    if REPORTLAB_AVAILABLE:
+        pdf_bytes = archived_tickets_to_pdf(df)
+
+        st.download_button(
+            "📄 SCARICA TICKET ARCHIVIATI IN PDF",
+            data=pdf_bytes,
+            file_name=f"ticket_archiviati_{datetime.now():%Y%m%d_%H%M}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+        )
+    else:
+        st.warning("Per il download PDF installa ReportLab: pip install reportlab")
+
+
+# ============================================================
 # GRAFICI
 # ============================================================
 
@@ -2931,11 +3164,12 @@ def admin_dashboard():
 
     st.divider()
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         [
             "📊 Dashboard",
             "➕ Nuovo Ticket",
             "✏️ Gestione",
+            "📦 Archivio",
             "☁️ Google Drive",
             "👥 Utenti",
         ]
@@ -2943,7 +3177,8 @@ def admin_dashboard():
 
     with tab1:
 
-        filtered = filter_tickets(df, "dashboard")
+        active_df = df[df["stato"] != "Chiuso"].copy()
+        filtered = filter_tickets(active_df, "dashboard")
 
         show_table(
             filtered
@@ -2967,7 +3202,8 @@ def admin_dashboard():
 
     with tab3:
 
-        filtered = filter_tickets(df, "gestione")
+        active_df = df[df["stato"] != "Chiuso"].copy()
+        filtered = filter_tickets(active_df, "gestione")
 
         users = [
             row[0]
@@ -2987,6 +3223,10 @@ def admin_dashboard():
         )
 
     with tab4:
+
+        archive_section()
+
+    with tab5:
 
         st.subheader(
             "☁️ Google Drive"
@@ -3028,7 +3268,7 @@ def admin_dashboard():
                         f"Errore: {e}"
                     )
 
-    with tab5:
+    with tab6:
 
         users_section()
 
