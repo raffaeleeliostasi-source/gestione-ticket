@@ -2103,7 +2103,6 @@ def admin_delete_section(
 
         st.rerun()
 
-
 # ============================================================
 # SCHEDA TECNICO - I MIEI TICKET
 # ============================================================
@@ -2122,10 +2121,16 @@ def technician_section():
 
         return
 
+    # ========================================================
     # KPI
+    # ========================================================
+
     col1, col2, col3, col4 = st.columns(4)
 
-    col1.metric("🎫 Totali", len(df))
+    col1.metric(
+        "🎫 Totali",
+        len(df),
+    )
 
     col2.metric(
         "🔴 Aperti",
@@ -2184,104 +2189,107 @@ def technician_section():
 
     st.divider()
 
-# ============================================================
-# AGGIORNA TICKET
-# ============================================================
+    # ========================================================
+    # AGGIORNA TICKET
+    # ========================================================
 
-st.subheader("🔧 Aggiorna Ticket")
+    st.subheader("🔧 Aggiorna Ticket")
 
-ticket_ids = df["id"].tolist()
+    ticket_ids = df["id"].tolist()
 
-selected_id = st.selectbox(
-    "Seleziona il ticket",
-    ticket_ids,
-    format_func=lambda x: f"Ticket #{x}",
-    key="tecnico_selected_ticket",
-)
-
-ticket = df[
-    df["id"] == selected_id
-].iloc[0]
-
-st.info(
-    f"**Ambiente:** {ticket['ambiente']}\n\n"
-    f"**Descrizione:** {ticket['descrizione']}"
-)
-
-# ============================================================
-# TICKET BLOCCATO
-# ============================================================
-
-if ticket["stato"] in ["Risolto", "Chiuso"]:
-
-    st.success(
-        f"✅ Questo ticket è {ticket['stato']}."
+    selected_id = st.selectbox(
+        "Seleziona il ticket",
+        ticket_ids,
+        format_func=lambda x: f"Ticket #{x}",
+        key="tecnico_selected_ticket",
     )
+
+    ticket = df[
+        df["id"] == selected_id
+    ].iloc[0]
 
     st.info(
-        "🔒 Il ticket è stato completato e non può più essere modificato dal tecnico."
+        f"**Ambiente:** {ticket['ambiente']}\n\n"
+        f"**Descrizione:** {ticket['descrizione']}"
     )
 
-    note_esistente = (
-        ""
-        if pd.isna(ticket["note_tecnico"])
-        else ticket["note_tecnico"]
-    )
+    # ========================================================
+    # TICKET BLOCCATO
+    # ========================================================
 
-    st.text_area(
-        "📝 Note tecnico",
-        value=note_esistente,
-        disabled=True,
-        key="tecnico_note_bloccato",
-    )
+    if ticket["stato"] in ["Risolto", "Chiuso"]:
 
-# ============================================================
-# TICKET MODIFICABILE
-# ============================================================
+        st.success(
+            f"✅ Questo ticket è {ticket['stato']}."
+        )
 
-else:
+        st.info(
+            "🔒 Il ticket è stato completato e "
+            "non può più essere modificato dal tecnico."
+        )
 
-    stati_disponibili = [
-        "Aperto",
-        "In Corso",
-        "Risolto",
-    ]
-
-    nuovo_stato = st.selectbox(
-        "Stato",
-        stati_disponibili,
-        index=stati_disponibili.index(ticket["stato"]),
-        key="tecnico_stato",
-    )
-
-    note = st.text_area(
-        "📝 Note tecnico",
-        value=(
+        note_esistente = (
             ""
             if pd.isna(ticket["note_tecnico"])
             else ticket["note_tecnico"]
-        ),
-        placeholder="Descrivi l'intervento effettuato...",
-        key="tecnico_note",
-    )
-
-    if st.button(
-        "💾 Salva aggiornamento",
-        type="primary",
-        use_container_width=True,
-    ):
-
-        update_ticket_technician(
-            selected_id,
-            nuovo_stato,
-            note,
         )
 
-        st.success(
-            "✅ Ticket aggiornato correttamente!"
+        st.text_area(
+            "📝 Note tecnico",
+            value=note_esistente,
+            disabled=True,
+            key="tecnico_note_bloccato",
         )
 
-        st.rerun()
+    # ========================================================
+    # TICKET MODIFICABILE
+    # ========================================================
+
+    else:
+
+        stati_disponibili = [
+            "Aperto",
+            "In Corso",
+            "Risolto",
+        ]
+
+        nuovo_stato = st.selectbox(
+            "Stato",
+            stati_disponibili,
+            index=stati_disponibili.index(
+                ticket["stato"]
+            ),
+            key="tecnico_stato",
+        )
+
+        note = st.text_area(
+            "📝 Note tecnico",
+            value=(
+                ""
+                if pd.isna(ticket["note_tecnico"])
+                else ticket["note_tecnico"]
+            ),
+            placeholder="Descrivi l'intervento effettuato...",
+            key="tecnico_note",
+        )
+
+        if st.button(
+            "💾 Salva aggiornamento",
+            type="primary",
+            use_container_width=True,
+        ):
+
+            update_ticket_technician(
+                selected_id,
+                nuovo_stato,
+                note,
+            )
+
+            st.success(
+                "✅ Ticket aggiornato correttamente!"
+            )
+
+            st.rerun()
     
 # ============================================================
 # SCHEDA CONSEGNA TICKET
