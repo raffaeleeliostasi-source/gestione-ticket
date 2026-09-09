@@ -447,6 +447,112 @@ def pagina_nuovo_ticket():
 
     st.title("➕ Nuovo Ticket")
 
+    # ========================================================
+    # CATEGORIA
+    # ========================================================
+    # La categoria è fuori dal form: così Streamlit aggiorna
+    # subito la pagina quando si sceglie "➕ Nuova categoria...".
+
+    categorie_attive = get_nomi_categorie_attive()
+    opzione_nuova_categoria = "➕ Nuova categoria..."
+
+    if is_admin():
+        opzioni_categoria = categorie_attive + [opzione_nuova_categoria]
+    else:
+        opzioni_categoria = categorie_attive
+
+    if not opzioni_categoria:
+
+        st.warning(
+            "⚠️ Non sono disponibili categorie attive. "
+            "Contatta l'amministratore."
+        )
+
+        categoria = None
+
+    else:
+
+        categoria = st.selectbox(
+            "Categoria",
+            opzioni_categoria,
+            key="categoria_nuovo_ticket"
+        )
+
+        # ====================================================
+        # NUOVA CATEGORIA - SOLO AMMINISTRATORE
+        # ====================================================
+
+        if is_admin() and categoria == opzione_nuova_categoria:
+
+            st.info(
+                "➕ Inserisci il nome della nuova categoria e premi "
+                "il pulsante per salvarla."
+            )
+
+            nuova_categoria = st.text_input(
+                "Nome nuova categoria",
+                placeholder="Esempio: Porte e serrature",
+                key="nome_nuova_categoria_ticket"
+            )
+
+            if st.button(
+                "➕ Aggiungi nuova categoria",
+                key="aggiungi_categoria_dal_ticket",
+                use_container_width=True
+            ):
+
+                if not nuova_categoria.strip():
+
+                    st.warning(
+                        "Inserisci il nome della nuova categoria."
+                    )
+
+                else:
+
+                    successo, messaggio = aggiungi_categoria(
+                        nuova_categoria
+                    )
+
+                    if successo:
+
+                        st.success(
+                            f"✅ Categoria '{nuova_categoria.strip()}' aggiunta correttamente!"
+                        )
+
+                        st.session_state[
+                            "categoria_nuovo_ticket"
+                        ] = nuova_categoria.strip()
+
+                        st.session_state[
+                            "nome_nuova_categoria_ticket"
+                        ] = ""
+
+                        st.rerun()
+
+                    else:
+
+                        categorie_aggiornate = get_nomi_categorie_attive()
+
+                        if nuova_categoria.strip() in categorie_aggiornate:
+
+                            st.session_state[
+                                "categoria_nuovo_ticket"
+                            ] = nuova_categoria.strip()
+
+                            st.info(
+                                "ℹ️ La categoria esiste già ed è stata selezionata."
+                            )
+
+                            st.rerun()
+
+                        else:
+
+                            st.error(f"❌ {messaggio}")
+
+    # ========================================================
+    # FORM NUOVO TICKET
+    # ========================================================
+
     with st.form("nuovo_ticket_form"):
 
         titolo = st.text_input("Titolo del problema")
@@ -460,48 +566,21 @@ def pagina_nuovo_ticket():
 
         with col1:
 
-            categorie_attive = get_nomi_categorie_attive()
+            if categoria and categoria != opzione_nuova_categoria:
 
-            # Solo l'amministratore può creare nuove categorie
-            opzione_nuova_categoria = "➕ Nuova categoria..."
-
-            if is_admin():
-                opzioni_categoria = categorie_attive + [opzione_nuova_categoria]
-            else:
-                opzioni_categoria = categorie_attive
-
-            if not opzioni_categoria:
-
-                st.warning(
-                    "⚠️ Non sono disponibili categorie attive. "
-                    "Contatta l'amministratore."
+                st.text_input(
+                    "Categoria selezionata",
+                    value=categoria,
+                    disabled=True
                 )
-
-                categoria = None
-                nuova_categoria = ""
 
             else:
 
-                categoria = st.selectbox(
-                    "Categoria",
-                    opzioni_categoria
+                st.text_input(
+                    "Categoria selezionata",
+                    value="Seleziona o crea una categoria",
+                    disabled=True
                 )
-
-                nuova_categoria = ""
-
-                # Se l'amministratore sceglie l'ultima voce,
-                # può creare la categoria direttamente dal ticket.
-                if is_admin() and categoria == opzione_nuova_categoria:
-
-                    nuova_categoria = st.text_input(
-                        "➕ Nome nuova categoria",
-                        placeholder="Esempio: Porte e serrature"
-                    )
-
-                    st.caption(
-                        "La nuova categoria verrà aggiunta automaticamente "
-                        "e utilizzata per questo ticket."
-                    )
 
         with col2:
 
@@ -519,7 +598,9 @@ def pagina_nuovo_ticket():
 
         st.subheader("📎 Allegati")
 
-        st.write("Puoi caricare un file dalla galleria oppure usare la fotocamera.")
+        st.write(
+            "Puoi caricare un file dalla galleria oppure usare la fotocamera."
+        )
 
         allegati = st.file_uploader(
             "📁 Seleziona file dalla galleria",
@@ -543,41 +624,22 @@ def pagina_nuovo_ticket():
             use_container_width=True
         )
 
+    # ========================================================
+    # CREAZIONE TICKET
+    # ========================================================
+
     if invia:
 
         if not titolo.strip():
             st.warning("Inserisci il titolo del ticket.")
             return
 
-        if not categoria:
-            st.warning("Seleziona una categoria valida.")
-            return
-
-        # Gestione della nuova categoria creata direttamente dal ticket.
-        if categoria == "➕ Nuova categoria...":
-
-            if not nuova_categoria.strip():
-                st.warning("Inserisci il nome della nuova categoria.")
-                return
-
-            successo_categoria, messaggio_categoria = aggiungi_categoria(
-                nuova_categoria
+        if not categoria or categoria == opzione_nuova_categoria:
+            st.warning(
+                "Seleziona una categoria esistente oppure aggiungi "
+                "prima la nuova categoria."
             )
-
-            if not successo_categoria:
-
-                # Se la categoria esiste già, permetti comunque di usarla
-                # se è presente tra quelle attive.
-                categorie_attuali = get_nomi_categorie_attive()
-
-                if nuova_categoria.strip() in categorie_attuali:
-                    categoria = nuova_categoria.strip()
-                else:
-                    st.error(f"❌ {messaggio_categoria}")
-                    return
-
-            else:
-                categoria = nuova_categoria.strip()
+            return
 
         if not descrizione.strip():
             st.warning("Inserisci una descrizione.")
@@ -608,10 +670,6 @@ def pagina_nuovo_ticket():
             ticket_creato = risposta.data[0]
             ticket_id = ticket_creato["id"]
 
-            # ------------------------------------------------
-            # ALLEGATI DALLA GALLERIA
-            # ------------------------------------------------
-
             if allegati:
 
                 for file in allegati:
@@ -621,10 +679,6 @@ def pagina_nuovo_ticket():
                         file
                     )
 
-            # ------------------------------------------------
-            # FOTO FOTOCAMERA
-            # ------------------------------------------------
-
             if foto:
 
                 salva_allegato(
@@ -633,19 +687,18 @@ def pagina_nuovo_ticket():
                 )
 
             st.success(
-                f"✅ Ticket #{ticket_id} creato correttamente!"
+                f"🎉 Ticket #{ticket_id} creato correttamente!"
             )
 
             st.balloons()
 
+            st.rerun()
+
         except Exception as e:
 
-            st.error(f"Errore: {e}")
-
-
-# ============================================================
-# SALVATAGGIO ALLEGATI
-# ============================================================
+            st.error(
+                f"❌ Errore durante la creazione del ticket: {e}"
+            )
 
 def salva_allegato(ticket_id, file):
     try:
