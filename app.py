@@ -507,6 +507,76 @@ def scarica_allegato(percorso_file):
 
 
 # ============================================================
+# ELIMINAZIONE COMPLETA TICKET
+# ============================================================
+
+def elimina_ticket_completo(ticket_id):
+    """
+    Elimina definitivamente:
+    - file degli allegati dallo Storage
+    - record degli allegati
+    - messaggi del ticket
+    - ticket principale
+    """
+
+    try:
+
+        allegati = get_allegati(ticket_id)
+
+        percorsi_file = [
+            allegato.get("percorso_file")
+            for allegato in allegati
+            if allegato.get("percorso_file")
+        ]
+
+        # 1. Elimina i file dal Supabase Storage
+        if percorsi_file:
+
+            try:
+                supabase.storage.from_("allegati").remove(
+                    percorsi_file
+                )
+
+            except Exception as e:
+                raise Exception(
+                    "Impossibile eliminare gli allegati dallo Storage. "
+                    f"Il ticket non è stato cancellato. Dettaglio: {e}"
+                )
+
+        # 2. Elimina i record degli allegati
+        (
+            supabase
+            .table("ticket_allegati")
+            .delete()
+            .eq("ticket_id", ticket_id)
+            .execute()
+        )
+
+        # 3. Elimina i messaggi collegati
+        (
+            supabase
+            .table("ticket_messaggi")
+            .delete()
+            .eq("ticket_id", ticket_id)
+            .execute()
+        )
+
+        # 4. Elimina il ticket
+        (
+            supabase
+            .table("tickets")
+            .delete()
+            .eq("id", ticket_id)
+            .execute()
+        )
+
+        return True, "Ticket eliminato completamente."
+
+    except Exception as e:
+        return False, str(e)
+
+
+# ============================================================
 # DETTAGLIO TICKET
 # ============================================================
 
@@ -658,9 +728,11 @@ def mostra_ticket(ticket):
 
         if is_admin():
 
-            col_admin1, col_admin2 = st.columns(2)
+            col_admin1, col_admin2, col_admin3 = st.columns(3)
 
+            # ====================================================
             # CHIUSURA
+            # ====================================================
 
             with col_admin1:
 
@@ -700,7 +772,9 @@ def mostra_ticket(ticket):
                         "📁 Ticket archiviato"
                     )
 
+            # ====================================================
             # PDF
+            # ====================================================
 
             with col_admin2:
 
@@ -714,6 +788,63 @@ def mostra_ticket(ticket):
                     key=f"pdf_{ticket_id}",
                     use_container_width=True
                 )
+
+            # ====================================================
+            # ELIMINAZIONE PROTETTA
+            # ====================================================
+
+            with col_admin3:
+
+                with st.expander(
+                    "🗑️ Elimina Ticket",
+                    expanded=False
+                ):
+
+                    st.error(
+                        "⚠️ Operazione irreversibile."
+                    )
+
+                    st.caption(
+                        "Verranno eliminati il ticket, "
+                        "tutti i messaggi e tutti gli allegati."
+                    )
+
+                    conferma_eliminazione = st.text_input(
+                        "Scrivi ELIMINA per confermare",
+                        key=f"confirm_delete_{ticket_id}"
+                    )
+
+                    if st.button(
+                        "🗑️ Elimina definitivamente",
+                        key=f"delete_{ticket_id}",
+                        use_container_width=True
+                    ):
+
+                        if conferma_eliminazione.strip() != "ELIMINA":
+
+                            st.warning(
+                                "Per confermare devi scrivere esattamente: ELIMINA"
+                            )
+
+                        else:
+
+                            successo, messaggio = (
+                                elimina_ticket_completo(ticket_id)
+                            )
+
+                            if successo:
+
+                                st.success(
+                                    f"✅ Ticket #{ticket_id} eliminato definitivamente."
+                                )
+
+                                st.rerun()
+
+                            else:
+
+                                st.error(
+                                    f"❌ Errore durante l'eliminazione: {messaggio}"
+                                )
 
 
 # ============================================================
@@ -961,7 +1092,7 @@ def pagina_archivio():
     st.title("📁 Archivio")
 
     st.write(
-        "I ticket chiusi sono archiviati e non possono più essere modificati."
+        "I ticket chiusi sono archiviati. Solo l'amministratore può eliminarli definitivamente."
     )
 
     tickets = get_tickets()
