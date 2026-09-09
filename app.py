@@ -384,6 +384,91 @@ def get_allegati(ticket_id):
 
 
 # ============================================================
+# INTERVENTO TECNICO
+# ============================================================
+
+def get_intervento(ticket_id):
+    """Restituisce l'intervento tecnico associato al ticket."""
+
+    try:
+        risposta = (
+            supabase
+            .table("ticket_interventi")
+            .select("*")
+            .eq("ticket_id", ticket_id)
+            .execute()
+        )
+
+        if risposta.data:
+            return risposta.data[0]
+
+        return None
+
+    except Exception as e:
+        st.error(f"Errore caricamento intervento tecnico: {e}")
+        return None
+
+
+def salva_intervento_tecnico(
+    ticket_id,
+    tecnico,
+    descrizione_intervento,
+    nuovo_stato
+):
+    """
+    Salva un unico intervento per ticket.
+    Se esiste già un intervento in lavorazione, viene aggiornato.
+    """
+
+    try:
+        dati = {
+            "ticket_id": ticket_id,
+            "tecnico": tecnico,
+            "descrizione": descrizione_intervento.strip(),
+            "stato": nuovo_stato,
+            "data_intervento": datetime.now().isoformat()
+        }
+
+        intervento_esistente = get_intervento(ticket_id)
+
+        if intervento_esistente:
+
+            (
+                supabase
+                .table("ticket_interventi")
+                .update(dati)
+                .eq("ticket_id", ticket_id)
+                .execute()
+            )
+
+        else:
+
+            (
+                supabase
+                .table("ticket_interventi")
+                .insert(dati)
+                .execute()
+            )
+
+        # Aggiorna contemporaneamente lo stato principale del ticket.
+        (
+            supabase
+            .table("tickets")
+            .update({
+                "stato": nuovo_stato
+            })
+            .eq("id", ticket_id)
+            .eq("assegnato_a", tecnico)
+            .execute()
+        )
+
+        return True, "Intervento salvato correttamente."
+
+    except Exception as e:
+        return False, str(e)
+
+
+# ============================================================
 # LOGIN
 # ============================================================
 
@@ -847,7 +932,16 @@ def elimina_ticket_completo(ticket_id):
             .execute()
         )
 
-        # 4. Elimina il ticket
+        # 4. Elimina l'intervento tecnico collegato
+        (
+            supabase
+            .table("ticket_interventi")
+            .delete()
+            .eq("ticket_id", ticket_id)
+            .execute()
+        )
+
+        # 5. Elimina il ticket
         (
             supabase
             .table("tickets")
@@ -869,13 +963,17 @@ def elimina_ticket_completo(ticket_id):
 def mostra_ticket(ticket):
 
     ticket_id = ticket["id"]
-
-    chiuso = ticket.get("stato") == "Chiuso"
+    stato_ticket = ticket.get("stato", "Aperto")
+    chiuso = stato_ticket == "Chiuso"
 
     with st.expander(
-        f"🎫 #{ticket_id} - {ticket['titolo']} | {ticket['stato']}",
+        f"🎫 #{ticket_id} - {ticket['titolo']} | {stato_ticket}",
         expanded=False
     ):
+
+        # ====================================================
+        # DATI TICKET
+        # ====================================================
 
         col1, col2, col3 = st.columns(3)
 
@@ -886,135 +984,62 @@ def mostra_ticket(ticket):
             st.write(f"**Priorità:** {ticket.get('priorita', '')}")
 
         with col3:
-            st.write(f"**Stato:** {ticket.get('stato', '')}")
+            st.write(f"**Stato:** {stato_ticket}")
 
-        st.write(
-            f"**Creato da:** {ticket.get('creato_da', '')}"
-        )
+        st.write(f"**Creato da:** {ticket.get('creato_da', '')}")
 
         if ticket.get("assegnato_a"):
             st.write(
-                f"**👷 Assegnato a:** {ticket.get('assegnato_a', '')}"
+                f"**👷 Tecnico assegnato:** "
+                f"{ticket.get('assegnato_a', '')}"
             )
 
-        st.write("### 📝 Descrizione")
-
+        st.write("### 📝 Problema segnalato")
         st.write(ticket.get("descrizione", ""))
 
         st.divider()
 
         # ====================================================
-        # MESSAGGI
+        # INTERVENTO TECNICO SALVATO
         # ====================================================
 
-        st.subheader("💬 Conversazione")
+        intervento = get_intervento(ticket_id)
 
-        messaggi = get_messaggi(ticket_id)
+        st.subheader("🔧 Intervento tecnico")
 
-        if messaggi:
+        if intervento:
 
-            for messaggio in messaggi:
+            st.success("Intervento tecnico registrato")
 
-                autore = messaggio.get("autore", "")
-                testo = messaggio.get("messaggio", "")
-                data = format_data(
-                    messaggio.get("data_messaggio")
-                )
+            col_int1, col_int2, col_int3 = st.columns(3)
 
-                if autore == st.session_state.username:
-
-                    st.info(
-                        f"**Tu - {data}**\n\n{testo}"
-                    )
-
-                else:
-
-                    st.success(
-                        f"**{autore} - {data}**\n\n{testo}"
-                    )
-
-        else:
-            st.info("Nessun messaggio presente.")
-
-        # ====================================================
-        # SE TICKET APERTO → MESSAGGI POSSIBILI
-        # ====================================================
-
-        if not chiuso:
-
-            nuovo_messaggio = st.text_area(
-                "Scrivi un messaggio",
-                key=f"msg_{ticket_id}"
-            )
-
-            if st.button(
-                "📨 Invia messaggio",
-                key=f"send_{ticket_id}"
-            ):
-
-                if nuovo_messaggio.strip():
-
-                    try:
-
-                        (
-                            supabase
-                            .table("ticket_messaggi")
-                            .insert({
-                                "ticket_id": ticket_id,
-                                "autore": st.session_state.username,
-                                "messaggio": nuovo_messaggio
-                            })
-                            .execute()
-                        )
-
-                        st.success("Messaggio inviato!")
-
-                        st.rerun()
-
-                    except Exception as e:
-
-                        st.error(f"Errore invio messaggio: {e}")
-
-                else:
-
-                    st.warning("Scrivi un messaggio.")
-
-        else:
-
-            st.warning(
-                "🔒 Questo ticket è chiuso e non può più essere modificato."
-            )
-
-        st.divider()
-
-        # ====================================================
-        # ALLEGATI
-        # ====================================================
-
-        st.subheader("📎 Allegati")
-
-        allegati = get_allegati(ticket_id)
-
-        if allegati:
-
-            for allegato in allegati:
-
+            with col_int1:
                 st.write(
-                    f"📄 **{allegato.get('nome_file', '')}**"
+                    f"**👷 Tecnico:** "
+                    f"{intervento.get('tecnico', '')}"
                 )
 
-                st.caption(
-                    allegato.get("tipo_file", "")
+            with col_int2:
+                st.write(
+                    f"**📅 Data intervento:** "
+                    f"{format_data(intervento.get('data_intervento'))}"
                 )
+
+            with col_int3:
+                st.write(
+                    f"**🔄 Stato:** "
+                    f"{intervento.get('stato', '')}"
+                )
+
+            st.write("#### 📝 Cosa è stato fatto")
+            st.write(intervento.get("descrizione", ""))
 
         else:
 
-            st.info("Nessun allegato.")
-
-        st.divider()
+            st.info("Nessun intervento tecnico ancora registrato.")
 
         # ====================================================
-        # GESTIONE STATO - TECNICO ASSEGNATO
+        # AREA OPERATIVA TECNICO
         # ====================================================
 
         utente_corrente = st.session_state.username
@@ -1025,77 +1050,172 @@ def mostra_ticket(ticket):
             and tecnico_assegnato == utente_corrente
         ):
 
-            st.subheader("🔧 Gestione Ticket")
+            if chiuso:
 
-            stato_corrente = ticket.get("stato", "Aperto")
+                st.warning(
+                    "🔒 Il ticket è chiuso dall'amministratore "
+                    "e non può più essere modificato."
+                )
 
-            # Un ticket risolto o chiuso non può essere riaperto dal tecnico.
-            if stato_corrente in ["Risolto", "Chiuso"]:
+            elif stato_ticket == "Risolto":
 
                 st.success(
-                    f"🔒 Ticket {stato_corrente.lower()}: "
-                    "non puoi più modificarne lo stato."
+                    "✅ Hai completato l'intervento. "
+                    "Il ticket è in attesa della chiusura dell'amministratore."
                 )
 
             else:
 
-                stati_tecnico = [
-                    "Aperto",
-                    "In lavorazione",
-                    "Risolto"
-                ]
+                st.divider()
+                st.subheader("🛠️ Registra il tuo intervento")
 
-                indice_stato = (
-                    stati_tecnico.index(stato_corrente)
-                    if stato_corrente in stati_tecnico
-                    else 0
+                testo_precedente = ""
+
+                if intervento:
+                    testo_precedente = intervento.get(
+                        "descrizione", ""
+                    )
+
+                descrizione_intervento = st.text_area(
+                    "📝 Cosa hai fatto?",
+                    value=testo_precedente,
+                    height=180,
+                    key=f"intervento_testo_{ticket_id}",
+                    placeholder=(
+                        "Descrivi in modo chiaro l'intervento effettuato..."
+                    )
                 )
 
-                nuovo_stato = st.selectbox(
-                    "Nuovo stato",
-                    stati_tecnico,
-                    index=indice_stato,
-                    key=f"stato_tecnico_{ticket_id}"
+                col_stato1, col_stato2 = st.columns(2)
+
+                with col_stato1:
+
+                    stati_tecnico = [
+                        "In lavorazione",
+                        "Risolto"
+                    ]
+
+                    indice_stato = 0
+
+                    if intervento:
+                        stato_intervento = intervento.get(
+                            "stato", "In lavorazione"
+                        )
+
+                        if stato_intervento in stati_tecnico:
+                            indice_stato = stati_tecnico.index(
+                                stato_intervento
+                            )
+
+                    nuovo_stato = st.selectbox(
+                        "🔄 Stato dopo l'intervento",
+                        stati_tecnico,
+                        index=indice_stato,
+                        key=f"intervento_stato_{ticket_id}"
+                    )
+
+                with col_stato2:
+
+                    foto_intervento = st.file_uploader(
+                        "📷 Foto dell'intervento (opzionale)",
+                        type=["jpg", "jpeg", "png"],
+                        accept_multiple_files=True,
+                        key=f"foto_intervento_{ticket_id}"
+                    )
+
+                foto_camera = st.camera_input(
+                    "📸 Scatta una foto dell'intervento (opzionale)",
+                    key=f"camera_intervento_{ticket_id}"
                 )
 
                 if st.button(
-                    "💾 Aggiorna stato",
-                    key=f"aggiorna_stato_{ticket_id}",
+                    "💾 Salva intervento",
+                    key=f"salva_intervento_{ticket_id}",
                     use_container_width=True
                 ):
 
-                    if nuovo_stato == stato_corrente:
+                    if not descrizione_intervento.strip():
 
-                        st.info("ℹ️ Lo stato non è cambiato.")
+                        st.warning(
+                            "Descrivi prima cosa hai fatto durante l'intervento."
+                        )
 
                     else:
 
-                        try:
+                        successo, messaggio = salva_intervento_tecnico(
+                            ticket_id,
+                            utente_corrente,
+                            descrizione_intervento,
+                            nuovo_stato
+                        )
 
-                            (
-                                supabase
-                                .table("tickets")
-                                .update({
-                                    "stato": nuovo_stato
-                                })
-                                .eq("id", ticket_id)
-                                .eq("assegnato_a", utente_corrente)
-                                .execute()
-                            )
+                        if successo:
+
+                            # Salva le eventuali foto insieme al ticket.
+                            if foto_intervento:
+
+                                for foto in foto_intervento:
+                                    salva_allegato(ticket_id, foto)
+
+                            if foto_camera:
+                                salva_allegato(
+                                    ticket_id,
+                                    foto_camera
+                                )
 
                             st.success(
-                                f"✅ Stato aggiornato: {nuovo_stato}"
+                                "✅ Intervento salvato correttamente!"
                             )
 
                             st.rerun()
 
-                        except Exception as e:
+                        else:
 
                             st.error(
-                                f"❌ Errore aggiornamento stato: {e}"
+                                f"❌ Errore salvataggio intervento: {messaggio}"
                             )
 
-            st.divider()
+        st.divider()
+
+        # ====================================================
+        # ALLEGATI E FOTO
+        # ====================================================
+
+        st.subheader("📎 Allegati e foto")
+
+        allegati = get_allegati(ticket_id)
+
+        if allegati:
+
+            for allegato in allegati:
+
+                nome_file = allegato.get("nome_file", "")
+                tipo_file = allegato.get("tipo_file", "")
+                percorso_file = allegato.get("percorso_file", "")
+
+                if tipo_file.startswith("image/") and percorso_file:
+
+                    contenuto = scarica_allegato(percorso_file)
+
+                    if contenuto:
+                        st.image(
+                            contenuto,
+                            caption=nome_file,
+                            use_container_width=True
+                        )
+                    else:
+                        st.write(f"📄 **{nome_file}**")
+
+                else:
+
+                    st.write(f"📄 **{nome_file}**")
+                    st.caption(tipo_file)
+
+        else:
+
+            st.info("Nessun allegato.")
+
+        st.divider()
 
         # ====================================================
         # AZIONI AMMINISTRATORE
@@ -1105,13 +1225,31 @@ def mostra_ticket(ticket):
 
             col_admin1, col_admin2, col_admin3 = st.columns(3)
 
-            # ====================================================
-            # CHIUSURA
-            # ====================================================
+            # ------------------------------------------------
+            # CHIUSURA: possibile solo dopo RISOLTO
+            # ------------------------------------------------
 
             with col_admin1:
 
-                if not chiuso:
+                if chiuso:
+
+                    st.success("📁 Ticket chiuso")
+
+                elif stato_ticket != "Risolto":
+
+                    st.info(
+                        "🔒 Il ticket può essere chiuso solo dopo "
+                        "che il tecnico lo ha impostato su Risolto."
+                    )
+
+                    st.button(
+                        "🔒 Chiudi Ticket",
+                        key=f"close_{ticket_id}",
+                        use_container_width=True,
+                        disabled=True
+                    )
+
+                else:
 
                     if st.button(
                         "🔒 Chiudi Ticket",
@@ -1132,24 +1270,20 @@ def mostra_ticket(ticket):
                             )
 
                             st.success(
-                                "Ticket chiuso e archiviato!"
+                                "🔒 Ticket chiuso dall'amministratore!"
                             )
 
                             st.rerun()
 
                         except Exception as e:
 
-                            st.error(f"Errore: {e}")
+                            st.error(
+                                f"Errore chiusura ticket: {e}"
+                            )
 
-                else:
-
-                    st.success(
-                        "📁 Ticket archiviato"
-                    )
-
-            # ====================================================
+            # ------------------------------------------------
             # PDF
-            # ====================================================
+            # ------------------------------------------------
 
             with col_admin2:
 
@@ -1164,9 +1298,9 @@ def mostra_ticket(ticket):
                     use_container_width=True
                 )
 
-            # ====================================================
-            # ELIMINAZIONE PROTETTA
-            # ====================================================
+            # ------------------------------------------------
+            # ELIMINAZIONE
+            # ------------------------------------------------
 
             with col_admin3:
 
@@ -1181,7 +1315,7 @@ def mostra_ticket(ticket):
 
                     st.caption(
                         "Verranno eliminati il ticket, "
-                        "tutti i messaggi e tutti gli allegati."
+                        "l'intervento e tutti gli allegati."
                     )
 
                     conferma_eliminazione = st.text_input(
@@ -1218,7 +1352,7 @@ def mostra_ticket(ticket):
                             else:
 
                                 st.error(
-                                    f"❌ Errore durante l'eliminazione: {messaggio}"
+                                    f"❌ Errore: {messaggio}"
                                 )
 
 
@@ -1245,7 +1379,6 @@ def genera_pdf(ticket):
     )
 
     elementi.append(titolo)
-
     elementi.append(Spacer(1, 20))
 
     dati = [
@@ -1253,7 +1386,8 @@ def genera_pdf(ticket):
         ["Categoria", ticket.get("categoria", "")],
         ["Priorità", ticket.get("priorita", "")],
         ["Stato", ticket.get("stato", "")],
-        ["Creato da", ticket.get("creato_da", "")]
+        ["Creato da", ticket.get("creato_da", "")],
+        ["Assegnato a", ticket.get("assegnato_a", "")]
     ]
 
     tabella = Table(
@@ -1272,12 +1406,11 @@ def genera_pdf(ticket):
     )
 
     elementi.append(tabella)
-
     elementi.append(Spacer(1, 20))
 
     elementi.append(
         Paragraph(
-            "Descrizione",
+            "Problema segnalato",
             styles["Heading2"]
         )
     )
@@ -1291,75 +1424,109 @@ def genera_pdf(ticket):
 
     elementi.append(Spacer(1, 20))
 
-    # --------------------------------------------------------
-    # MESSAGGI NEL PDF
-    # --------------------------------------------------------
+    # ========================================================
+    # INTERVENTO TECNICO
+    # ========================================================
 
-    messaggi = get_messaggi(ticket["id"])
+    intervento = get_intervento(ticket["id"])
 
-    if messaggi:
+    if intervento:
 
         elementi.append(
             Paragraph(
-                "Conversazione",
+                "Intervento tecnico",
                 styles["Heading2"]
             )
         )
 
-        for messaggio in messaggi:
-
-            testo = (
-                f"<b>{messaggio.get('autore', '')}</b> "
-                f"({format_data(messaggio.get('data_messaggio'))})"
-                f"<br/>{messaggio.get('messaggio', '')}"
+        elementi.append(
+            Paragraph(
+                f"<b>Tecnico:</b> {intervento.get('tecnico', '')}",
+                styles["BodyText"]
             )
+        )
 
-            elementi.append(
-                Paragraph(
-                    testo,
-                    styles["BodyText"]
-                )
+        elementi.append(
+            Paragraph(
+                f"<b>Data intervento:</b> "
+                f"{format_data(intervento.get('data_intervento'))}",
+                styles["BodyText"]
             )
+        )
 
-            elementi.append(
-                Spacer(1, 10)
+        elementi.append(
+            Paragraph(
+                f"<b>Stato:</b> {intervento.get('stato', '')}",
+                styles["BodyText"]
             )
+        )
 
-    # --------------------------------------------------------
-    # FOTO ALLEGATE NEL PDF
-    # --------------------------------------------------------
+        elementi.append(Spacer(1, 10))
+
+        elementi.append(
+            Paragraph(
+                intervento.get("descrizione", ""),
+                styles["BodyText"]
+            )
+        )
+
+        elementi.append(Spacer(1, 20))
+
+    # ========================================================
+    # FOTO ALLEGATE
+    # ========================================================
+
     allegati = get_allegati(ticket["id"])
     immagini_aggiunte = False
 
     for allegato in allegati:
+
         tipo_file = allegato.get("tipo_file", "")
         nome_file = allegato.get("nome_file", "")
         percorso_file = allegato.get("percorso_file", "")
 
         if tipo_file.startswith("image/") and percorso_file:
+
             contenuto = scarica_allegato(percorso_file)
 
             if contenuto:
+
                 if not immagini_aggiunte:
-                    elementi.append(Paragraph("Foto allegate", styles["Heading2"]))
+
+                    elementi.append(
+                        Paragraph(
+                            "Foto e allegati",
+                            styles["Heading2"]
+                        )
+                    )
+
                     elementi.append(Spacer(1, 10))
                     immagini_aggiunte = True
 
                 try:
+
                     immagine_buffer = BytesIO(contenuto)
                     image_reader = ImageReader(immagine_buffer)
                     larghezza, altezza = image_reader.getSize()
 
                     max_larghezza = 500
                     max_altezza = 600
+
                     rapporto = min(
                         max_larghezza / larghezza,
                         max_altezza / altezza,
                         1
                     )
 
-                    elementi.append(Paragraph(nome_file, styles["BodyText"]))
+                    elementi.append(
+                        Paragraph(
+                            nome_file,
+                            styles["BodyText"]
+                        )
+                    )
+
                     elementi.append(Spacer(1, 5))
+
                     elementi.append(
                         RLImage(
                             BytesIO(contenuto),
@@ -1367,9 +1534,11 @@ def genera_pdf(ticket):
                             height=altezza * rapporto
                         )
                     )
+
                     elementi.append(Spacer(1, 15))
 
                 except Exception as e:
+
                     elementi.append(
                         Paragraph(
                             f"Impossibile inserire l'immagine {nome_file}: {e}",
