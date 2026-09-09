@@ -207,6 +207,35 @@ def get_ticket(ticket_id):
         return None
 
 
+def get_tecnici_attivi():
+    """Restituisce gli username dei tecnici attivi."""
+
+    try:
+        risposta = (
+            supabase
+            .table("utenti")
+            .select("*")
+            .order("username")
+            .execute()
+        )
+
+        utenti = risposta.data or []
+
+        tecnici = [
+            utente.get("username", "")
+            for utente in utenti
+            if utente.get("username")
+            and utente.get("attivo", True) is not False
+            and str(utente.get("ruolo", "")).strip().lower() == "tecnico"
+        ]
+
+        return tecnici
+
+    except Exception as e:
+        st.error(f"Errore caricamento tecnici: {e}")
+        return []
+
+
 # ============================================================
 # GESTIONE CATEGORIE
 # ============================================================
@@ -556,6 +585,8 @@ def pagina_nuovo_ticket():
     # FORM NUOVO TICKET
     # ========================================================
 
+    tecnici_attivi = get_tecnici_attivi()
+
     with st.form("nuovo_ticket_form"):
 
         titolo = st.text_input("Titolo del problema")
@@ -595,6 +626,26 @@ def pagina_nuovo_ticket():
                     "Alta",
                     "Urgente"
                 ]
+            )
+
+        # ====================================================
+        # ASSEGNAZIONE TICKET
+        # ====================================================
+
+        if tecnici_attivi:
+
+            assegnato_a = st.selectbox(
+                "👷 Assegna a",
+                tecnici_attivi,
+                help="Seleziona il tecnico responsabile del ticket."
+            )
+
+        else:
+
+            assegnato_a = None
+
+            st.warning(
+                "⚠️ Non ci sono tecnici attivi disponibili per l'assegnazione."
             )
 
         st.divider()
@@ -648,6 +699,12 @@ def pagina_nuovo_ticket():
             st.warning("Inserisci una descrizione.")
             return
 
+        if not assegnato_a:
+            st.warning(
+                "Seleziona un tecnico a cui assegnare il ticket."
+            )
+            return
+
         try:
 
             dati_ticket = {
@@ -655,6 +712,7 @@ def pagina_nuovo_ticket():
                 "descrizione": descrizione,
                 "categoria": categoria,
                 "priorita": priorita,
+                "assegnato_a": assegnato_a,
                 "stato": "Aperto",
                 "creato_da": st.session_state.username
             }
