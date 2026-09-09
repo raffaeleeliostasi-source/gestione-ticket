@@ -892,6 +892,11 @@ def mostra_ticket(ticket):
             f"**Creato da:** {ticket.get('creato_da', '')}"
         )
 
+        if ticket.get("assegnato_a"):
+            st.write(
+                f"**👷 Assegnato a:** {ticket.get('assegnato_a', '')}"
+            )
+
         st.write("### 📝 Descrizione")
 
         st.write(ticket.get("descrizione", ""))
@@ -1007,6 +1012,90 @@ def mostra_ticket(ticket):
             st.info("Nessun allegato.")
 
         st.divider()
+
+        # ====================================================
+        # GESTIONE STATO - TECNICO ASSEGNATO
+        # ====================================================
+
+        utente_corrente = st.session_state.username
+        tecnico_assegnato = ticket.get("assegnato_a", "")
+
+        if (
+            not is_admin()
+            and tecnico_assegnato == utente_corrente
+        ):
+
+            st.subheader("🔧 Gestione Ticket")
+
+            stato_corrente = ticket.get("stato", "Aperto")
+
+            # Un ticket risolto o chiuso non può essere riaperto dal tecnico.
+            if stato_corrente in ["Risolto", "Chiuso"]:
+
+                st.success(
+                    f"🔒 Ticket {stato_corrente.lower()}: "
+                    "non puoi più modificarne lo stato."
+                )
+
+            else:
+
+                stati_tecnico = [
+                    "Aperto",
+                    "In lavorazione",
+                    "Risolto"
+                ]
+
+                indice_stato = (
+                    stati_tecnico.index(stato_corrente)
+                    if stato_corrente in stati_tecnico
+                    else 0
+                )
+
+                nuovo_stato = st.selectbox(
+                    "Nuovo stato",
+                    stati_tecnico,
+                    index=indice_stato,
+                    key=f"stato_tecnico_{ticket_id}"
+                )
+
+                if st.button(
+                    "💾 Aggiorna stato",
+                    key=f"aggiorna_stato_{ticket_id}",
+                    use_container_width=True
+                ):
+
+                    if nuovo_stato == stato_corrente:
+
+                        st.info("ℹ️ Lo stato non è cambiato.")
+
+                    else:
+
+                        try:
+
+                            (
+                                supabase
+                                .table("tickets")
+                                .update({
+                                    "stato": nuovo_stato
+                                })
+                                .eq("id", ticket_id)
+                                .eq("assegnato_a", utente_corrente)
+                                .execute()
+                            )
+
+                            st.success(
+                                f"✅ Stato aggiornato: {nuovo_stato}"
+                            )
+
+                            st.rerun()
+
+                        except Exception as e:
+
+                            st.error(
+                                f"❌ Errore aggiornamento stato: {e}"
+                            )
+
+            st.divider()
 
         # ====================================================
         # AZIONI AMMINISTRATORE
