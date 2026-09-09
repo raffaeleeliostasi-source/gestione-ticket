@@ -14,6 +14,10 @@ from reportlab.platypus import (
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
+import hashlib
+import hmac
+import secrets
+import re
 
 
 # ============================================================
@@ -68,7 +72,92 @@ if "pagina" not in st.session_state:
 # ============================================================
 
 def is_admin():
-    return st.session_state.get("ruolo", "") == "amministratore"
+    ruolo = st.session_state.get("ruolo", "").strip().lower()
+    return ruolo == "amministratore"
+
+
+# ============================================================
+# SICUREZZA PASSWORD
+# ============================================================
+
+def genera_hash_password(password):
+    """Genera un hash PBKDF2-HMAC-SHA256 con salt casuale."""
+    salt = secrets.token_bytes(16)
+
+    password_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        200_000
+    )
+
+    return f"{salt.hex()}${password_hash.hex()}"
+
+
+def verifica_password(password, password_salvata):
+    """
+    Verifica la password.
+    Supporta temporaneamente anche le vecchie password in chiaro
+    per consentire la migrazione automatica al primo accesso.
+    """
+    if not password_salvata:
+        return False
+
+    if "$" in password_salvata:
+        try:
+            salt_hex, hash_salvato = password_salvata.split("$", 1)
+            salt = bytes.fromhex(salt_hex)
+
+            nuovo_hash = hashlib.pbkdf2_hmac(
+                "sha256",
+                password.encode("utf-8"),
+                salt,
+                200_000
+            ).hex()
+
+            return hmac.compare_digest(nuovo_hash, hash_salvato)
+
+        except Exception:
+            return False
+
+    # Compatibilità temporanea con password precedenti in chiaro
+    return hmac.compare_digest(password, password_salvata)
+
+
+def password_da_migrare(password_salvata):
+    return bool(password_salvata and "$" not in password_salvata)
+
+
+def valida_password(password):
+    """
+    Regole:
+    - almeno 8 caratteri
+    - almeno una maiuscola
+    - almeno una minuscola
+    - almeno un numero
+    """
+    errori = []
+
+    if len(password) < 8:
+        errori.append("Almeno 8 caratteri.")
+
+    if not re.search(r"[A-Z]", password):
+        errori.append("Almeno una lettera maiuscola.")
+
+    if not re.search(r"[a-z]", password):
+        errori.append("Almeno una lettera minuscola.")
+
+    if not re.search(r"\d", password):
+        errori.append("Almeno un numero.")
+
+    return errori
+
+
+def mostra_regole_password():
+    st.caption(
+        "La password deve contenere almeno 8 caratteri, "
+        "una maiuscola, una minuscola e un numero."
+    )
 
 
 def format_data(data):
@@ -161,12 +250,12 @@ def get_allegati(ticket_id):
 def pagina_login():
 
     st.title("🎫 Gestione Ticket")
-
     st.write("Accedi al sistema")
 
     with st.form("form_login"):
 
         username = st.text_input("Username")
+
         password = st.text_input(
             "Password",
             type="password"
@@ -179,35 +268,61 @@ def pagina_login():
 
     if login:
 
+        username = username.strip()
+
         if not username or not password:
             st.warning("Inserisci username e password.")
             return
 
         try:
 
+            # Cerchiamo l'utente, senza confrontare la password nel database.
             risposta = (
                 supabase
                 .table("utenti")
                 .select("*")
                 .eq("username", username)
-                .eq("password", password)
                 .execute()
             )
 
-            if risposta.data:
-
-                utente = risposta.data[0]
-
-                st.session_state.logged_in = True
-                st.session_state.username = utente["username"]
-                st.session_state.ruolo = utente["ruolo"]
-
-                st.success("Login effettuato!")
-
-                st.rerun()
-
-            else:
+            if not risposta.data:
                 st.error("❌ Username o password non corretti.")
+                return
+
+            utente = risposta.data[0]
+
+            # Se la colonna attivo è presente, impedisce il login
+            # agli account disattivati. Per i vecchi record senza colonna
+            # viene considerato attivo per compatibilità.
+            if utente.get("attivo", True) is False:
+                st.error("⛔ Questo account è stato disattivato.")
+                return
+
+            password_salvata = utente.get("password", "")
+
+            if not verifica_password(password, password_salvata):
+                st.error("❌ Username o password non corretti.")
+                return
+
+            # Migrazione automatica delle vecchie password in chiaro.
+            if password_da_migrare(password_salvata):
+
+                nuovo_hash = genera_hash_password(password)
+
+                (
+                    supabase
+                    .table("utenti")
+                    .update({"password": nuovo_hash})
+                    .eq("id", utente["id"])
+                    .execute()
+                )
+
+            st.session_state.logged_in = True
+            st.session_state.username = utente["username"]
+            st.session_state.ruolo = utente.get("ruolo", "")
+
+            st.success("✅ Login effettuato!")
+            st.rerun()
 
         except Exception as e:
             st.error(f"Errore login: {e}")
@@ -868,32 +983,16 @@ def pagina_archivio():
 
 
 # ============================================================
-# AREA AMMINISTRATORE
+# CAMBIO PASSWORD PERSONALE
 # ============================================================
 
-def pagina_amministrazione():
+def pagina_password():
 
-    if not is_admin():
+    st.title("🔐 La mia Password")
 
-        st.error(
-            "⛔ Accesso riservato all'amministratore."
-        )
+    mostra_regole_password()
 
-        return
-
-    st.title("👨‍💼 Amministrazione")
-
-    st.success(
-        f"Accesso amministratore: {st.session_state.username}"
-    )
-
-    # ============================================================
-    # CAMBIO PASSWORD
-    # ============================================================
-
-    st.subheader("🔐 Cambia Password")
-
-    with st.form("form_cambio_password"):
+    with st.form("form_cambio_password_personale"):
 
         password_attuale = st.text_input(
             "Password attuale",
@@ -910,77 +1009,29 @@ def pagina_amministrazione():
             type="password"
         )
 
-        cambia_password = st.form_submit_button(
-            "🔒 Cambia Password",
+        salva = st.form_submit_button(
+            "🔒 Salva nuova password",
             use_container_width=True
         )
 
-    if cambia_password:
+    if not salva:
+        return
 
-        if not password_attuale or not nuova_password or not conferma_password:
+    if not password_attuale or not nuova_password or not conferma_password:
+        st.warning("⚠️ Compila tutti i campi.")
+        return
 
-            st.warning("⚠️ Compila tutti i campi.")
+    if nuova_password != conferma_password:
+        st.error("❌ Le nuove password non coincidono.")
+        return
 
-        elif nuova_password != conferma_password:
+    errori = valida_password(nuova_password)
 
-            st.error("❌ Le nuove password non coincidono.")
-
-        elif len(nuova_password) < 6:
-
-            st.error(
-                "❌ La nuova password deve contenere almeno 6 caratteri."
-            )
-
-        else:
-
-            try:
-
-                # Verifica della password attuale
-                risposta = (
-                    supabase
-                    .table("utenti")
-                    .select("id, username")
-                    .eq("username", st.session_state.username)
-                    .eq("password", password_attuale)
-                    .execute()
-                )
-
-                if not risposta.data:
-
-                    st.error("❌ La password attuale non è corretta.")
-
-                else:
-
-                    (
-                        supabase
-                        .table("utenti")
-                        .update({
-                            "password": nuova_password
-                        })
-                        .eq(
-                            "username",
-                            st.session_state.username
-                        )
-                        .execute()
-                    )
-
-                    st.success(
-                        "✅ Password modificata correttamente!"
-                    )
-
-            except Exception as e:
-
-                st.error(
-                    f"Errore durante la modifica della password: {e}"
-                )
-
-    st.divider()
-
-    # ============================================================
-    # UTENTI
-    # ============================================================
-
-    st.subheader("👥 Utenti")
+    if errori:
+        st.error("❌ La nuova password non soddisfa i requisiti:")
+        for errore in errori:
+            st.write(f"• {errore}")
+        return
 
     try:
 
@@ -988,35 +1039,371 @@ def pagina_amministrazione():
             supabase
             .table("utenti")
             .select("*")
+            .eq("username", st.session_state.username)
+            .execute()
+        )
+
+        if not risposta.data:
+            st.error("❌ Utente non trovato.")
+            return
+
+        utente = risposta.data[0]
+
+        if not verifica_password(
+            password_attuale,
+            utente.get("password", "")
+        ):
+            st.error("❌ La password attuale non è corretta.")
+            return
+
+        if hmac.compare_digest(password_attuale, nuova_password):
+            st.warning("⚠️ La nuova password deve essere diversa da quella attuale.")
+            return
+
+        nuovo_hash = genera_hash_password(nuova_password)
+
+        (
+            supabase
+            .table("utenti")
+            .update({"password": nuovo_hash})
+            .eq("id", utente["id"])
+            .execute()
+        )
+
+        st.success("✅ Password modificata correttamente!")
+
+    except Exception as e:
+        st.error(f"Errore durante il cambio password: {e}")
+
+
+# ============================================================
+# GESTIONE UTENTI AMMINISTRATORE
+# ============================================================
+
+def sezione_gestione_utenti():
+
+    st.subheader("👥 Gestione Utenti")
+
+    # --------------------------------------------------------
+    # CREAZIONE NUOVO UTENTE
+    # --------------------------------------------------------
+
+    with st.expander("➕ Crea nuovo utente", expanded=False):
+
+        with st.form("form_crea_utente"):
+
+            nuovo_username = st.text_input("Username nuovo utente")
+
+            nuova_password = st.text_input(
+                "Password iniziale",
+                type="password"
+            )
+
+            ruolo = st.selectbox(
+                "Ruolo",
+                ["amministratore", "tecnico"]
+            )
+
+            mostra_regole_password()
+
+            crea_utente = st.form_submit_button(
+                "➕ Crea utente",
+                use_container_width=True
+            )
+
+        if crea_utente:
+
+            nuovo_username = nuovo_username.strip()
+
+            if not nuovo_username:
+                st.warning("Inserisci uno username.")
+                return
+
+            if " " in nuovo_username:
+                st.warning("Lo username non può contenere spazi.")
+                return
+
+            errori = valida_password(nuova_password)
+
+            if errori:
+                st.error("❌ Password non valida:")
+                for errore in errori:
+                    st.write(f"• {errore}")
+                return
+
+            try:
+
+                controllo = (
+                    supabase
+                    .table("utenti")
+                    .select("id")
+                    .eq("username", nuovo_username)
+                    .execute()
+                )
+
+                if controllo.data:
+                    st.error("❌ Username già esistente.")
+                    return
+
+                password_hash = genera_hash_password(nuova_password)
+
+                (
+                    supabase
+                    .table("utenti")
+                    .insert({
+                        "username": nuovo_username,
+                        "password": password_hash,
+                        "ruolo": ruolo,
+                        "attivo": True
+                    })
+                    .execute()
+                )
+
+                st.success("✅ Utente creato correttamente!")
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Errore creazione utente: {e}")
+
+    st.divider()
+    st.subheader("📋 Utenti registrati")
+
+    try:
+
+        risposta = (
+            supabase
+            .table("utenti")
+            .select("*")
+            .order("username")
             .execute()
         )
 
         utenti = risposta.data or []
 
-        if utenti:
-
-            # Non mostrare mai la password nella tabella
-            utenti_sicuri = [
-                {
-                    chiave: valore
-                    for chiave, valore in utente.items()
-                    if chiave != "password"
-                }
-                for utente in utenti
-            ]
-
-            st.dataframe(
-                utenti_sicuri,
-                use_container_width=True
-            )
-
-        else:
-
+        if not utenti:
             st.info("Nessun utente trovato.")
+            return
+
+        for utente in utenti:
+
+            user_id = utente.get("id")
+            username = utente.get("username", "")
+            ruolo = utente.get("ruolo", "")
+            attivo = utente.get("attivo", True)
+
+            stato = "🟢 Attivo" if attivo else "🔴 Disattivato"
+
+            with st.expander(
+                f"👤 {username} | {ruolo} | {stato}"
+            ):
+
+                col1, col2, col3 = st.columns(3)
+
+                # ------------------------------------------------
+                # RESET PASSWORD
+                # ------------------------------------------------
+
+                with col1:
+
+                    st.write("### 🔑 Reset Password")
+
+                    nuova_pw_admin = st.text_input(
+                        "Nuova password",
+                        type="password",
+                        key=f"reset_pw_{user_id}"
+                    )
+
+                    if st.button(
+                        "🔑 Reimposta",
+                        key=f"reset_btn_{user_id}",
+                        use_container_width=True
+                    ):
+
+                        if not nuova_pw_admin:
+                            st.warning("Inserisci una nuova password.")
+
+                        else:
+
+                            errori = valida_password(nuova_pw_admin)
+
+                            if errori:
+                                st.error("❌ Password non valida:")
+                                for errore in errori:
+                                    st.write(f"• {errore}")
+
+                            else:
+
+                                try:
+
+                                    nuovo_hash = genera_hash_password(
+                                        nuova_pw_admin
+                                    )
+
+                                    (
+                                        supabase
+                                        .table("utenti")
+                                        .update({
+                                            "password": nuovo_hash
+                                        })
+                                        .eq("id", user_id)
+                                        .execute()
+                                    )
+
+                                    st.success(
+                                        "✅ Password reimpostata correttamente!"
+                                    )
+
+                                except Exception as e:
+                                    st.error(f"Errore reset password: {e}")
+
+                # ------------------------------------------------
+                # MODIFICA RUOLO
+                # ------------------------------------------------
+
+                with col2:
+
+                    st.write("### 👔 Ruolo")
+
+                    ruoli = ["amministratore", "tecnico"]
+
+                    indice_ruolo = (
+                        ruoli.index(ruolo)
+                        if ruolo in ruoli
+                        else 1
+                    )
+
+                    nuovo_ruolo = st.selectbox(
+                        "Seleziona ruolo",
+                        ruoli,
+                        index=indice_ruolo,
+                        key=f"role_{user_id}"
+                    )
+
+                    if st.button(
+                        "💾 Salva ruolo",
+                        key=f"role_btn_{user_id}",
+                        use_container_width=True
+                    ):
+
+                        # Evita che l'amministratore corrente si tolga
+                        # da solo i privilegi amministrativi.
+                        if (
+                            username == st.session_state.username
+                            and nuovo_ruolo != "amministratore"
+                        ):
+                            st.warning(
+                                "Non puoi rimuovere il tuo stesso ruolo amministratore."
+                            )
+
+                        else:
+
+                            try:
+
+                                (
+                                    supabase
+                                    .table("utenti")
+                                    .update({
+                                        "ruolo": nuovo_ruolo
+                                    })
+                                    .eq("id", user_id)
+                                    .execute()
+                                )
+
+                                st.success("✅ Ruolo aggiornato!")
+
+                                if username == st.session_state.username:
+                                    st.session_state.ruolo = nuovo_ruolo
+
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"Errore aggiornamento ruolo: {e}")
+
+                # ------------------------------------------------
+                # ATTIVA / DISATTIVA ACCOUNT
+                # ------------------------------------------------
+
+                with col3:
+
+                    st.write("### 🚫 Account")
+
+                    if username == st.session_state.username:
+
+                        st.info("Non puoi disattivare il tuo account.")
+
+                    else:
+
+                        if attivo:
+
+                            if st.button(
+                                "🚫 Disattiva",
+                                key=f"disable_{user_id}",
+                                use_container_width=True
+                            ):
+
+                                try:
+
+                                    (
+                                        supabase
+                                        .table("utenti")
+                                        .update({"attivo": False})
+                                        .eq("id", user_id)
+                                        .execute()
+                                    )
+
+                                    st.warning("Account disattivato.")
+                                    st.rerun()
+
+                                except Exception as e:
+                                    st.error(f"Errore disattivazione account: {e}")
+
+                        else:
+
+                            if st.button(
+                                "✅ Riattiva",
+                                key=f"enable_{user_id}",
+                                use_container_width=True
+                            ):
+
+                                try:
+
+                                    (
+                                        supabase
+                                        .table("utenti")
+                                        .update({"attivo": True})
+                                        .eq("id", user_id)
+                                        .execute()
+                                    )
+
+                                    st.success("Account riattivato.")
+                                    st.rerun()
+
+                                except Exception as e:
+                                    st.error(f"Errore riattivazione account: {e}")
 
     except Exception as e:
-
         st.error(f"Errore caricamento utenti: {e}")
+
+
+# ============================================================
+# AREA AMMINISTRATORE
+# ============================================================
+
+def pagina_amministrazione():
+
+    if not is_admin():
+        st.error("⛔ Accesso riservato all'amministratore.")
+        return
+
+    st.title("👨‍💼 Amministrazione")
+
+    st.success(
+        f"Accesso amministratore: {st.session_state.username}"
+    )
+
+    sezione_gestione_utenti()
+
+
 # ============================================================
 # MENU PRINCIPALE
 # ============================================================
@@ -1061,6 +1448,12 @@ def applicazione():
         ):
             st.session_state.pagina = "Archivio"
 
+        if st.button(
+            "🔐 La mia Password",
+            use_container_width=True
+        ):
+            st.session_state.pagina = "Password"
+
         if is_admin():
 
             if st.button(
@@ -1088,23 +1481,21 @@ def applicazione():
     # --------------------------------------------------------
 
     if st.session_state.pagina == "Dashboard":
-
         pagina_dashboard()
 
     elif st.session_state.pagina == "Nuovo Ticket":
-
         pagina_nuovo_ticket()
 
     elif st.session_state.pagina == "Ticket":
-
         pagina_ticket()
 
     elif st.session_state.pagina == "Archivio":
-
         pagina_archivio()
 
-    elif st.session_state.pagina == "Amministrazione":
+    elif st.session_state.pagina == "Password":
+        pagina_password()
 
+    elif st.session_state.pagina == "Amministrazione":
         pagina_amministrazione()
 
 
