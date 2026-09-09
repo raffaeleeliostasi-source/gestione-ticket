@@ -462,7 +462,15 @@ def pagina_nuovo_ticket():
 
             categorie_attive = get_nomi_categorie_attive()
 
-            if not categorie_attive:
+            # Solo l'amministratore può creare nuove categorie
+            opzione_nuova_categoria = "➕ Nuova categoria..."
+
+            if is_admin():
+                opzioni_categoria = categorie_attive + [opzione_nuova_categoria]
+            else:
+                opzioni_categoria = categorie_attive
+
+            if not opzioni_categoria:
 
                 st.warning(
                     "⚠️ Non sono disponibili categorie attive. "
@@ -470,13 +478,30 @@ def pagina_nuovo_ticket():
                 )
 
                 categoria = None
+                nuova_categoria = ""
 
             else:
 
                 categoria = st.selectbox(
                     "Categoria",
-                    categorie_attive
+                    opzioni_categoria
                 )
+
+                nuova_categoria = ""
+
+                # Se l'amministratore sceglie l'ultima voce,
+                # può creare la categoria direttamente dal ticket.
+                if is_admin() and categoria == opzione_nuova_categoria:
+
+                    nuova_categoria = st.text_input(
+                        "➕ Nome nuova categoria",
+                        placeholder="Esempio: Porte e serrature"
+                    )
+
+                    st.caption(
+                        "La nuova categoria verrà aggiunta automaticamente "
+                        "e utilizzata per questo ticket."
+                    )
 
         with col2:
 
@@ -527,6 +552,32 @@ def pagina_nuovo_ticket():
         if not categoria:
             st.warning("Seleziona una categoria valida.")
             return
+
+        # Gestione della nuova categoria creata direttamente dal ticket.
+        if categoria == "➕ Nuova categoria...":
+
+            if not nuova_categoria.strip():
+                st.warning("Inserisci il nome della nuova categoria.")
+                return
+
+            successo_categoria, messaggio_categoria = aggiungi_categoria(
+                nuova_categoria
+            )
+
+            if not successo_categoria:
+
+                # Se la categoria esiste già, permetti comunque di usarla
+                # se è presente tra quelle attive.
+                categorie_attuali = get_nomi_categorie_attive()
+
+                if nuova_categoria.strip() in categorie_attuali:
+                    categoria = nuova_categoria.strip()
+                else:
+                    st.error(f"❌ {messaggio_categoria}")
+                    return
+
+            else:
+                categoria = nuova_categoria.strip()
 
         if not descrizione.strip():
             st.warning("Inserisci una descrizione.")
