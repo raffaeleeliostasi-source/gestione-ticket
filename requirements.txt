@@ -7,4 +7,4 @@ google-api-python-client
 supabase
 reportlab
 Pillow
-streamlit-drawable-canvas
+streamlit-drawable-canvas[image]>=0.10.0
