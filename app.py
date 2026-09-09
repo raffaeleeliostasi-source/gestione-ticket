@@ -461,6 +461,15 @@ def pagina_nuovo_ticket():
     else:
         opzioni_categoria = categorie_attive
 
+    # Se una nuova categoria è stata appena salvata, impostiamo
+    # la selezione PRIMA di creare il widget Streamlit.
+    categoria_da_selezionare = st.session_state.pop(
+        "categoria_da_selezionare", None
+    )
+
+    if categoria_da_selezionare in opzioni_categoria:
+        st.session_state["categoria_nuovo_ticket"] = categoria_da_selezionare
+
     if not opzioni_categoria:
 
         st.warning(
@@ -519,13 +528,11 @@ def pagina_nuovo_ticket():
                             f"✅ Categoria '{nuova_categoria.strip()}' aggiunta correttamente!"
                         )
 
+                        # Non modifichiamo direttamente la chiave del selectbox
+                        # dopo che il widget è stato creato: Streamlit lo vieta.
                         st.session_state[
-                            "categoria_nuovo_ticket"
+                            "categoria_da_selezionare"
                         ] = nuova_categoria.strip()
-
-                        st.session_state[
-                            "nome_nuova_categoria_ticket"
-                        ] = ""
 
                         st.rerun()
 
@@ -536,12 +543,8 @@ def pagina_nuovo_ticket():
                         if nuova_categoria.strip() in categorie_aggiornate:
 
                             st.session_state[
-                                "categoria_nuovo_ticket"
+                                "categoria_da_selezionare"
                             ] = nuova_categoria.strip()
-
-                            st.info(
-                                "ℹ️ La categoria esiste già ed è stata selezionata."
-                            )
 
                             st.rerun()
 
