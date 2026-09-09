@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_drawable_canvas import st_canvas
 from supabase import create_client, Client
 from datetime import datetime
 from io import BytesIO
@@ -413,7 +414,8 @@ def salva_intervento_tecnico(
     ticket_id,
     tecnico,
     descrizione_intervento,
-    nuovo_stato
+    nuovo_stato,
+    firma_path=None
 ):
     """
     Salva un unico intervento per ticket.
@@ -426,7 +428,8 @@ def salva_intervento_tecnico(
             "tecnico": tecnico,
             "descrizione": descrizione_intervento.strip(),
             "stato": nuovo_stato,
-            "data_intervento": datetime.now().isoformat()
+            "data_intervento": datetime.now().isoformat(),
+            "firma_path": firma_path
         }
 
         intervento_esistente = get_intervento(ticket_id)
@@ -466,6 +469,52 @@ def salva_intervento_tecnico(
 
     except Exception as e:
         return False, str(e)
+
+
+# ============================================================
+# FIRMA GRAFICA DEL TECNICO
+# ============================================================
+
+def salva_firma_intervento(ticket_id, firma_png, tecnico):
+    """Salva la firma PNG del tecnico nello Storage Supabase."""
+
+    try:
+        nome_file = (
+            f"firma_ticket_{ticket_id}_{tecnico}_"
+            f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        )
+
+        percorso = f"firme/{ticket_id}/{nome_file}"
+
+        # Il bucket utilizzato è lo stesso degli allegati dell'app.
+        supabase.storage.from_("allegati").upload(
+            percorso,
+            firma_png,
+            {
+                "content-type": "image/png",
+                "upsert": "true"
+            }
+        )
+
+        return True, percorso
+
+    except Exception as e:
+        return False, str(e)
+
+
+def scarica_firma_intervento(percorso):
+    """Scarica la firma dal Supabase Storage."""
+
+    try:
+        return (
+            supabase
+            .storage
+            .from_("allegati")
+            .download(percorso)
+        )
+
+    except Exception:
+        return None
 
 
 # ============================================================
@@ -1034,6 +1083,20 @@ def mostra_ticket(ticket):
             st.write("#### 📝 Cosa è stato fatto")
             st.write(intervento.get("descrizione", ""))
 
+            firma_path = intervento.get("firma_path")
+
+            if firma_path:
+
+                firma_bytes = scarica_firma_intervento(firma_path)
+
+                if firma_bytes:
+
+                    st.write("#### ✍️ Firma del tecnico")
+                    st.image(
+                        firma_bytes,
+                        width=350
+                    )
+
         else:
 
             st.info("Nessun intervento tecnico ancora registrato.")
@@ -1128,6 +1191,26 @@ def mostra_ticket(ticket):
                     key=f"camera_intervento_{ticket_id}"
                 )
 
+                st.divider()
+
+                st.subheader("✍️ Firma del tecnico")
+
+                st.caption(
+                    "Disegna la tua firma nello spazio sottostante. "
+                    "La firma è obbligatoria quando imposti il ticket su Risolto."
+                )
+
+                firma_canvas = st_canvas(
+                    fill_color="rgba(255, 255, 255, 0)",
+                    stroke_width=2,
+                    stroke_color="#000000",
+                    background_color="#FFFFFF",
+                    height=180,
+                    width=500,
+                    drawing_mode="freedraw",
+                    key=f"firma_canvas_{ticket_id}"
+                )
+
                 if st.button(
                     "💾 Salva intervento",
                     key=f"salva_intervento_{ticket_id}",
@@ -1142,11 +1225,71 @@ def mostra_ticket(ticket):
 
                     else:
 
+                        firma_png = None
+                        firma_path = None
+
+                        # Verifica che il tecnico abbia effettivamente disegnato.
+                        if (
+                            firma_canvas.image_data is not None
+                            and firma_canvas.json_data is not None
+                            and firma_canvas.json_data.get("objects")
+                        ):
+
+                            from PIL import Image
+
+                            firma_immagine = Image.fromarray(
+                                firma_canvas.image_data.astype("uint8")
+                            )
+
+                            buffer_firma = BytesIO()
+                            firma_immagine.save(
+                                buffer_firma,
+                                format="PNG"
+                            )
+
+                            firma_png = buffer_firma.getvalue()
+
+                        # La firma è obbligatoria solo per la risoluzione finale.
+                        if nuovo_stato == "Risolto" and not firma_png:
+
+                            st.warning(
+                                "✍️ Per impostare il ticket su Risolto "
+                                "devi inserire la firma del tecnico."
+                            )
+                            return
+
+                        if firma_png:
+
+                            esito_firma, risultato_firma = (
+                                salva_firma_intervento(
+                                    ticket_id,
+                                    firma_png,
+                                    utente_corrente
+                                )
+                            )
+
+                            if not esito_firma:
+
+                                st.error(
+                                    f"❌ Errore salvataggio firma: "
+                                    f"{risultato_firma}"
+                                )
+                                return
+
+                            firma_path = risultato_firma
+
+                        # Se non viene ridisegnata una firma durante un
+                        # aggiornamento in lavorazione, conserva quella esistente.
+                        elif intervento and intervento.get("firma_path"):
+
+                            firma_path = intervento.get("firma_path")
+
                         successo, messaggio = salva_intervento_tecnico(
                             ticket_id,
                             utente_corrente,
                             descrizione_intervento,
-                            nuovo_stato
+                            nuovo_stato,
+                            firma_path
                         )
 
                         if successo:
@@ -1469,6 +1612,54 @@ def genera_pdf(ticket):
                 styles["BodyText"]
             )
         )
+
+        firma_path = intervento.get("firma_path")
+
+        if firma_path:
+
+            firma_bytes = scarica_firma_intervento(firma_path)
+
+            if firma_bytes:
+
+                try:
+
+                    elementi.append(Spacer(1, 15))
+
+                    elementi.append(
+                        Paragraph(
+                            "Firma del tecnico",
+                            styles["Heading3"]
+                        )
+                    )
+
+                    firma_reader = ImageReader(BytesIO(firma_bytes))
+                    larghezza, altezza = firma_reader.getSize()
+
+                    max_larghezza = 300
+                    max_altezza = 120
+
+                    rapporto = min(
+                        max_larghezza / larghezza,
+                        max_altezza / altezza,
+                        1
+                    )
+
+                    elementi.append(
+                        RLImage(
+                            BytesIO(firma_bytes),
+                            width=larghezza * rapporto,
+                            height=altezza * rapporto
+                        )
+                    )
+
+                except Exception as e:
+
+                    elementi.append(
+                        Paragraph(
+                            f"Firma non disponibile nel PDF: {e}",
+                            styles["BodyText"]
+                        )
+                    )
 
         elementi.append(Spacer(1, 20))
 
