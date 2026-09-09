@@ -207,6 +207,117 @@ def get_ticket(ticket_id):
         return None
 
 
+# ============================================================
+# GESTIONE CATEGORIE
+# ============================================================
+
+def get_categorie(solo_attive=True):
+    try:
+        query = (
+            supabase
+            .table("categorie")
+            .select("*")
+            .order("nome")
+        )
+
+        if solo_attive:
+            query = query.eq("attivo", True)
+
+        risposta = query.execute()
+        return risposta.data or []
+
+    except Exception as e:
+        st.error(f"Errore caricamento categorie: {e}")
+        return []
+
+
+def get_nomi_categorie_attive():
+    categorie = get_categorie(solo_attive=True)
+    return [categoria.get("nome", "") for categoria in categorie]
+
+
+def aggiungi_categoria(nome):
+    try:
+        nome = nome.strip()
+
+        if not nome:
+            return False, "Inserisci il nome della categoria."
+
+        (
+            supabase
+            .table("categorie")
+            .insert({
+                "nome": nome,
+                "attivo": True
+            })
+            .execute()
+        )
+
+        return True, "Categoria aggiunta correttamente."
+
+    except Exception as e:
+        messaggio = str(e)
+
+        if "duplicate" in messaggio.lower() or "unique" in messaggio.lower():
+            return False, "Esiste già una categoria con questo nome."
+
+        return False, f"Errore: {e}"
+
+
+def modifica_categoria(categoria_id, vecchio_nome, nuovo_nome):
+    try:
+        nuovo_nome = nuovo_nome.strip()
+
+        if not nuovo_nome:
+            return False, "Il nome della categoria non può essere vuoto."
+
+        if nuovo_nome == vecchio_nome:
+            return False, "Il nuovo nome è uguale a quello attuale."
+
+        (
+            supabase
+            .table("categorie")
+            .update({"nome": nuovo_nome})
+            .eq("id", categoria_id)
+            .execute()
+        )
+
+        # Mantiene coerenti anche i ticket già creati.
+        (
+            supabase
+            .table("tickets")
+            .update({"categoria": nuovo_nome})
+            .eq("categoria", vecchio_nome)
+            .execute()
+        )
+
+        return True, "Categoria modificata e ticket aggiornati."
+
+    except Exception as e:
+        messaggio = str(e)
+
+        if "duplicate" in messaggio.lower() or "unique" in messaggio.lower():
+            return False, "Esiste già una categoria con questo nome."
+
+        return False, f"Errore: {e}"
+
+
+def cambia_stato_categoria(categoria_id, attivo):
+    try:
+        (
+            supabase
+            .table("categorie")
+            .update({"attivo": attivo})
+            .eq("id", categoria_id)
+            .execute()
+        )
+
+        return True, "Stato categoria aggiornato."
+
+    except Exception as e:
+        return False, f"Errore: {e}"
+
+
 def get_messaggi(ticket_id):
     try:
         risposta = (
@@ -349,17 +460,23 @@ def pagina_nuovo_ticket():
 
         with col1:
 
-            categoria = st.selectbox(
-                "Categoria",
-                [
-                    "Generale",
-                    "Tecnico",
-                    "Software",
-                    "Hardware",
-                    "Rete",
-                    "Altro"
-                ]
-            )
+            categorie_attive = get_nomi_categorie_attive()
+
+            if not categorie_attive:
+
+                st.warning(
+                    "⚠️ Non sono disponibili categorie attive. "
+                    "Contatta l'amministratore."
+                )
+
+                categoria = None
+
+            else:
+
+                categoria = st.selectbox(
+                    "Categoria",
+                    categorie_attive
+                )
 
         with col2:
 
@@ -405,6 +522,10 @@ def pagina_nuovo_ticket():
 
         if not titolo.strip():
             st.warning("Inserisci il titolo del ticket.")
+            return
+
+        if not categoria:
+            st.warning("Seleziona una categoria valida.")
             return
 
         if not descrizione.strip():
@@ -1517,6 +1638,148 @@ def sezione_gestione_utenti():
 
 
 # ============================================================
+# GESTIONE CATEGORIE AMMINISTRATORE
+# ============================================================
+
+def sezione_gestione_categorie():
+
+    st.subheader("🏷️ Gestione Categorie")
+
+    st.info(
+        "Le categorie disattivate non saranno disponibili nei nuovi ticket, "
+        "ma resteranno visibili nello storico dei ticket già creati."
+    )
+
+    with st.expander("➕ Aggiungi nuova categoria", expanded=False):
+
+        with st.form("form_aggiungi_categoria"):
+
+            nuova_categoria = st.text_input(
+                "Nome nuova categoria",
+                placeholder="Esempio: Porte e serrature"
+            )
+
+            aggiungi = st.form_submit_button(
+                "➕ Aggiungi categoria",
+                use_container_width=True
+            )
+
+        if aggiungi:
+
+            successo, messaggio = aggiungi_categoria(nuova_categoria)
+
+            if successo:
+                st.success(f"✅ {messaggio}")
+                st.rerun()
+            else:
+                st.error(f"❌ {messaggio}")
+
+    st.divider()
+    st.subheader("📋 Categorie registrate")
+
+    categorie = get_categorie(solo_attive=False)
+
+    if not categorie:
+        st.warning("Nessuna categoria disponibile.")
+        return
+
+    for categoria in categorie:
+
+        categoria_id = categoria.get("id")
+        nome = categoria.get("nome", "")
+        attivo = categoria.get("attivo", True)
+
+        stato = "🟢 Attiva" if attivo else "🔴 Disattivata"
+
+        with st.expander(f"🏷️ {nome} | {stato}"):
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.write("### ✏️ Modifica")
+
+                nuovo_nome = st.text_input(
+                    "Nome categoria",
+                    value=nome,
+                    key=f"categoria_nome_{categoria_id}"
+                )
+
+                st.caption(
+                    "La modifica aggiornerà anche i ticket "
+                    "che utilizzano questa categoria."
+                )
+
+                if st.button(
+                    "💾 Salva modifica",
+                    key=f"salva_categoria_{categoria_id}",
+                    use_container_width=True
+                ):
+
+                    successo, messaggio = modifica_categoria(
+                        categoria_id,
+                        nome,
+                        nuovo_nome
+                    )
+
+                    if successo:
+                        st.success(f"✅ {messaggio}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {messaggio}")
+
+            with col2:
+
+                st.write("### 🚫 Stato")
+
+                if attivo:
+
+                    st.write(
+                        "La categoria è disponibile per i nuovi ticket."
+                    )
+
+                    if st.button(
+                        "🚫 Disattiva categoria",
+                        key=f"disattiva_categoria_{categoria_id}",
+                        use_container_width=True
+                    ):
+
+                        successo, messaggio = cambia_stato_categoria(
+                            categoria_id,
+                            False
+                        )
+
+                        if successo:
+                            st.warning("Categoria disattivata.")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {messaggio}")
+
+                else:
+
+                    st.write(
+                        "La categoria non è disponibile nei nuovi ticket."
+                    )
+
+                    if st.button(
+                        "✅ Riattiva categoria",
+                        key=f"riattiva_categoria_{categoria_id}",
+                        use_container_width=True
+                    ):
+
+                        successo, messaggio = cambia_stato_categoria(
+                            categoria_id,
+                            True
+                        )
+
+                        if successo:
+                            st.success("Categoria riattivata.")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {messaggio}")
+
+
+# ============================================================
 # AREA AMMINISTRATORE
 # ============================================================
 
@@ -1532,7 +1795,16 @@ def pagina_amministrazione():
         f"Accesso amministratore: {st.session_state.username}"
     )
 
-    sezione_gestione_utenti()
+    tab_utenti, tab_categorie = st.tabs([
+        "👥 Gestione Utenti",
+        "🏷️ Gestione Categorie"
+    ])
+
+    with tab_utenti:
+        sezione_gestione_utenti()
+
+    with tab_categorie:
+        sezione_gestione_categorie()
 
 
 # ============================================================
