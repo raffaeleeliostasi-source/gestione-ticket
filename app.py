@@ -1228,26 +1228,35 @@ def mostra_ticket(ticket):
                         firma_png = None
                         firma_path = None
 
-                        # Verifica che il tecnico abbia effettivamente disegnato.
+                        # Verifica prima se il tecnico ha effettivamente
+                        # disegnato qualcosa. NON accediamo a image_data finché
+                        # il canvas non contiene oggetti: su Streamlit Cloud,
+                        # con il canvas vuoto, image_data può generare RuntimeError.
+                        canvas_json = firma_canvas.json_data
+
                         if (
-                            firma_canvas.image_data is not None
-                            and firma_canvas.json_data is not None
-                            and firma_canvas.json_data.get("objects")
+                            canvas_json is not None
+                            and canvas_json.get("objects")
                         ):
 
                             from PIL import Image
 
-                            firma_immagine = Image.fromarray(
-                                firma_canvas.image_data.astype("uint8")
-                            )
+                            canvas_image = firma_canvas.image_data
 
-                            buffer_firma = BytesIO()
-                            firma_immagine.save(
-                                buffer_firma,
-                                format="PNG"
-                            )
+                            if canvas_image is not None:
 
-                            firma_png = buffer_firma.getvalue()
+                                firma_immagine = Image.fromarray(
+                                    canvas_image.astype("uint8")
+                                )
+
+                                buffer_firma = BytesIO()
+
+                                firma_immagine.save(
+                                    buffer_firma,
+                                    format="PNG"
+                                )
+
+                                firma_png = buffer_firma.getvalue()
 
                         # La firma è obbligatoria solo per la risoluzione finale.
                         if nuovo_stato == "Risolto" and not firma_png:
