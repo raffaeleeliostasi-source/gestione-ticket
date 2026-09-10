@@ -105,9 +105,24 @@ def mostra_ticket(ticket):
 def pagina_dashboard():
     st.title("🏠 Dashboard Ticket")
     
-    tickets = db.get_tickets()
-    if not tickets:
+    tutti_i_tickets = db.get_tickets()
+    if not tutti_i_tickets:
         st.info("Nessun ticket presente nel sistema.")
+        return
+
+    # Se l'utente è un Tecnico, filtra per mostrare i ticket assegnati a lui o creati da lui
+    if not is_admin():
+        utente_attuale = st.session_state.username.lower()
+        tickets = [
+            t for t in tutti_i_tickets 
+            if str(t.get("assegnato_a", "")).lower() == utente_attuale 
+            or str(t.get("creato_da", "")).lower() == utente_attuale
+        ]
+    else:
+        tickets = tutti_i_tickets
+
+    if not tickets:
+        st.info("Non ci sono ticket assegnati a te o creati da te al momento.")
         return
 
     # --- BARRA DI RICERCA E FILTRI ---
@@ -136,7 +151,7 @@ def pagina_dashboard():
 
     # --- METRICHE RAPIDE ---
     col1, col2, col3 = st.columns(3)
-    col1.metric("Totale Ticket Visualizzati", len(tickets_filtrati))
+    col1.metric("Totale Visualizzati", len(tickets_filtrati))
     col2.metric("Aperti / In corso", len([t for t in tickets_filtrati if t.get("stato") in ["Aperto", "In lavorazione"]]))
     col3.metric("Risolti / Chiusi", len([t for t in tickets_filtrati if t.get("stato") in ["Risolto", "Chiuso"]]))
 
