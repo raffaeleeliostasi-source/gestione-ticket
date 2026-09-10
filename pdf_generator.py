@@ -70,9 +70,9 @@ def genera_pdf(ticket):
     story.append(Paragraph(str(ticket.get("descrizione", "")), normal_style))
     story.append(Spacer(1, 12))
 
-    # --- FOTO / ALLEGATI (Query diretta alla tabella allegati) ---
+    # --- FOTO / ALLEGATI (Tabella corretta: ticket_allegati) ---
     try:
-        res_all = db.supabase.table("allegati").select("*").eq("ticket_id", tid).execute()
+        res_all = db.supabase.table("ticket_allegati").select("*").eq("ticket_id", tid).execute()
         allegati = res_all.data if res_all and res_all.data else []
     except Exception:
         allegati = []
@@ -80,7 +80,7 @@ def genera_pdf(ticket):
     if allegati:
         story.append(Paragraph("<b>Foto e Allegati:</b>", h2_style))
         for allegato in allegati:
-            file_path = allegato.get("file_path") or allegato.get("url") or allegato.get("path") or allegato.get("file")
+            file_path = allegato.get("percorso_file") or allegato.get("file_path") or allegato.get("url")
             if file_path:
                 try:
                     img_bytes = None
@@ -89,8 +89,8 @@ def genera_pdf(ticket):
                         if res.status_code == 200:
                             img_bytes = io.BytesIO(res.content)
                     elif isinstance(file_path, str):
-                        clean_path = file_path.replace("allegati/", "")
-                        data = db.supabase.storage.from_("allegati").download(clean_path)
+                        # Scarica dal bucket "allegati"
+                        data = db.supabase.storage.from_("allegati").download(file_path)
                         img_bytes = io.BytesIO(data)
 
                     if img_bytes:
@@ -99,10 +99,10 @@ def genera_pdf(ticket):
                 except Exception as e:
                     print(f"Errore caricamento allegato PDF: {e}")
 
-    # --- DETTAGLI INTERVENTO (Query diretta alla tabella interventi) ---
+    # --- DETTAGLI INTERVENTO (Tabella corretta: ticket_interventi) ---
     intervento = None
     try:
-        res_int = db.supabase.table("interventi").select("*").eq("ticket_id", tid).execute()
+        res_int = db.supabase.table("ticket_interventi").select("*").eq("ticket_id", tid).execute()
         if res_int and res_int.data:
             intervento = res_int.data[0]
     except Exception:
@@ -111,7 +111,7 @@ def genera_pdf(ticket):
     if intervento:
         story.append(Paragraph("<b>Dettagli Intervento Tecnico:</b>", h2_style))
         
-        desc_intervento = intervento.get("descrizione") or intervento.get("note") or "Nessuna nota registrata."
+        desc_intervento = intervento.get("descrizione") or "Nessuna nota registrata."
         tecnico_intervento = intervento.get("tecnico") or ticket.get("assegnato_a") or "N/D"
 
         story.append(Paragraph(f"<b>Eseguito da:</b> {tecnico_intervento}", normal_style))
@@ -119,8 +119,8 @@ def genera_pdf(ticket):
         story.append(Paragraph(f"<b>Descrizione lavoro:</b> {desc_intervento}", normal_style))
         story.append(Spacer(1, 12))
 
-        # --- FIRMA ---
-        firma_path = intervento.get("firma_path") or intervento.get("firma") or intervento.get("url_firma")
+        # --- FIRMA (Salvata nel bucket "allegati") ---
+        firma_path = intervento.get("firma_path")
         
         if firma_path:
             try:
@@ -130,8 +130,8 @@ def genera_pdf(ticket):
                     if res.status_code == 200:
                         img_bytes = io.BytesIO(res.content)
                 elif isinstance(firma_path, str):
-                    clean_firma_path = firma_path.replace("firme/", "")
-                    img_data = db.supabase.storage.from_("firme").download(clean_firma_path)
+                    # La firma si trova nel bucket "allegati" come visto in database.py
+                    img_data = db.supabase.storage.from_("allegati").download(firma_path)
                     img_bytes = io.BytesIO(img_data)
                 elif isinstance(firma_path, bytes):
                     img_bytes = io.BytesIO(firma_path)
