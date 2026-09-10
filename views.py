@@ -79,7 +79,7 @@ def mostra_dettaglio_ticket(ticket_id):
 
     st.subheader(f"Ticket #{ticket.get('id')} - {ticket.get('titolo', '')}")
     
-    st.write(f"**Stato:** {ticket.get('stato', '')}")
+    st.write(f"**Stato Attuale:** {ticket.get('stato', '')}")
     st.write(f"**Priorità:** {ticket.get('priorita', '')}")
     st.write(f"**Categoria:** {ticket.get('categoria', '')}")
     st.write(f"**Creato da:** {ticket.get('creato_da', '')}")
@@ -90,24 +90,23 @@ def mostra_dettaglio_ticket(ticket_id):
     st.markdown("---")
 
     # --- SEZIONE INTERVENTO E FIRMA ---
-    st.subheader("Gestione Intervento Tecnico")
+    st.subheader("🛠️ Gestione Intervento Tecnico")
     
     intervento_esistente = db.get_intervento(ticket_id)
     desc_iniziale = intervento_esistente.get("descrizione", "") if intervento_esistente else ""
-    stato_iniziale = intervento_esistente.get("stato", ticket.get("stato", "Aperto"))
+    
+    # Stati consentiti per evitare errori di vincolo sul database
+    stabili_stati = ["Aperto", "In Lavorazione", "Risolto"]
+    stato_attuale_db = intervento_esistente.get("stato", ticket.get("stato", "Aperto"))
+    if stato_attuale_db not in stabili_stati:
+        stato_attuale_db = "Aperto"
 
-    stabili_stati = ["In Lavorazione", "Risolto"]
-    try:
-        idx_stato = stabili_stati.index(stato_iniziale)
-    except ValueError:
-        idx_stato = 0
-
-    nuovo_stato = st.selectbox("Aggiorna Stato", stabili_stati, index=idx_stato, key=f"stato_{ticket_id}")
-    desc_int = st.text_area("Note / Descrizione Intervento", value=desc_iniziale, key=f"desc_{ticket_id}")
+    nuovo_stato = st.selectbox("Aggiorna Stato Intervento", stabili_stati, index=stabili_stati.index(stato_attuale_db), key=f"stato_{ticket_id}")
+    desc_int = st.text_area("Note / Descrizione Lavoro", value=desc_iniziale, key=f"desc_{ticket_id}")
 
     canvas = None
     if nuovo_stato == "Risolto":
-        st.write("### Firma del Cliente / Tecnico")
+        st.write("### ✍️ Firma del Tecnico / Cliente")
         canvas = st_canvas(
             fill_color="rgba(255, 165, 0, 0.3)",
             stroke_width=2,
@@ -136,7 +135,7 @@ def mostra_dettaglio_ticket(ticket_id):
                     else:
                         st.error(f"Errore salvataggio firma: {res_path}")
             except Exception as e:
-                st.error(f"Errore durante l'elaborazione della firma: {e}")
+                st.error(f"Errore elaborazione firma: {e}")
 
         successo, messaggio = db.salva_intervento_tecnico(
             ticket_id=ticket_id,
@@ -152,24 +151,34 @@ def mostra_dettaglio_ticket(ticket_id):
         else:
             st.error(f"❌ Errore nel salvataggio: {messaggio}")
 
-    # --- DOWNLOAD PDF ---
+    # --- AZIONI AMMINISTRATORE & PDF ---
     st.markdown("---")
     if is_admin():
-        if st.button("📄 Genera e Scarica PDF Report", key=f"pdf_btn_{ticket_id}"):
+        st.subheader("⚙️ Pannello Amministratore")
+        col_pdf, col_chiudi = st.columns(2)
+        
+        if col_pdf.button("📄 Genera e Scarica PDF", key=f"pdf_btn_{ticket_id}"):
             try:
                 pdf_bytes = pdf_generator.genera_pdf(ticket)
                 st.download_button(
-                    label="📥 Clicca qui per scaricare il PDF",
+                    label="📥 Scarica PDF Report",
                     data=pdf_bytes,
                     file_name=f"report_ticket_{ticket_id}.pdf",
                     mime="application/pdf",
                     key=f"download_pdf_{ticket_id}"
                 )
             except Exception as e:
-                st.error(f"Errore nella generazione del PDF: {e}")
+                st.error(f"Errore generazione PDF: {e}")
+
+        if ticket.get("stato") != "Chiuso":
+            if col_chiudi.button("🔒 Chiudi Definitivamente", key=f"chiudi_{ticket_id}"):
+                db.supabase.table("tickets").update({"stato": "Chiuso"}).eq("id", ticket_id).execute()
+                st.success("Ticket chiuso con successo!")
+                st.rerun()
+        else:
+            col_chiudi.info("Ticket già chiuso.")
 
 def mostra_ticket(ticket_id):
-    """Funzione alias per retrocompatibilità"""
     return mostra_dettaglio_ticket(ticket_id)
 
 def pagina_dashboard():
