@@ -94,14 +94,26 @@ def mostra_ticket(ticket):
             if st.button("💾 Salva intervento", key=f"btn_int_{tid}"):
                 firma_path = None
                 if nuovo_stato == "Risolto":
-                    try:
-                        if canvas is not None and canvas.image_data is not None:
+                    # Verifica che sia stato effettuato un disegno effettivo sul canvas
+                    has_drawing = (
+                        canvas is not None 
+                        and canvas.image_data is not None 
+                        and canvas.image_data.any()
+                        and canvas.image_data.shape[-1] == 4 
+                        and (canvas.image_data[:, :, 3] > 0).any()
+                    )
+                    
+                    if has_drawing:
+                        try:
                             img = Image.fromarray(canvas.image_data.astype("uint8"))
                             buf = BytesIO()
                             img.save(buf, format="PNG")
                             ok, firma_path = db.salva_firma_intervento(tid, buf.getvalue(), st.session_state.username)
-                    except Exception:
-                        st.warning("Impossibile salvare la firma, l'intervento verrà comunque registrato.")
+                            if not ok:
+                                st.warning("⚠️ Impossibile salvare la firma su Supabase. L'intervento verrà salvato senza firma.")
+                        except Exception as e:
+                            print(f"Errore generazione firma: {e}")
+                            st.warning("⚠️ Si è verificato un problema con l'immagine della firma.")
 
                 db.salva_intervento_tecnico(tid, st.session_state.username, desc_int, nuovo_stato, firma_path)
                 st.rerun()
@@ -128,7 +140,7 @@ def mostra_ticket(ticket):
                     st.success("Ticket chiuso definitivamente!")
                     st.rerun()
             else:
-                c2.info("⏳ In attesa che il tecnico risolva il ticket.")
+                c2.info("⏳ In attesa che il tecnico risolva il ticket per la chiusura.")
 
             # Elimina Ticket
             if c3.button("🗑️ Elimina", key=f"del_{tid}"):
