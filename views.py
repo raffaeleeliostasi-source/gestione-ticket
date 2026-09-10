@@ -94,18 +94,24 @@ def mostra_ticket(ticket):
             if st.button("💾 Salva intervento", key=f"btn_int_{tid}"):
                 firma_path = None
                 if nuovo_stato == "Risolto":
-                    # Verifica che sia stato effettuato un disegno effettivo sul canvas
+                    # Estrazione sicura dell'immagine per evitare RuntimeError
+                    img_data = None
+                    try:
+                        if canvas is not None:
+                            img_data = canvas.image_data
+                    except Exception:
+                        img_data = None
+
                     has_drawing = (
-                        canvas is not None 
-                        and canvas.image_data is not None 
-                        and canvas.image_data.any()
-                        and canvas.image_data.shape[-1] == 4 
-                        and (canvas.image_data[:, :, 3] > 0).any()
+                        img_data is not None 
+                        and img_data.any() 
+                        and img_data.shape[-1] == 4 
+                        and (img_data[:, :, 3] > 0).any()
                     )
                     
                     if has_drawing:
                         try:
-                            img = Image.fromarray(canvas.image_data.astype("uint8"))
+                            img = Image.fromarray(img_data.astype("uint8"))
                             buf = BytesIO()
                             img.save(buf, format="PNG")
                             ok, firma_path = db.salva_firma_intervento(tid, buf.getvalue(), st.session_state.username)
