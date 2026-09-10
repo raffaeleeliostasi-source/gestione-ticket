@@ -2,8 +2,70 @@ import streamlit as st
 from io import BytesIO
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
+import pandas as pd
+import auth
 import database as db
 import pdf_generator
+
+def is_admin():
+    ruolo = str(st.session_state.get("ruolo", "")).strip().lower()
+    return ruolo in ["amministratore", "admin"]
+
+def pagina_login():
+    st.title("🎫 Gestione Ticket")
+    with st.form("form_login"):
+        username = st.text_input("Username").strip().lower()
+        password = st.text_input("Password", type="password")
+        if st.form_submit_button("🔐 Accedi", use_container_width=True):
+            if not username or not password:
+                st.warning("Inserisci username e password.")
+                return
+            risposta = db.supabase.table("utenti").select("*").eq("username", username).execute()
+            if not risposta.data or risposta.data[0].get("attivo") is False:
+                st.error("❌ Credenziali errate o account disattivato.")
+                return
+            utente = risposta.data[0]
+            if not auth.verifica_password(password, utente.get("password", "")):
+                st.error("❌ Credenziali errate.")
+                return
+            if auth.password_da_migrare(utente.get("password", "")):
+                db.supabase.table("utenti").update({"password": auth.genera_hash_password(password)}).eq("id", utente["id"]).execute()
+            st.session_state.logged_in = True
+            st.session_state.username = utente["username"]
+            st.session_state.ruolo = utente.get("ruolo", "")
+            st.rerun()
+
+def pagina_nuovo_ticket():
+    st.title("➕ Nuovo Ticket")
+    categorie = db.get_nomi_categorie_attive()
+    tecnici = db.get_tecnici_attivi()
+
+    with st.form("nuovo_ticket_form"):
+        titolo = st.text_input("Titolo del problema")
+        descrizione = st.text_area("Descrizione", height=150)
+        col1, col2 = st.columns(2)
+        categoria = col1.selectbox("Categoria", categorie) if categorie else None
+        priorita = col2.selectbox("Priorità", ["Bassa", "Media", "Alta", "Urgente"])
+        assegnato_a = st.selectbox("👷 Assegna a", tecnici) if tecnici else None
+        allegati = st.file_uploader("📁 Allegati", accept_multiple_files=True)
+        foto = st.camera_input("📷 Scatta una foto")
+
+        if st.form_submit_button("🎫 Crea Ticket", use_container_width=True):
+            if not titolo or not descrizione or not categoria or not assegnato_a:
+                st.warning("Compila tutti i campi obbligatori.")
+                return
+            res = db.supabase.table("tickets").insert({
+                "titolo": titolo, "descrizione": descrizione, "categoria": categoria,
+                "priorita": priorita, "assegnato_a": assegnato_a, "stato": "Aperto",
+                "creato_da": st.session_state.username
+            }).execute()
+            if res.data:
+                tid = res.data[0]["id"]
+                if allegati:
+                    for f in allegati: db.salva_allegato(tid, f)
+                if foto:
+                    db.salva_allegato(tid, foto)
+                st.success("✅ Ticket creato con successo!")
 
 def mostra_dettaglio_ticket(ticket_id):
     ticket = db.get_ticket(ticket_id)
@@ -17,7 +79,6 @@ def mostra_dettaglio_ticket(ticket_id):
 
     st.subheader(f"Ticket #{ticket.get('id')} - {ticket.get('titolo', '')}")
     
-    # Informazioni principali
     st.write(f"**Stato:** {ticket.get('stato', '')}")
     st.write(f"**Priorità:** {ticket.get('priorita', '')}")
     st.write(f"**Categoria:** {ticket.get('categoria', '')}")
@@ -61,7 +122,6 @@ def mostra_dettaglio_ticket(ticket_id):
     if st.button("💾 Salva intervento", key=f"btn_salva_int_{ticket_id}"):
         firma_path = None
         
-        # Se lo stato è Risolto, salviamo la firma dal canvas
         if nuovo_stato == "Risolto":
             try:
                 if canvas is not None and canvas.image_data is not None:
@@ -78,7 +138,6 @@ def mostra_dettaglio_ticket(ticket_id):
             except Exception as e:
                 st.error(f"Errore durante l'elaborazione della firma: {e}")
 
-        # Salvataggio dell'intervento nel database
         successo, messaggio = db.salva_intervento_tecnico(
             ticket_id=ticket_id,
             tecnico=st.session_state.get("username", "tecnico"),
@@ -95,27 +154,27 @@ def mostra_dettaglio_ticket(ticket_id):
 
     # --- DOWNLOAD PDF ---
     st.markdown("---")
-    if st.button("📄 Genera e Scarica PDF Report", key=f"pdf_btn_{ticket_id}"):
-        try:
-            pdf_bytes = pdf_generator.genera_pdf(ticket)
-            st.download_button(
-                label="📥 Clicca qui per scaricare il PDF",
-                data=pdf_bytes,
-                file_name=f"report_ticket_{ticket_id}.pdf",
-                mime="application/pdf",
-                key=f"download_pdf_{ticket_id}"
-            )
-        except Exception as e:
-            st.error(f"Errore nella generazione del PDF: {e}")
+    if is_admin():
+        if st.button("📄 Genera e Scarica PDF Report", key=f"pdf_btn_{ticket_id}"):
+            try:
+                pdf_bytes = pdf_generator.genera_pdf(ticket)
+                st.download_button(
+                    label="📥 Clicca qui per scaricare il PDF",
+                    data=pdf_bytes,
+                    file_name=f"report_ticket_{ticket_id}.pdf",
+                    mime="application/pdf",
+                    key=f"download_pdf_{ticket_id}"
+                )
+            except Exception as e:
+                st.error(f"Errore nella generazione del PDF: {e}")
 
 def mostra_ticket(ticket_id):
-    """Funzione alias richiesta dalla dashboard"""
+    """Funzione alias per retrocompatibilità"""
     return mostra_dettaglio_ticket(ticket_id)
 
 def pagina_dashboard():
-    st.title("Dashboard Ticket")
+    st.title("🏠 Dashboard Ticket")
     
-    # Se un ticket è aperto, mostra i suoi dettagli
     if "ticket_aperto" in st.session_state and st.session_state["ticket_aperto"]:
         mostra_ticket(st.session_state["ticket_aperto"])
         return
@@ -136,3 +195,22 @@ def pagina_dashboard():
         if col3.button("Apri", key=f"open_{tid}"):
             st.session_state["ticket_aperto"] = tid
             st.rerun()
+
+def pagina_statistiche():
+    if not is_admin():
+        st.error("Accesso riservato agli amministratori.")
+        return
+    st.title("📊 Statistiche")
+    tickets = db.get_tickets()
+    if tickets:
+        df = pd.DataFrame(tickets)
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("Nessun dato statistico disponibile.")
+
+def pagina_amministrazione():
+    if not is_admin():
+        st.error("Accesso riservato agli amministratori.")
+        return
+    st.title("👨‍💼 Amministrazione")
+    st.write("Pannello di controllo utenti e categorie.")
