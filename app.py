@@ -31,6 +31,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# Costanti di Sicurezza Upload
+MAX_FILE_SIZE_MB = 10
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
 
 # ============================================================
 # COLLEGAMENTO SUPABASE
@@ -75,6 +79,12 @@ if "pagina" not in st.session_state:
 def is_admin():
     ruolo = st.session_state.get("ruolo", "").strip().lower()
     return ruolo == "amministratore"
+
+
+def sanitizza_nome_file(nome_file):
+    """Rimuove caratteri speciali e spazi per prevenire Path Traversal o errori di encoding."""
+    nome_pulito = re.sub(r'[^a-zA-Z0-9_.-]', '_', nome_file)
+    return nome_pulito
 
 
 # ============================================================
@@ -171,13 +181,15 @@ def format_data(data):
         return str(data)
 
 
-def get_tickets():
+def get_tickets(limit=200):
+    """Recupera i ticket limitando la quantità per ottimizzare le prestazioni."""
     try:
         risposta = (
             supabase
             .table("tickets")
             .select("*")
             .order("id", desc=True)
+            .limit(limit)
             .execute()
         )
 
@@ -542,7 +554,7 @@ def pagina_login():
 
     if login:
 
-        username = username.strip()
+        username = username.strip().lower()
 
         if not username or not password:
             st.warning("Inserisci username e password.")
@@ -565,9 +577,6 @@ def pagina_login():
 
             utente = risposta.data[0]
 
-            # Se la colonna attivo è presente, impedisce il login
-            # agli account disattivati. Per i vecchi record senza colonna
-            # viene considerato attivo per compatibilità.
             if utente.get("attivo", True) is False:
                 st.error("⛔ Questo account è stato disattivato.")
                 return
@@ -610,8 +619,6 @@ def pagina_nuovo_ticket():
 
     st.title("➕ Nuovo Ticket")
 
-    # Messaggio mostrato dopo il salvataggio, quando la pagina viene
-    # riportata automaticamente al modulo di creazione.
     ticket_creato_id = st.session_state.pop("ticket_creato_id", None)
     if ticket_creato_id is not None:
         st.success(
@@ -622,12 +629,6 @@ def pagina_nuovo_ticket():
         )
         st.balloons()
 
-    # ========================================================
-    # CATEGORIA
-    # ========================================================
-    # La categoria è fuori dal form: così Streamlit aggiorna
-    # subito la pagina quando si sceglie "➕ Nuova categoria...".
-
     categorie_attive = get_nomi_categorie_attive()
     opzione_nuova_categoria = "➕ Nuova categoria..."
 
@@ -636,8 +637,6 @@ def pagina_nuovo_ticket():
     else:
         opzioni_categoria = categorie_attive
 
-    # Se una nuova categoria è stata appena salvata, impostiamo
-    # la selezione PRIMA di creare il widget Streamlit.
     categoria_da_selezionare = st.session_state.pop(
         "categoria_da_selezionare", None
     )
@@ -661,10 +660,6 @@ def pagina_nuovo_ticket():
             opzioni_categoria,
             key="categoria_nuovo_ticket"
         )
-
-        # ====================================================
-        # NUOVA CATEGORIA - SOLO AMMINISTRATORE
-        # ====================================================
 
         if is_admin() and categoria == opzione_nuova_categoria:
 
@@ -703,8 +698,6 @@ def pagina_nuovo_ticket():
                             f"✅ Categoria '{nuova_categoria.strip()}' aggiunta correttamente!"
                         )
 
-                        # Non modifichiamo direttamente la chiave del selectbox
-                        # dopo che il widget è stato creato: Streamlit lo vieta.
                         st.session_state[
                             "categoria_da_selezionare"
                         ] = nuova_categoria.strip()
@@ -726,10 +719,6 @@ def pagina_nuovo_ticket():
                         else:
 
                             st.error(f"❌ {messaggio}")
-
-    # ========================================================
-    # FORM NUOVO TICKET
-    # ========================================================
 
     tecnici_attivi = get_tecnici_attivi()
 
@@ -774,10 +763,6 @@ def pagina_nuovo_ticket():
                 ]
             )
 
-        # ====================================================
-        # ASSEGNAZIONE TICKET
-        # ====================================================
-
         if tecnici_attivi:
 
             assegnato_a = st.selectbox(
@@ -799,7 +784,7 @@ def pagina_nuovo_ticket():
         st.subheader("📎 Allegati")
 
         st.write(
-            "Puoi caricare un file dalla galleria oppure usare la fotocamera."
+            f"Puoi caricare un file dalla galleria (Max {MAX_FILE_SIZE_MB}MB) oppure usare la fotocamera."
         )
 
         allegati = st.file_uploader(
@@ -823,10 +808,6 @@ def pagina_nuovo_ticket():
             "🎫 Crea Ticket",
             use_container_width=True
         )
-
-    # ========================================================
-    # CREAZIONE TICKET
-    # ========================================================
 
     if invia:
 
@@ -893,8 +874,6 @@ def pagina_nuovo_ticket():
                     foto
                 )
 
-            # Dopo la creazione torniamo sempre alla schermata
-            # "➕ Nuovo Ticket", pronta per inserire un altro ticket.
             st.session_state.pagina = "Nuovo Ticket"
             st.session_state.ticket_creato_id = ticket_id
 
@@ -906,12 +885,21 @@ def pagina_nuovo_ticket():
                 f"❌ Errore durante la creazione del ticket: {e}"
             )
 
+
 def salva_allegato(ticket_id, file):
     try:
-        nome_file = file.name
-        tipo_file = getattr(file, "type", "application/octet-stream")
-        percorso_file = f"ticket_{ticket_id}/{nome_file}"
         contenuto = file.getvalue()
+
+        # Controllo dimensione massima
+        if len(contenuto) > MAX_FILE_SIZE_BYTES:
+            st.warning(
+                f"⚠️ Il file '{file.name}' supera il limite massimo di {MAX_FILE_SIZE_MB}MB e non è stato salvato."
+            )
+            return
+
+        nome_file_sicuro = sanitizza_nome_file(file.name)
+        tipo_file = getattr(file, "type", "application/octet-stream")
+        percorso_file = f"ticket_{ticket_id}/{nome_file_sicuro}"
 
         supabase.storage.from_("allegati").upload(
             path=percorso_file,
@@ -921,7 +909,7 @@ def salva_allegato(ticket_id, file):
 
         supabase.table("ticket_allegati").insert({
             "ticket_id": ticket_id,
-            "nome_file": nome_file,
+            "nome_file": nome_file_sicuro,
             "percorso_file": percorso_file,
             "tipo_file": tipo_file
         }).execute()
@@ -1031,10 +1019,6 @@ def mostra_ticket(ticket):
         expanded=False
     ):
 
-        # ====================================================
-        # DATI TICKET
-        # ====================================================
-
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -1058,10 +1042,6 @@ def mostra_ticket(ticket):
         st.write(ticket.get("descrizione", ""))
 
         st.divider()
-
-        # ====================================================
-        # INTERVENTO TECNICO SALVATO
-        # ====================================================
 
         intervento = get_intervento(ticket_id)
 
@@ -1111,10 +1091,6 @@ def mostra_ticket(ticket):
         else:
 
             st.info("Nessun intervento tecnico ancora registrato.")
-
-        # ====================================================
-        # AREA OPERATIVA TECNICO
-        # ====================================================
 
         utente_corrente = st.session_state.username
         tecnico_assegnato = ticket.get("assegnato_a", "")
@@ -1191,7 +1167,7 @@ def mostra_ticket(ticket):
                 with col_stato2:
 
                     foto_intervento = st.file_uploader(
-                        "📷 Foto dell'intervento (opzionale)",
+                        f"📷 Foto dell'intervento (Max {MAX_FILE_SIZE_MB}MB)",
                         type=["jpg", "jpeg", "png"],
                         accept_multiple_files=True,
                         key=f"foto_intervento_{ticket_id}"
@@ -1240,8 +1216,6 @@ def mostra_ticket(ticket):
                         firma_png = None
                         firma_path = None
 
-                        # Verifica se il tecnico ha effettivamente
-                        # disegnato una firma.
                         canvas_json = firma_canvas.json_data
 
                         if (
@@ -1249,17 +1223,12 @@ def mostra_ticket(ticket):
                             and canvas_json.get("objects")
                         ):
 
-                            # Nelle versioni recenti della libreria i dati
-                            # immagine sono opt-in. return_image_data=True
-                            # abilita image_bytes direttamente in formato PNG.
                             firma_png = getattr(
                                 firma_canvas,
                                 "image_bytes",
                                 None
                             )
 
-                            # Fallback compatibile con eventuali versioni
-                            # che espongono solo image_data.
                             if firma_png is None:
 
                                 canvas_image = getattr(
@@ -1285,7 +1254,6 @@ def mostra_ticket(ticket):
 
                                     firma_png = buffer_firma.getvalue()
 
-                        # La firma è obbligatoria solo per la risoluzione finale.
                         if nuovo_stato == "Risolto" and not firma_png:
 
                             st.warning(
@@ -1314,8 +1282,6 @@ def mostra_ticket(ticket):
 
                             firma_path = risultato_firma
 
-                        # Se non viene ridisegnata una firma durante un
-                        # aggiornamento in lavorazione, conserva quella esistente.
                         elif intervento and intervento.get("firma_path"):
 
                             firma_path = intervento.get("firma_path")
@@ -1330,7 +1296,6 @@ def mostra_ticket(ticket):
 
                         if successo:
 
-                            # Salva le eventuali foto insieme al ticket.
                             if foto_intervento:
 
                                 for foto in foto_intervento:
@@ -1355,10 +1320,6 @@ def mostra_ticket(ticket):
                             )
 
         st.divider()
-
-        # ====================================================
-        # ALLEGATI E FOTO
-        # ====================================================
 
         st.subheader("📎 Allegati e foto")
 
@@ -1396,17 +1357,9 @@ def mostra_ticket(ticket):
 
         st.divider()
 
-        # ====================================================
-        # AZIONI AMMINISTRATORE
-        # ====================================================
-
         if is_admin():
 
             col_admin1, col_admin2, col_admin3 = st.columns(3)
-
-            # ------------------------------------------------
-            # CHIUSURA: possibile solo dopo RISOLTO
-            # ------------------------------------------------
 
             with col_admin1:
 
@@ -1460,10 +1413,6 @@ def mostra_ticket(ticket):
                                 f"Errore chiusura ticket: {e}"
                             )
 
-            # ------------------------------------------------
-            # PDF
-            # ------------------------------------------------
-
             with col_admin2:
 
                 pdf = genera_pdf(ticket)
@@ -1476,10 +1425,6 @@ def mostra_ticket(ticket):
                     key=f"pdf_{ticket_id}",
                     use_container_width=True
                 )
-
-            # ------------------------------------------------
-            # ELIMINAZIONE
-            # ------------------------------------------------
 
             with col_admin3:
 
@@ -1543,10 +1488,6 @@ def genera_pdf(ticket):
 
     buffer = BytesIO()
 
-    # ========================================================
-    # STILI PDF
-    # ========================================================
-
     styles = getSampleStyleSheet()
 
     stile_titolo = styles["Title"].clone("TicketTitle")
@@ -1575,7 +1516,6 @@ def genera_pdf(ticket):
     stile_testo.spaceAfter = 6
 
     def testo_pdf(valore):
-        """Converte il testo in una forma sicura per ReportLab."""
         if valore is None:
             return "-"
         valore = str(valore).strip()
@@ -1621,10 +1561,6 @@ def genera_pdf(ticket):
 
     elementi = []
 
-    # ========================================================
-    # INTESTAZIONE TICKET
-    # ========================================================
-
     elementi.append(
         Paragraph(
             f"Ticket #{testo_pdf(ticket.get('id', ''))}",
@@ -1637,10 +1573,6 @@ def genera_pdf(ticket):
             stile_sottotitolo
         )
     )
-
-    # ========================================================
-    # RIEPILOGO
-    # ========================================================
 
     elementi.append(Paragraph("Riepilogo ticket", stile_sezione))
 
@@ -1676,10 +1608,6 @@ def genera_pdf(ticket):
 
     elementi.append(tabella)
 
-    # ========================================================
-    # PROBLEMA SEGNALATO
-    # ========================================================
-
     elementi.append(Paragraph("Problema segnalato", stile_sezione))
     elementi.append(
         Paragraph(
@@ -1687,10 +1615,6 @@ def genera_pdf(ticket):
             stile_testo
         )
     )
-
-    # ========================================================
-    # INTERVENTO TECNICO
-    # ========================================================
 
     intervento = get_intervento(ticket["id"])
 
@@ -1741,10 +1665,6 @@ def genera_pdf(ticket):
             )
         )
 
-        # ====================================================
-        # FIRMA TECNICO
-        # ====================================================
-
         firma_path = intervento.get("firma_path")
 
         if firma_path:
@@ -1792,10 +1712,6 @@ def genera_pdf(ticket):
                             stile_testo
                         )
                     )
-
-    # ========================================================
-    # FOTO E ALLEGATI
-    # ========================================================
 
     allegati = get_allegati(ticket["id"])
     immagini_aggiunte = False
@@ -1867,10 +1783,6 @@ def genera_pdf(ticket):
                         )
                     )
 
-    # ========================================================
-    # GENERAZIONE
-    # ========================================================
-
     doc.build(
         elementi,
         onFirstPage=intestazione_pagina,
@@ -1897,9 +1809,6 @@ def pagina_dashboard():
         st.info("Non ci sono ancora ticket.")
         return
 
-    # ========================================================
-    # FILTRI
-    # ========================================================
     st.subheader("🔎 Filtra ticket")
 
     col1, col2 = st.columns(2)
@@ -1930,9 +1839,6 @@ def pagina_dashboard():
     })
     filtro_categoria = col5.selectbox("🏷️ Categoria", ["Tutte"] + categorie, key="dashboard_categoria")
 
-    # ========================================================
-    # APPLICA FILTRI
-    # ========================================================
     tickets_filtrati = []
     testo_lower = testo.strip().lower()
 
@@ -1957,9 +1863,6 @@ def pagina_dashboard():
 
         tickets_filtrati.append(ticket)
 
-    # ========================================================
-    # KPI
-    # ========================================================
     aperti = sum(1 for t in tickets_filtrati if t.get("stato") == "Aperto")
     lavorazione = sum(1 for t in tickets_filtrati if t.get("stato") == "In lavorazione")
     risolti = sum(1 for t in tickets_filtrati if t.get("stato") == "Risolto")
@@ -1976,9 +1879,6 @@ def pagina_dashboard():
     k4.metric("🔵 Risolti", risolti)
     k5.metric("🔴 Urgenti", urgenti)
 
-    # ========================================================
-    # SITUAZIONE TICKET
-    # ========================================================
     st.divider()
     st.subheader("📌 Situazione ticket")
     c1, c2, c3, c4 = st.columns(4)
@@ -1987,9 +1887,6 @@ def pagina_dashboard():
     c3.metric("🔵 Risolti", risolti)
     c4.metric("⚫ Chiusi", chiusi)
 
-    # ========================================================
-    # TICKET URGENTI
-    # ========================================================
     urgenti_ticket = [
         t for t in tickets_filtrati
         if t.get("priorita") == "Urgente" and t.get("stato") != "Chiuso"
@@ -2010,9 +1907,6 @@ def pagina_dashboard():
         if len(urgenti_ticket) > 5:
             st.caption(f"Altri {len(urgenti_ticket) - 5} ticket urgenti non visualizzati in questa sezione.")
 
-    # ========================================================
-    # GRAFICI
-    # ========================================================
     st.divider()
     st.subheader("📊 Analisi")
 
@@ -2052,9 +1946,6 @@ def pagina_dashboard():
     else:
         st.info("Nessun dato disponibile.")
 
-    # ========================================================
-    # ULTIMI TICKET
-    # ========================================================
     st.divider()
     st.subheader("🕐 Ultimi ticket")
 
@@ -2230,10 +2121,6 @@ def sezione_gestione_utenti():
 
     st.subheader("👥 Gestione Utenti")
 
-    # --------------------------------------------------------
-    # CREAZIONE NUOVO UTENTE
-    # --------------------------------------------------------
-
     with st.expander("➕ Crea nuovo utente", expanded=False):
 
         with st.form("form_crea_utente"):
@@ -2259,7 +2146,7 @@ def sezione_gestione_utenti():
 
         if crea_utente:
 
-            nuovo_username = nuovo_username.strip()
+            nuovo_username = nuovo_username.strip().lower()
 
             if not nuovo_username:
                 st.warning("Inserisci uno username.")
@@ -2345,10 +2232,6 @@ def sezione_gestione_utenti():
 
                 col1, col2, col3 = st.columns(3)
 
-                # ------------------------------------------------
-                # RESET PASSWORD
-                # ------------------------------------------------
-
                 with col1:
 
                     st.write("### 🔑 Reset Password")
@@ -2402,10 +2285,6 @@ def sezione_gestione_utenti():
                                 except Exception as e:
                                     st.error(f"Errore reset password: {e}")
 
-                # ------------------------------------------------
-                # MODIFICA RUOLO
-                # ------------------------------------------------
-
                 with col2:
 
                     st.write("### 👔 Ruolo")
@@ -2431,8 +2310,6 @@ def sezione_gestione_utenti():
                         use_container_width=True
                     ):
 
-                        # Evita che l'amministratore corrente si tolga
-                        # da solo i privilegi amministrativi.
                         if (
                             username == st.session_state.username
                             and nuovo_ruolo != "amministratore"
@@ -2464,10 +2341,6 @@ def sezione_gestione_utenti():
 
                             except Exception as e:
                                 st.error(f"Errore aggiornamento ruolo: {e}")
-
-                # ------------------------------------------------
-                # ATTIVA / DISATTIVA ACCOUNT
-                # ------------------------------------------------
 
                 with col3:
 
@@ -2772,10 +2645,6 @@ def applicazione():
             st.session_state.pagina = "Dashboard"
 
             st.rerun()
-
-    # --------------------------------------------------------
-    # PAGINE
-    # --------------------------------------------------------
 
     if st.session_state.pagina == "Dashboard":
         pagina_dashboard()
