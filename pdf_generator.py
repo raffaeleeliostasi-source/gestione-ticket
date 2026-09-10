@@ -1,119 +1,120 @@
-from io import BytesIO
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+import io
+import requests
+from PIL import Image
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.utils import ImageReader
-from database import get_intervento, get_allegati, scarica_allegato, scarica_firma_intervento, format_data
+import database as db
 
 def genera_pdf(ticket):
-    buffer = BytesIO()
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+    story = []
     styles = getSampleStyleSheet()
 
-    stile_titolo = styles["Title"].clone("TicketTitle")
-    stile_titolo.fontName = "Helvetica-Bold"
-    stile_titolo.fontSize = 20
-    stile_titolo.leading = 24
+    tid = ticket.get("id")
 
-    stile_sottotitolo = styles["Normal"].clone("TicketSubtitle")
-    stile_sottotitolo.fontSize = 9
-    stile_sottotitolo.textColor = colors.grey
+    # Stili personalizzati
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Title'],
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor('#1E3A8A'),
+        alignment=0
+    )
+    h2_style = ParagraphStyle(
+        'SectionHeader',
+        parent=styles['Heading2'],
+        fontSize=14,
+        leading=18,
+        textColor=colors.HexColor('#1E3A8A'),
+        spaceBefore=10,
+        spaceAfter=10
+    )
+    normal_style = styles['Normal']
 
-    stile_sezione = styles["Heading2"].clone("TicketSection")
-    stile_sezione.fontName = "Helvetica-Bold"
-    stile_sezione.fontSize = 13
-    stile_sezione.spaceBefore = 10
+    # --- INTESTAZIONE ---
+    story.append(Paragraph(f"<b>REPORT TICKET #{tid}</b>", title_style))
+    story.append(Spacer(1, 12))
 
-    stile_testo = styles["BodyText"].clone("TicketBody")
-    stile_testo.fontSize = 9.5
-    stile_testo.leading = 14
-
-    def testo_pdf(valore):
-        if not valore:
-            return "-"
-        return str(valore).strip().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
-
-    def intestazione_pagina(canvas, doc):
-        canvas.saveState()
-        larghezza, altezza = A4
-        canvas.setStrokeColor(colors.HexColor("#D9D9D9"))
-        canvas.line(40, altezza - 42, larghezza - 40, altezza - 42)
-        canvas.setFont("Helvetica-Bold", 8)
-        canvas.setFillColor(colors.HexColor("#555555"))
-        canvas.drawString(40, altezza - 32, "GESTIONE TICKET")
-        canvas.setFont("Helvetica", 8)
-        canvas.drawRightString(larghezza - 40, altezza - 32, f"Ticket #{ticket.get('id', '')}")
-        canvas.line(40, 35, larghezza - 40, 35)
-        canvas.drawString(40, 23, "Report generato automaticamente")
-        canvas.drawRightString(larghezza - 40, 23, f"Pagina {doc.page}")
-        canvas.restoreState()
-
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=58, bottomMargin=48)
-    elementi = [
-        Paragraph(f"Ticket #{testo_pdf(ticket.get('id', ''))}", stile_titolo),
-        Paragraph(testo_pdf(ticket.get("titolo", "Senza titolo")), stile_sottotitolo),
-        Paragraph("Riepilogo ticket", stile_sezione)
+    # --- TABELLA DETTAGLI TICKET ---
+    data_ticket = [
+        [Paragraph("<b>Titolo:</b>", normal_style), Paragraph(str(ticket.get("titolo", "")), normal_style)],
+        [Paragraph("<b>Stato:</b>", normal_style), Paragraph(str(ticket.get("stato", "")), normal_style)],
+        [Paragraph("<b>Priorità:</b>", normal_style), Paragraph(str(ticket.get("priorita", "")), normal_style)],
+        [Paragraph("<b>Categoria:</b>", normal_style), Paragraph(str(ticket.get("categoria", "")), normal_style)],
+        [Paragraph("<b>Creato da:</b>", normal_style), Paragraph(str(ticket.get("creato_da", "")), normal_style)],
+        [Paragraph("<b>Tecnico Assegnato:</b>", normal_style), Paragraph(str(ticket.get("assegnato_a", "")), normal_style)],
     ]
 
-    dati = [
-        ["Categoria", testo_pdf(ticket.get("categoria", ""))],
-        ["Priorità", testo_pdf(ticket.get("priorita", ""))],
-        ["Stato", testo_pdf(ticket.get("stato", ""))],
-        ["Creato da", testo_pdf(ticket.get("creato_da", ""))],
-        ["Assegnato a", testo_pdf(ticket.get("assegnato_a", ""))]
-    ]
-    tabella = Table(dati, colWidths=[125, 365])
-    tabella.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F3F5")),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D0D4D8")),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("PADDING", (0, 0), (-1, -1), 6)
+    t_ticket = Table(data_ticket, colWidths=[130, 400])
+    t_ticket.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F3F4F6')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
+        ('PADDING', (0, 0), (-1, -1), 6),
     ]))
-    elementi.extend([tabella, Paragraph("Problema segnalato", stile_sezione), Paragraph(testo_pdf(ticket.get("descrizione", "")), stile_testo)])
+    story.append(t_ticket)
+    story.append(Spacer(1, 12))
 
-    intervento = get_intervento(ticket["id"])
+    # --- DESCRIZIONE PROBLEMA ---
+    story.append(Paragraph("<b>Descrizione del Problema:</b>", h2_style))
+    story.append(Paragraph(str(ticket.get("descrizione", "")), normal_style))
+    story.append(Spacer(1, 16))
+
+    # --- DETTAGLI INTERVENTO ---
+    intervento = db.get_intervento(tid) if hasattr(db, 'get_intervento') else None
+
     if intervento:
-        elementi.append(Paragraph("Intervento tecnico", stile_sezione))
-        dati_int = [
-            ["Tecnico", testo_pdf(intervento.get("tecnico", ""))],
-            ["Data intervento", testo_pdf(format_data(intervento.get("data_intervento")))],
-            ["Esito", testo_pdf(intervento.get("stato", ""))]
-        ]
-        t_int = Table(dati_int, colWidths=[125, 365])
-        t_int.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F3F5")),
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D0D4D8")),
-            ("PADDING", (0, 0), (-1, -1), 6)
-        ]))
-        elementi.extend([t_int, Spacer(1, 10), Paragraph("Descrizione dell'intervento", styles["Heading3"]), Paragraph(testo_pdf(intervento.get("descrizione", "")), stile_testo)])
+        story.append(Paragraph("<b>Dettagli Intervento Tecnico:</b>", h2_style))
+        
+        desc_intervento = intervento.get("descrizione") or intervento.get("note") or "Nessuna nota registrata."
+        tecnico_intervento = intervento.get("tecnico") or ticket.get("assegnato_a") or "N/D"
 
-        firma_path = intervento.get("firma_path")
+        story.append(Paragraph(f"<b>Eseguito da:</b> {tecnico_intervento}", normal_style))
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(f"<b>Descrizione lavoro:</b> {desc_intervento}", normal_style))
+        story.append(Spacer(1, 12))
+
+        # --- RECUPERO E INSERIMENTO FIRMA ---
+        firma_path = intervento.get("firma_path") or intervento.get("firma")
+        
         if firma_path:
-            firma_bytes = scarica_firma_intervento(firma_path)
-            if firma_bytes:
-                try:
-                    firma_reader = ImageReader(BytesIO(firma_bytes))
-                    w, h = firma_reader.getSize()
-                    rapporto = min(250 / w, 90 / h, 1)
-                    elementi.extend([Spacer(1, 10), Paragraph("Firma del tecnico", styles["Heading3"]), RLImage(BytesIO(firma_bytes), width=w*rapporto, height=h*rapporto)])
-                except Exception:
-                    pass
+            try:
+                img_bytes = None
 
-    allegati = get_allegati(ticket["id"])
-    for allegato in allegati:
-        if allegato.get("tipo_file", "").startswith("image/") and allegato.get("percorso_file"):
-            contenuto = scarica_allegato(allegato["percorso_file"])
-            if contenuto:
-                try:
-                    img_reader = ImageReader(BytesIO(contenuto))
-                    w, h = img_reader.getSize()
-                    rapporto = min(490 / w, 520 / h, 1)
-                    elementi.extend([Paragraph(testo_pdf(allegato.get("nome_file")), stile_sottotitolo), RLImage(BytesIO(contenuto), width=w*rapporto, height=h*rapporto), Spacer(1, 10)])
-                except Exception:
-                    pass
+                # Caso 1: firma_path è un URL di Supabase Storage
+                if isinstance(firma_path, str) and (firma_path.startswith("http://") or firma_path.startswith("https://")):
+                    res = requests.get(firma_path, timeout=5)
+                    if res.status_code == 200:
+                        img_bytes = io.BytesIO(res.content)
+                # Caso 2: firma_path è una stringa con percorso interno Supabase
+                elif isinstance(firma_path, str):
+                    img_data = db.supabase.storage.from_("firme").download(firma_path)
+                    img_bytes = io.BytesIO(img_data)
+                # Caso 3: firma_path è già in formato bytes
+                elif isinstance(firma_path, bytes):
+                    img_bytes = io.BytesIO(firma_path)
 
-    doc.build(elementi, onFirstPage=intestazione_pagina, onLaterPages=intestazione_pagina)
+                if img_bytes:
+                    story.append(Paragraph("<b>Firma Intervento:</b>", normal_style))
+                    story.append(Spacer(1, 6))
+                    # Aggiunge l'immagine della firma ridimensionata nel PDF
+                    rl_img = RLImage(img_bytes, width=180, height=70)
+                    story.append(rl_img)
+            except Exception as e:
+                print(f"Errore durante l'inserimento della firma nel PDF: {e}")
+                story.append(Paragraph("<i>(Firma registrata ma non caricabile nel PDF)</i>", normal_style))
+
+    # Generazione file
+    doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
