@@ -8,7 +8,8 @@ import database as db
 import pdf_generator
 
 def is_admin():
-    return st.session_state.get("ruolo", "").strip().lower() == "amministratore"
+    ruolo = str(st.session_state.get("ruolo", "")).strip().lower()
+    return ruolo in ["amministratore", "admin"]
 
 def pagina_login():
     st.title("🎫 Gestione Ticket")
@@ -70,6 +71,7 @@ def mostra_ticket(ticket):
     tid = ticket["id"]
     stato_attuale = ticket.get("stato", "Aperto")
     chiuso = stato_attuale == "Chiuso"
+    admin_status = is_admin()
     
     with st.expander(f"🎫 #{tid} - {ticket['titolo']} | {stato_attuale}"):
         st.write(f"**Categoria:** {ticket.get('categoria')} | **Priorità:** {ticket.get('priorita')}")
@@ -81,7 +83,7 @@ def mostra_ticket(ticket):
             st.success(f"Intervento eseguito da {intervento.get('tecnico')}: {intervento.get('descrizione')}")
 
         # --- SEZIONE TECNICO ---
-        if not is_admin() and ticket.get("assegnato_a") == st.session_state.username and not chiuso:
+        if not admin_status and str(ticket.get("assegnato_a", "")).lower() == str(st.session_state.get("username", "")).lower() and not chiuso:
             st.subheader("🛠️ Registra Intervento")
             desc_int = st.text_area("Cosa hai fatto?", key=f"desc_{tid}")
             nuovo_stato = st.selectbox("Stato", ["In lavorazione", "Risolto"], key=f"st_{tid}")
@@ -103,8 +105,9 @@ def mostra_ticket(ticket):
                 st.rerun()
 
         # --- AZIONI AMMINISTRATORE ---
-        if is_admin():
+        if admin_status:
             st.divider()
+            st.markdown("### ⚙️ Azioni Amministratore")
             c1, c2, c3 = st.columns(3)
             
             # Scarica PDF
@@ -120,7 +123,7 @@ def mostra_ticket(ticket):
             else:
                 if c2.button("🔒 Chiudi Ticket", key=f"close_{tid}"):
                     db.supabase.table("tickets").update({"stato": "Chiuso"}).eq("id", tid).execute()
-                    st.success("Ticket chiuso definitamente!")
+                    st.success("Ticket chiuso definitivamente!")
                     st.rerun()
 
             # Elimina Ticket
@@ -137,7 +140,7 @@ def pagina_dashboard():
         return
 
     if not is_admin():
-        utente_attuale = st.session_state.username.lower()
+        utente_attuale = str(st.session_state.get("username", "")).lower()
         tickets = [
             t for t in tutti_i_tickets 
             if str(t.get("assegnato_a", "")).lower() == utente_attuale 
