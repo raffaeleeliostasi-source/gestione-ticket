@@ -75,6 +75,8 @@ import database as db
 import pdf_generator
 
 def mostra_dettaglio_ticket(ticket_id):
+    """Alias per retrocompatibilità con la dashboard"""
+    return mostra_dettaglio_ticket(ticket_id)
     ticket = db.get_ticket(ticket_id)
     if not ticket:
         st.error("Ticket non trovato.")
