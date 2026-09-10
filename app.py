@@ -610,6 +610,18 @@ def pagina_nuovo_ticket():
 
     st.title("➕ Nuovo Ticket")
 
+    # Messaggio mostrato dopo il salvataggio, quando la pagina viene
+    # riportata automaticamente al modulo di creazione.
+    ticket_creato_id = st.session_state.pop("ticket_creato_id", None)
+    if ticket_creato_id is not None:
+        st.success(
+            f"🎉 Ticket #{ticket_creato_id} creato correttamente!"
+        )
+        st.info(
+            "Il modulo è pronto per inserire un nuovo ticket."
+        )
+        st.balloons()
+
     # ========================================================
     # CATEGORIA
     # ========================================================
@@ -881,11 +893,10 @@ def pagina_nuovo_ticket():
                     foto
                 )
 
-            st.success(
-                f"🎉 Ticket #{ticket_id} creato correttamente!"
-            )
-
-            st.balloons()
+            # Dopo la creazione torniamo sempre alla schermata
+            # "➕ Nuovo Ticket", pronta per inserire un altro ticket.
+            st.session_state.pagina = "Nuovo Ticket"
+            st.session_state.ticket_creato_id = ticket_id
 
             st.rerun()
 
