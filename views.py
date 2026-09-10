@@ -163,6 +163,14 @@ def mostra_dettaglio_ticket(ticket_id):
         else:
             col_chiudi.success("✅ Il ticket è attualmente chiuso.")
 
+        # Opzione admin per riaprire un ticket risolto/chiuso
+        if ticket.get("stato") in ["Risolto", "Chiuso"]:
+            if st.button("🔄 Riapri Ticket", key=f"riapri_{ticket_id}"):
+                db.supabase.table("tickets").update({"stato": "In Lavorazione"}).eq("id", ticket_id).execute()
+                db.supabase.table("ticket_interventi").update({"stato": "In Lavorazione"}).eq("ticket_id", ticket_id).execute()
+                st.success("Ticket riaperto con successo!")
+                st.rerun()
+
         # --- SEZIONE ELIMINAZIONE TICKET (ADMIN) ---
         st.markdown("---")
         with st.expander("⚠️ Zona Pericolosa - Eliminazione Ticket"):
@@ -180,62 +188,79 @@ def mostra_dettaglio_ticket(ticket_id):
     else:
         st.subheader("🛠️ Gestione Intervento Tecnico")
         
-        desc_iniziale = intervento_esistente.get("descrizione", "")
-        stabili_stati = ["Aperto", "In Lavorazione", "Risolto"]
-        stato_attuale_db = intervento_esistente.get("stato", ticket.get("stato", "Aperto"))
-        if stato_attuale_db not in stabili_stati:
-            stato_attuale_db = "Aperto"
-
-        nuovo_stato = st.selectbox("Aggiorna Stato Intervento", stabili_stati, index=stabili_stati.index(stato_attuale_db), key=f"stato_{ticket_id}")
-        desc_int = st.text_area("Note / Descrizione Lavoro", value=desc_iniziale, key=f"desc_{ticket_id}")
-
-        canvas = None
-        if nuovo_stato == "Risolto":
-            st.write("### ✍️ Firma del Tecnico / Cliente")
-            canvas = st_canvas(
-                fill_color="rgba(255, 165, 0, 0.3)",
-                stroke_width=2,
-                stroke_color="#000000",
-                background_color="#FFFFFF",
-                height=150,
-                width=400,
-                drawing_mode="freedraw",
-                return_image_data=True,
-                key=f"canvas_firma_{ticket_id}"
-            )
-
-        if st.button("💾 Salva intervento", key=f"btn_salva_int_{ticket_id}"):
-            firma_path = intervento_esistente.get("firma_path") if intervento_esistente else None
+        stato_intervento_corrente = intervento_esistente.get("stato", "Aperto")
+        
+        # Se il tecnico ha già impostato lo stato su Risolto o il ticket è chiuso, blocca le modifiche
+        if stato_intervento_corrente == "Risolto" or ticket.get("stato") == "Chiuso":
+            st.info("🔒 Questo intervento è stato segnato come **Risolto** ed è in attesa di verifica/chiusura da parte dell'amministratore. Non è più modificabile.")
+            st.write(f"**Stato Intervento:** {stato_intervento_corrente}")
+            st.write(f"**Note Lavoro:** {intervento_esistente.get('descrizione', 'Nessuna nota')}")
             
-            if nuovo_stato == "Risolto":
+            firma_path = intervento_esistente.get("firma_path")
+            if firma_path:
+                st.write("**Firma registrata:**")
                 try:
-                    if canvas is not None and canvas.image_data is not None:
-                        img_data = canvas.image_data
-                        img = Image.fromarray(img_data.astype("uint8"))
-                        buf = BytesIO()
-                        img.save(buf, format="PNG")
-                        
-                        ok, res_path = db.salva_firma_intervento(ticket_id, buf.getvalue(), st.session_state.get("username", "tecnico"))
-                        if ok:
-                            firma_path = res_path
-                        else:
-                            st.error(f"Errore salvataggio firma: {res_path}")
-                except Exception as e:
-                    st.error(f"Errore elaborazione firma: {e}")
+                    img_data = db.supabase.storage.from_("allegati").download(firma_path)
+                    st.image(img_data, width=300)
+                except Exception:
+                    st.info("Impossibile caricare l'immagine della firma.")
+        else:
+            desc_iniziale = intervento_esistente.get("descrizione", "")
+            stabili_stati = ["Aperto", "In Lavorazione", "Risolto"]
+            stato_attuale_db = stato_intervento_corrente
+            if stato_attuale_db not in stabili_stati:
+                stato_attuale_db = "Aperto"
 
-            successo, messaggio = db.salva_intervento_tecnico(
-                ticket_id=ticket_id,
-                tecnico=st.session_state.get("username", "tecnico"),
-                descrizione_intervento=desc_int,
-                nuovo_stato=nuovo_stato,
-                firma_path=firma_path
-            )
+            nuovo_stato = st.selectbox("Aggiorna Stato Intervento", stabili_stati, index=stabili_stati.index(stato_attuale_db), key=f"stato_{ticket_id}")
+            desc_int = st.text_area("Note / Descrizione Lavoro", value=desc_iniziale, key=f"desc_{ticket_id}")
 
-            if successo:
-                st.success("✅ Intervento salvato con successo!")
-                st.rerun()
-            else:
-                st.error(f"❌ Errore nel salvataggio: {messaggio}")
+            canvas = None
+            if nuovo_stato == "Risolto":
+                st.write("### ✍️ Firma del Tecnico / Cliente")
+                canvas = st_canvas(
+                    fill_color="rgba(255, 165, 0, 0.3)",
+                    stroke_width=2,
+                    stroke_color="#000000",
+                    background_color="#FFFFFF",
+                    height=150,
+                    width=400,
+                    drawing_mode="freedraw",
+                    return_image_data=True,
+                    key=f"canvas_firma_{ticket_id}"
+                )
+
+            if st.button("💾 Salva intervento", key=f"btn_salva_int_{ticket_id}"):
+                firma_path = intervento_esistente.get("firma_path") if intervento_esistente else None
+                
+                if nuovo_stato == "Risolto":
+                    try:
+                        if canvas is not None and canvas.image_data is not None:
+                            img_data = canvas.image_data
+                            img = Image.fromarray(img_data.astype("uint8"))
+                            buf = BytesIO()
+                            img.save(buf, format="PNG")
+                            
+                            ok, res_path = db.salva_firma_intervento(ticket_id, buf.getvalue(), st.session_state.get("username", "tecnico"))
+                            if ok:
+                                firma_path = res_path
+                            else:
+                                st.error(f"Errore salvataggio firma: {res_path}")
+                    except Exception as e:
+                        st.error(f"Errore elaborazione firma: {e}")
+
+                successo, messaggio = db.salva_intervento_tecnico(
+                    ticket_id=ticket_id,
+                    tecnico=st.session_state.get("username", "tecnico"),
+                    descrizione_intervento=desc_int,
+                    nuovo_stato=nuovo_stato,
+                    firma_path=firma_path
+                )
+
+                if successo:
+                    st.success("✅ Intervento salvato con successo!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Errore nel salvataggio: {messaggio}")
 
 def mostra_ticket(ticket_id):
     """Alias di retrocompatibilità"""
