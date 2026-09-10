@@ -1787,45 +1787,204 @@ def genera_pdf(ticket):
 def pagina_dashboard():
 
     st.title("🏠 Dashboard")
+    st.caption("Centro di controllo della gestione ticket")
 
     tickets = get_tickets()
 
-    aperti = len([
-        t for t in tickets
-        if t.get("stato") == "Aperto"
-    ])
+    if not tickets:
+        st.info("Non ci sono ancora ticket.")
+        return
 
-    lavorazione = len([
-        t for t in tickets
+    # ========================================================
+    # KPI PRINCIPALI
+    # ========================================================
+
+    aperti = sum(1 for t in tickets if t.get("stato") == "Aperto")
+    lavorazione = sum(
+        1 for t in tickets
         if t.get("stato") == "In lavorazione"
-    ])
+    )
+    risolti = sum(1 for t in tickets if t.get("stato") == "Risolto")
+    chiusi = sum(1 for t in tickets if t.get("stato") == "Chiuso")
+    urgenti = sum(1 for t in tickets if t.get("priorita") == "Urgente")
 
-    chiusi = len([
-        t for t in tickets
-        if t.get("stato") == "Chiuso"
-    ])
-
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     col1.metric("🎫 Totali", len(tickets))
     col2.metric("🟢 Aperti", aperti)
     col3.metric("🟠 In lavorazione", lavorazione)
-    col4.metric("🔒 Archiviati", chiusi)
+    col4.metric("🔵 Risolti", risolti)
+    col5.metric("🔴 Urgenti", urgenti)
 
     st.divider()
 
+    # ========================================================
+    # FILTRI
+    # ========================================================
+
+    st.subheader("🔎 Filtra ticket")
+
+    col1, col2, col3 = st.columns(3)
+
+    testo = col1.text_input(
+        "Cerca",
+        placeholder="Titolo o descrizione...",
+        key="dashboard_cerca"
+    )
+
+    stati = ["Tutti"] + sorted({
+        str(t.get("stato", ""))
+        for t in tickets
+        if t.get("stato")
+    })
+    filtro_stato = col2.selectbox(
+        "Stato",
+        stati,
+        key="dashboard_stato"
+    )
+
+    priorita_opzioni = ["Tutte"] + sorted({
+        str(t.get("priorita", ""))
+        for t in tickets
+        if t.get("priorita")
+    })
+    filtro_priorita = col3.selectbox(
+        "Priorità",
+        priorita_opzioni,
+        key="dashboard_priorita"
+    )
+
+    col4, col5 = st.columns(2)
+
+    tecnici = sorted({
+        str(t.get("assegnato_a", ""))
+        for t in tickets
+        if t.get("assegnato_a")
+    })
+    filtro_tecnico = col4.selectbox(
+        "👷 Tecnico",
+        ["Tutti"] + tecnici,
+        key="dashboard_tecnico"
+    )
+
+    categorie = sorted({
+        str(t.get("categoria", ""))
+        for t in tickets
+        if t.get("categoria")
+    })
+    filtro_categoria = col5.selectbox(
+        "🏷️ Categoria",
+        ["Tutte"] + categorie,
+        key="dashboard_categoria"
+    )
+
+    # ========================================================
+    # APPLICA FILTRI
+    # ========================================================
+
+    tickets_filtrati = []
+
+    testo_lower = testo.strip().lower()
+
+    for ticket in tickets:
+        titolo = str(ticket.get("titolo", ""))
+        descrizione = str(ticket.get("descrizione", ""))
+
+        if testo_lower and testo_lower not in (
+            titolo + " " + descrizione
+        ).lower():
+            continue
+
+        if filtro_stato != "Tutti" and ticket.get("stato") != filtro_stato:
+            continue
+
+        if (
+            filtro_priorita != "Tutte"
+            and ticket.get("priorita") != filtro_priorita
+        ):
+            continue
+
+        if (
+            filtro_tecnico != "Tutti"
+            and ticket.get("assegnato_a") != filtro_tecnico
+        ):
+            continue
+
+        if (
+            filtro_categoria != "Tutte"
+            and ticket.get("categoria") != filtro_categoria
+        ):
+            continue
+
+        tickets_filtrati.append(ticket)
+
+    st.write(
+        f"**{len(tickets_filtrati)}** ticket corrispondenti ai filtri selezionati."
+    )
+
+    st.divider()
+
+    # ========================================================
+    # STATISTICHE
+    # ========================================================
+
+    st.subheader("📊 Panoramica")
+
+    col1, col2 = st.columns(2)
+
+    stati_dashboard = {}
+    for ticket in tickets_filtrati:
+        stato = ticket.get("stato") or "Senza stato"
+        stati_dashboard[stato] = stati_dashboard.get(stato, 0) + 1
+
+    categorie_dashboard = {}
+    for ticket in tickets_filtrati:
+        categoria = ticket.get("categoria") or "Senza categoria"
+        categorie_dashboard[categoria] = (
+            categorie_dashboard.get(categoria, 0) + 1
+        )
+
+    with col1:
+        st.markdown("**📌 Ticket per stato**")
+        if stati_dashboard:
+            st.bar_chart(stati_dashboard)
+        else:
+            st.info("Nessun dato disponibile.")
+
+    with col2:
+        st.markdown("**🏷️ Ticket per categoria**")
+        if categorie_dashboard:
+            st.bar_chart(categorie_dashboard)
+        else:
+            st.info("Nessun dato disponibile.")
+
+    st.markdown("**👷 Ticket per tecnico**")
+
+    tecnici_dashboard = {}
+    for ticket in tickets_filtrati:
+        tecnico = ticket.get("assegnato_a") or "Non assegnato"
+        tecnici_dashboard[tecnico] = tecnici_dashboard.get(tecnico, 0) + 1
+
+    if tecnici_dashboard:
+        st.bar_chart(tecnici_dashboard)
+    else:
+        st.info("Nessun dato disponibile.")
+
+    st.divider()
+
+    # ========================================================
+    # TICKET RECENTI
+    # ========================================================
+
     st.subheader("🎫 Ticket recenti")
 
-    recenti = tickets[:5]
+    recenti = tickets_filtrati[:5]
 
     if recenti:
-
         for ticket in recenti:
             mostra_ticket(ticket)
-
     else:
-
-        st.info("Non ci sono ancora ticket.")
+        st.info("Nessun ticket corrisponde ai filtri selezionati.")
 
 
 # ============================================================
