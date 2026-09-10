@@ -68,7 +68,32 @@ def genera_pdf(ticket):
     # --- DESCRIZIONE PROBLEMA ---
     story.append(Paragraph("<b>Descrizione del Problema:</b>", h2_style))
     story.append(Paragraph(str(ticket.get("descrizione", "")), normal_style))
-    story.append(Spacer(1, 16))
+    story.append(Spacer(1, 12))
+
+    # --- FOTO / ALLEGATI DEL TICKET ---
+    allegati = db.get_allegati_ticket(tid) if hasattr(db, 'get_allegati_ticket') else []
+    if allegati:
+        story.append(Paragraph("<b>Foto e Allegati:</b>", h2_style))
+        for allegato in allegati:
+            file_path = allegato.get("file_path") or allegato.get("url")
+            if file_path:
+                try:
+                    img_bytes = None
+                    if isinstance(file_path, str) and file_path.startswith("http"):
+                        res = requests.get(file_path, timeout=5)
+                        if res.status_code == 200:
+                            img_bytes = io.BytesIO(res.content)
+                    elif isinstance(file_path, str):
+                        # Pulisce eventuale prefisso nome bucket se presente
+                        clean_path = file_path.replace("allegati/", "")
+                        data = db.supabase.storage.from_("allegati").download(clean_path)
+                        img_bytes = io.BytesIO(data)
+
+                    if img_bytes:
+                        story.append(RLImage(img_bytes, width=200, height=150))
+                        story.append(Spacer(1, 8))
+                except Exception as e:
+                    print(f"Errore caricamento allegato nel PDF: {e}")
 
     # --- DETTAGLI INTERVENTO ---
     intervento = db.get_intervento(tid) if hasattr(db, 'get_intervento') else None
@@ -91,30 +116,26 @@ def genera_pdf(ticket):
             try:
                 img_bytes = None
 
-                # Caso 1: firma_path è un URL di Supabase Storage
-                if isinstance(firma_path, str) and (firma_path.startswith("http://") or firma_path.startswith("https://")):
+                if isinstance(firma_path, str) and firma_path.startswith("http"):
                     res = requests.get(firma_path, timeout=5)
                     if res.status_code == 200:
                         img_bytes = io.BytesIO(res.content)
-                # Caso 2: firma_path è una stringa con percorso interno Supabase
                 elif isinstance(firma_path, str):
-                    img_data = db.supabase.storage.from_("firme").download(firma_path)
+                    clean_firma_path = firma_path.replace("firme/", "")
+                    img_data = db.supabase.storage.from_("firme").download(clean_firma_path)
                     img_bytes = io.BytesIO(img_data)
-                # Caso 3: firma_path è già in formato bytes
                 elif isinstance(firma_path, bytes):
                     img_bytes = io.BytesIO(firma_path)
 
                 if img_bytes:
                     story.append(Paragraph("<b>Firma Intervento:</b>", normal_style))
                     story.append(Spacer(1, 6))
-                    # Aggiunge l'immagine della firma ridimensionata nel PDF
                     rl_img = RLImage(img_bytes, width=180, height=70)
                     story.append(rl_img)
             except Exception as e:
                 print(f"Errore durante l'inserimento della firma nel PDF: {e}")
-                story.append(Paragraph("<i>(Firma registrata ma non caricabile nel PDF)</i>", normal_style))
+                story.append(Paragraph("<i>(Firma non presente o non caricabile)</i>", normal_style))
 
-    # Generazione file
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
