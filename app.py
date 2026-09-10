@@ -610,16 +610,10 @@ def pagina_nuovo_ticket():
 
     st.title("➕ Nuovo Ticket")
 
-    # Messaggio mostrato dopo il salvataggio, quando la pagina viene
-    # riportata automaticamente al modulo di creazione.
     ticket_creato_id = st.session_state.pop("ticket_creato_id", None)
     if ticket_creato_id is not None:
-        st.success(
-            f"🎉 Ticket #{ticket_creato_id} creato correttamente!"
-        )
-        st.info(
-            "Il modulo è pronto per inserire un nuovo ticket."
-        )
+        st.success(f"🎉 Ticket #{ticket_creato_id} creato correttamente!")
+        st.info("Il modulo è pronto per inserire un nuovo ticket.")
         st.balloons()
 
     # ========================================================
@@ -893,11 +887,10 @@ def pagina_nuovo_ticket():
                     foto
                 )
 
-            # Dopo la creazione torniamo sempre alla schermata
-            # "➕ Nuovo Ticket", pronta per inserire un altro ticket.
+            # Torna alla schermata Nuovo Ticket e mostra il messaggio
+            # una sola volta dopo il rerun.
             st.session_state.pagina = "Nuovo Ticket"
             st.session_state.ticket_creato_id = ticket_id
-
             st.rerun()
 
         except Exception as e:
@@ -1540,345 +1533,150 @@ def mostra_ticket(ticket):
 # ============================================================
 
 def genera_pdf(ticket):
+    """Genera un report PDF professionale del ticket."""
 
     buffer = BytesIO()
-
-    # ========================================================
-    # STILI PDF
-    # ========================================================
-
-    styles = getSampleStyleSheet()
-
-    stile_titolo = styles["Title"].clone("TicketTitle")
-    stile_titolo.fontName = "Helvetica-Bold"
-    stile_titolo.fontSize = 20
-    stile_titolo.leading = 24
-    stile_titolo.spaceAfter = 4
-
-    stile_sottotitolo = styles["Normal"].clone("TicketSubtitle")
-    stile_sottotitolo.fontName = "Helvetica"
-    stile_sottotitolo.fontSize = 9
-    stile_sottotitolo.textColor = colors.grey
-    stile_sottotitolo.spaceAfter = 12
-
-    stile_sezione = styles["Heading2"].clone("TicketSection")
-    stile_sezione.fontName = "Helvetica-Bold"
-    stile_sezione.fontSize = 13
-    stile_sezione.leading = 16
-    stile_sezione.spaceBefore = 10
-    stile_sezione.spaceAfter = 8
-
-    stile_testo = styles["BodyText"].clone("TicketBody")
-    stile_testo.fontName = "Helvetica"
-    stile_testo.fontSize = 9.5
-    stile_testo.leading = 14
-    stile_testo.spaceAfter = 6
-
-    def testo_pdf(valore):
-        """Converte il testo in una forma sicura per ReportLab."""
-        if valore is None:
-            return "-"
-        valore = str(valore).strip()
-        if not valore:
-            return "-"
-        return (valore.replace("&", "&amp;")
-                      .replace("<", "&lt;")
-                      .replace(">", "&gt;")
-                      .replace("\n", "<br/>"))
-
-    def intestazione_pagina(canvas, doc):
-        canvas.saveState()
-        larghezza, altezza = A4
-
-        canvas.setStrokeColor(colors.HexColor("#D9D9D9"))
-        canvas.line(40, altezza - 42, larghezza - 40, altezza - 42)
-
-        canvas.setFont("Helvetica-Bold", 8)
-        canvas.setFillColor(colors.HexColor("#555555"))
-        canvas.drawString(40, altezza - 32, "GESTIONE TICKET")
-        canvas.setFont("Helvetica", 8)
-        canvas.drawRightString(
-            larghezza - 40,
-            altezza - 32,
-            f"Ticket #{ticket.get('id', '')}"
-        )
-
-        canvas.line(40, 35, larghezza - 40, 35)
-        canvas.setFont("Helvetica", 7.5)
-        canvas.setFillColor(colors.HexColor("#777777"))
-        canvas.drawString(40, 23, "Report generato automaticamente da Gestione Ticket")
-        canvas.drawRightString(larghezza - 40, 23, f"Pagina {doc.page}")
-        canvas.restoreState()
-
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
         rightMargin=40,
         leftMargin=40,
-        topMargin=58,
-        bottomMargin=48
+        topMargin=55,
+        bottomMargin=45
     )
+
+    styles = getSampleStyleSheet()
+    styles["Title"].fontSize = 18
+    styles["Title"].leading = 22
+    styles["Heading2"].fontSize = 13
+    styles["Heading2"].leading = 16
+    styles["BodyText"].fontSize = 9.5
+    styles["BodyText"].leading = 13
 
     elementi = []
+    ticket_id = ticket.get("id", "")
+    stato = ticket.get("stato", "")
+    priorita = ticket.get("priorita", "")
 
-    # ========================================================
-    # INTESTAZIONE TICKET
-    # ========================================================
-
-    elementi.append(
-        Paragraph(
-            f"Ticket #{testo_pdf(ticket.get('id', ''))}",
-            stile_titolo
-        )
-    )
-    elementi.append(
-        Paragraph(
-            testo_pdf(ticket.get("titolo", "Senza titolo")),
-            stile_sottotitolo
-        )
-    )
-
-    # ========================================================
-    # RIEPILOGO
-    # ========================================================
-
-    elementi.append(Paragraph("Riepilogo ticket", stile_sezione))
+    elementi.append(Paragraph("GESTIONE TICKET", styles["Title"]))
+    elementi.append(Paragraph(
+        f"<b>Ticket #{ticket_id}</b> — {ticket.get('titolo', '')}",
+        styles["Heading2"]
+    ))
+    elementi.append(Spacer(1, 12))
 
     dati = [
-        ["Categoria", testo_pdf(ticket.get("categoria", ""))],
-        ["Priorità", testo_pdf(ticket.get("priorita", ""))],
-        ["Stato", testo_pdf(ticket.get("stato", ""))],
-        ["Creato da", testo_pdf(ticket.get("creato_da", ""))],
-        ["Assegnato a", testo_pdf(ticket.get("assegnato_a", ""))]
+        ["Categoria", ticket.get("categoria", "")],
+        ["Priorità", priorita],
+        ["Stato", stato],
+        ["Creato da", ticket.get("creato_da", "")],
+        ["Tecnico assegnato", ticket.get("assegnato_a", "")]
     ]
 
-    tabella = Table(
-        dati,
-        colWidths=[125, 365],
-        repeatRows=0
-    )
-
-    tabella.setStyle(
-        TableStyle([
-            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F3F5")),
-            ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#333333")),
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-            ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D0D4D8")),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-            ("TOPPADDING", (0, 0), (-1, -1), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 7)
-        ])
-    )
-
+    tabella = Table(dati, colWidths=[145, 365], repeatRows=0)
+    tabella.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eeeeee")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("PADDING", (0, 0), (-1, -1), 7)
+    ]))
     elementi.append(tabella)
+    elementi.append(Spacer(1, 16))
 
-    # ========================================================
-    # PROBLEMA SEGNALATO
-    # ========================================================
+    elementi.append(Paragraph("Problema segnalato", styles["Heading2"]))
+    descrizione = str(ticket.get("descrizione", "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+    elementi.append(Paragraph(descrizione or "Nessuna descrizione.", styles["BodyText"]))
 
-    elementi.append(Paragraph("Problema segnalato", stile_sezione))
-    elementi.append(
-        Paragraph(
-            testo_pdf(ticket.get("descrizione", "")),
-            stile_testo
-        )
-    )
-
-    # ========================================================
-    # INTERVENTO TECNICO
-    # ========================================================
-
-    intervento = get_intervento(ticket["id"])
-
+    intervento = get_intervento(ticket_id)
     if intervento:
-
-        elementi.append(Paragraph("Intervento tecnico", stile_sezione))
-
-        dati_intervento = [
-            ["Tecnico", testo_pdf(intervento.get("tecnico", ""))],
-            [
-                "Data intervento",
-                testo_pdf(format_data(intervento.get("data_intervento")))
-            ],
-            ["Esito", testo_pdf(intervento.get("stato", ""))]
+        elementi.append(Spacer(1, 18))
+        elementi.append(Paragraph("Intervento tecnico", styles["Heading2"]))
+        info_intervento = [
+            ["Tecnico", intervento.get("tecnico", "")],
+            ["Data intervento", format_data(intervento.get("data_intervento"))],
+            ["Esito", intervento.get("stato", "")]
         ]
-
-        tabella_intervento = Table(
-            dati_intervento,
-            colWidths=[125, 365]
-        )
-        tabella_intervento.setStyle(
-            TableStyle([
-                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F3F5")),
-                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D0D4D8")),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 7),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 7)
-            ])
-        )
-        elementi.append(tabella_intervento)
+        tab_intervento = Table(info_intervento, colWidths=[145, 365])
+        tab_intervento.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eeeeee")),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("PADDING", (0, 0), (-1, -1), 7),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE")
+        ]))
+        elementi.append(tab_intervento)
         elementi.append(Spacer(1, 10))
 
-        elementi.append(
-            Paragraph(
-                "Descrizione dell'intervento",
-                styles["Heading3"]
-            )
-        )
-        elementi.append(
-            Paragraph(
-                testo_pdf(intervento.get("descrizione", "")),
-                stile_testo
-            )
-        )
-
-        # ====================================================
-        # FIRMA TECNICO
-        # ====================================================
+        testo_intervento = str(intervento.get("descrizione", "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+        elementi.append(Paragraph(testo_intervento or "Nessuna descrizione dell'intervento.", styles["BodyText"]))
 
         firma_path = intervento.get("firma_path")
-
         if firma_path:
             firma_bytes = scarica_firma_intervento(firma_path)
-
             if firma_bytes:
                 try:
-                    elementi.append(Spacer(1, 10))
-                    elementi.append(
-                        Paragraph(
-                            "Firma del tecnico",
-                            styles["Heading3"]
-                        )
-                    )
-
+                    elementi.append(Spacer(1, 14))
+                    elementi.append(Paragraph("Firma del tecnico", styles["Heading2"]))
                     firma_reader = ImageReader(BytesIO(firma_bytes))
                     larghezza, altezza = firma_reader.getSize()
-                    max_larghezza = 250
-                    max_altezza = 90
-                    rapporto = min(
-                        max_larghezza / larghezza,
-                        max_altezza / altezza,
-                        1
-                    )
-
-                    elementi.append(
-                        RLImage(
-                            BytesIO(firma_bytes),
-                            width=larghezza * rapporto,
-                            height=altezza * rapporto
-                        )
-                    )
-                    elementi.append(Spacer(1, 5))
-                    elementi.append(
-                        Paragraph(
-                            testo_pdf(intervento.get("tecnico", "")),
-                            stile_sottotitolo
-                        )
-                    )
-
+                    rapporto = min(260 / larghezza, 100 / altezza, 1)
+                    elementi.append(RLImage(
+                        BytesIO(firma_bytes),
+                        width=larghezza * rapporto,
+                        height=altezza * rapporto
+                    ))
                 except Exception:
-                    elementi.append(
-                        Paragraph(
-                            "Firma del tecnico non disponibile nel PDF.",
-                            stile_testo
-                        )
-                    )
+                    pass
 
-    # ========================================================
-    # FOTO E ALLEGATI
-    # ========================================================
+    allegati = get_allegati(ticket_id)
+    immagini = [
+        a for a in allegati
+        if a.get("tipo_file", "").startswith("image/") and a.get("percorso_file")
+    ]
 
-    allegati = get_allegati(ticket["id"])
-    immagini_aggiunte = False
-    numero_allegati = len(allegati)
+    if immagini:
+        elementi.append(Spacer(1, 18))
+        elementi.append(Paragraph("Documentazione fotografica", styles["Heading2"]))
+        elementi.append(Paragraph(
+            f"Immagini allegate: {len(immagini)}",
+            styles["BodyText"]
+        ))
 
-    if numero_allegati:
-        elementi.append(Paragraph("Allegati", stile_sezione))
-        elementi.append(
-            Paragraph(
-                f"Numero allegati: {numero_allegati}",
-                stile_sottotitolo
-            )
-        )
+        for allegato in immagini:
+            contenuto = scarica_allegato(allegato.get("percorso_file"))
+            if not contenuto:
+                continue
+            try:
+                reader = ImageReader(BytesIO(contenuto))
+                larghezza, altezza = reader.getSize()
+                rapporto = min(500 / larghezza, 600 / altezza, 1)
+                nome = str(allegato.get("nome_file", "Foto")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                elementi.append(Spacer(1, 8))
+                elementi.append(Paragraph(nome, styles["BodyText"]))
+                elementi.append(RLImage(
+                    BytesIO(contenuto),
+                    width=larghezza * rapporto,
+                    height=altezza * rapporto
+                ))
+            except Exception:
+                elementi.append(Paragraph(
+                    "Impossibile inserire una delle immagini allegate.",
+                    styles["BodyText"]
+                ))
 
-    for allegato in allegati:
+    def intestazione_pagina(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.drawString(40, 25, f"Gestione Ticket — Ticket #{ticket_id}")
+        canvas.drawRightString(555, 25, f"Pagina {doc.page}")
+        canvas.restoreState()
 
-        tipo_file = allegato.get("tipo_file", "")
-        nome_file = allegato.get("nome_file", "")
-        percorso_file = allegato.get("percorso_file", "")
-
-        if tipo_file.startswith("image/") and percorso_file:
-
-            contenuto = scarica_allegato(percorso_file)
-
-            if contenuto:
-
-                if not immagini_aggiunte:
-                    elementi.append(
-                        Paragraph(
-                            "Documentazione fotografica",
-                            styles["Heading3"]
-                        )
-                    )
-                    immagini_aggiunte = True
-
-                try:
-                    immagine_buffer = BytesIO(contenuto)
-                    image_reader = ImageReader(immagine_buffer)
-                    larghezza, altezza = image_reader.getSize()
-
-                    max_larghezza = 490
-                    max_altezza = 520
-                    rapporto = min(
-                        max_larghezza / larghezza,
-                        max_altezza / altezza,
-                        1
-                    )
-
-                    elementi.append(
-                        Paragraph(
-                            testo_pdf(nome_file),
-                            stile_sottotitolo
-                        )
-                    )
-                    elementi.append(
-                        RLImage(
-                            BytesIO(contenuto),
-                            width=larghezza * rapporto,
-                            height=altezza * rapporto
-                        )
-                    )
-                    elementi.append(Spacer(1, 12))
-
-                except Exception:
-                    elementi.append(
-                        Paragraph(
-                            f"Impossibile inserire l'immagine {testo_pdf(nome_file)}.",
-                            stile_testo
-                        )
-                    )
-
-    # ========================================================
-    # GENERAZIONE
-    # ========================================================
-
-    doc.build(
-        elementi,
-        onFirstPage=intestazione_pagina,
-        onLaterPages=intestazione_pagina
-    )
-
+    doc.build(elementi, onFirstPage=intestazione_pagina, onLaterPages=intestazione_pagina)
     buffer.seek(0)
-
     return buffer.getvalue()
 
 
@@ -1889,7 +1687,7 @@ def genera_pdf(ticket):
 def pagina_dashboard():
 
     st.title("🏠 Dashboard")
-    st.caption("Centro di controllo della gestione ticket")
+    st.caption("Centro di controllo dei ticket e delle attività tecniche")
 
     tickets = get_tickets()
 
@@ -1897,196 +1695,144 @@ def pagina_dashboard():
         st.info("Non ci sono ancora ticket.")
         return
 
-    # ========================================================
-    # KPI PRINCIPALI
-    # ========================================================
-
-    aperti = sum(1 for t in tickets if t.get("stato") == "Aperto")
-    lavorazione = sum(
-        1 for t in tickets
-        if t.get("stato") == "In lavorazione"
-    )
-    risolti = sum(1 for t in tickets if t.get("stato") == "Risolto")
-    chiusi = sum(1 for t in tickets if t.get("stato") == "Chiuso")
-    urgenti = sum(1 for t in tickets if t.get("priorita") == "Urgente")
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    col1.metric("🎫 Totali", len(tickets))
-    col2.metric("🟢 Aperti", aperti)
-    col3.metric("🟠 In lavorazione", lavorazione)
-    col4.metric("🔵 Risolti", risolti)
-    col5.metric("🔴 Urgenti", urgenti)
-
-    st.divider()
-
-    # ========================================================
+    # --------------------------------------------------------
     # FILTRI
-    # ========================================================
-
+    # --------------------------------------------------------
     st.subheader("🔎 Filtra ticket")
 
-    col1, col2, col3 = st.columns(3)
-
-    testo = col1.text_input(
-        "Cerca",
-        placeholder="Titolo o descrizione...",
-        key="dashboard_cerca"
-    )
-
-    stati = ["Tutti"] + sorted({
-        str(t.get("stato", ""))
-        for t in tickets
-        if t.get("stato")
-    })
-    filtro_stato = col2.selectbox(
-        "Stato",
-        stati,
-        key="dashboard_stato"
-    )
-
-    priorita_opzioni = ["Tutte"] + sorted({
-        str(t.get("priorita", ""))
-        for t in tickets
-        if t.get("priorita")
-    })
-    filtro_priorita = col3.selectbox(
-        "Priorità",
-        priorita_opzioni,
-        key="dashboard_priorita"
-    )
-
-    col4, col5 = st.columns(2)
-
     tecnici = sorted({
-        str(t.get("assegnato_a", ""))
-        for t in tickets
+        t.get("assegnato_a") for t in tickets
         if t.get("assegnato_a")
     })
-    filtro_tecnico = col4.selectbox(
-        "👷 Tecnico",
-        ["Tutti"] + tecnici,
-        key="dashboard_tecnico"
-    )
-
     categorie = sorted({
-        str(t.get("categoria", ""))
-        for t in tickets
+        t.get("categoria") for t in tickets
         if t.get("categoria")
     })
-    filtro_categoria = col5.selectbox(
-        "🏷️ Categoria",
-        ["Tutte"] + categorie,
-        key="dashboard_categoria"
-    )
-
-    # ========================================================
-    # APPLICA FILTRI
-    # ========================================================
-
-    tickets_filtrati = []
-
-    testo_lower = testo.strip().lower()
-
-    for ticket in tickets:
-        titolo = str(ticket.get("titolo", ""))
-        descrizione = str(ticket.get("descrizione", ""))
-
-        if testo_lower and testo_lower not in (
-            titolo + " " + descrizione
-        ).lower():
-            continue
-
-        if filtro_stato != "Tutti" and ticket.get("stato") != filtro_stato:
-            continue
-
-        if (
-            filtro_priorita != "Tutte"
-            and ticket.get("priorita") != filtro_priorita
-        ):
-            continue
-
-        if (
-            filtro_tecnico != "Tutti"
-            and ticket.get("assegnato_a") != filtro_tecnico
-        ):
-            continue
-
-        if (
-            filtro_categoria != "Tutte"
-            and ticket.get("categoria") != filtro_categoria
-        ):
-            continue
-
-        tickets_filtrati.append(ticket)
-
-    st.write(
-        f"**{len(tickets_filtrati)}** ticket corrispondenti ai filtri selezionati."
-    )
-
-    st.divider()
-
-    # ========================================================
-    # STATISTICHE
-    # ========================================================
-
-    st.subheader("📊 Panoramica")
 
     col1, col2 = st.columns(2)
-
-    stati_dashboard = {}
-    for ticket in tickets_filtrati:
-        stato = ticket.get("stato") or "Senza stato"
-        stati_dashboard[stato] = stati_dashboard.get(stato, 0) + 1
-
-    categorie_dashboard = {}
-    for ticket in tickets_filtrati:
-        categoria = ticket.get("categoria") or "Senza categoria"
-        categorie_dashboard[categoria] = (
-            categorie_dashboard.get(categoria, 0) + 1
+    with col1:
+        ricerca = st.text_input(
+            "🔎 Cerca",
+            placeholder="Titolo o descrizione...",
+            key="dashboard_ricerca"
+        )
+    with col2:
+        stato_filtro = st.selectbox(
+            "Stato",
+            ["Tutti", "Aperto", "In lavorazione", "Risolto", "Chiuso"],
+            key="dashboard_stato"
         )
 
-    with col1:
-        st.markdown("**📌 Ticket per stato**")
-        if stati_dashboard:
-            st.bar_chart(stati_dashboard)
-        else:
-            st.info("Nessun dato disponibile.")
+    col3, col4, col5 = st.columns(3)
+    with col3:
+        priorita_filtro = st.selectbox(
+            "Priorità",
+            ["Tutte", "Bassa", "Media", "Alta", "Urgente"],
+            key="dashboard_priorita"
+        )
+    with col4:
+        tecnico_filtro = st.selectbox(
+            "👷 Tecnico",
+            ["Tutti"] + tecnici,
+            key="dashboard_tecnico"
+        )
+    with col5:
+        categoria_filtro = st.selectbox(
+            "🏷️ Categoria",
+            ["Tutte"] + categorie,
+            key="dashboard_categoria"
+        )
 
-    with col2:
-        st.markdown("**🏷️ Ticket per categoria**")
-        if categorie_dashboard:
-            st.bar_chart(categorie_dashboard)
-        else:
-            st.info("Nessun dato disponibile.")
+    filtrati = []
+    testo = ricerca.strip().lower()
 
-    st.markdown("**👷 Ticket per tecnico**")
+    for ticket in tickets:
+        if testo:
+            contenuto = (
+                f"{ticket.get('titolo', '')} "
+                f"{ticket.get('descrizione', '')}"
+            ).lower()
+            if testo not in contenuto:
+                continue
 
-    tecnici_dashboard = {}
-    for ticket in tickets_filtrati:
-        tecnico = ticket.get("assegnato_a") or "Non assegnato"
-        tecnici_dashboard[tecnico] = tecnici_dashboard.get(tecnico, 0) + 1
+        if stato_filtro != "Tutti" and ticket.get("stato") != stato_filtro:
+            continue
+        if priorita_filtro != "Tutte" and ticket.get("priorita") != priorita_filtro:
+            continue
+        if tecnico_filtro != "Tutti" and ticket.get("assegnato_a") != tecnico_filtro:
+            continue
+        if categoria_filtro != "Tutte" and ticket.get("categoria") != categoria_filtro:
+            continue
 
-    if tecnici_dashboard:
-        st.bar_chart(tecnici_dashboard)
-    else:
-        st.info("Nessun dato disponibile.")
+        filtrati.append(ticket)
+
+    # --------------------------------------------------------
+    # KPI
+    # --------------------------------------------------------
+    aperti = sum(t.get("stato") == "Aperto" for t in filtrati)
+    lavorazione = sum(t.get("stato") == "In lavorazione" for t in filtrati)
+    risolti = sum(t.get("stato") == "Risolto" for t in filtrati)
+    chiusi = sum(t.get("stato") == "Chiuso" for t in filtrati)
+    urgenti = sum(t.get("priorita") == "Urgente" for t in filtrati)
 
     st.divider()
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("🎫 Totali", len(filtrati))
+    k2.metric("🟢 Aperti", aperti)
+    k3.metric("🟠 In lavorazione", lavorazione)
+    k4.metric("🔵 Risolti", risolti)
+    k5.metric("🔴 Urgenti", urgenti)
 
-    # ========================================================
-    # TICKET RECENTI
-    # ========================================================
+    # --------------------------------------------------------
+    # DISTRIBUZIONI
+    # --------------------------------------------------------
+    st.divider()
+    grafico1, grafico2 = st.columns(2)
 
-    st.subheader("🎫 Ticket recenti")
+    with grafico1:
+        st.subheader("📊 Ticket per stato")
+        stati = ["Aperto", "In lavorazione", "Risolto", "Chiuso"]
+        dati_stato = {
+            stato: sum(t.get("stato") == stato for t in filtrati)
+            for stato in stati
+        }
+        st.bar_chart(dati_stato)
 
-    recenti = tickets_filtrati[:5]
+    with grafico2:
+        st.subheader("🏷️ Ticket per categoria")
+        dati_categoria = {}
+        for ticket in filtrati:
+            categoria = ticket.get("categoria") or "Senza categoria"
+            dati_categoria[categoria] = dati_categoria.get(categoria, 0) + 1
+        if dati_categoria:
+            st.bar_chart(dati_categoria)
+        else:
+            st.info("Nessun dato disponibile.")
 
-    if recenti:
-        for ticket in recenti:
-            mostra_ticket(ticket)
-    else:
+    st.subheader("👷 Ticket per tecnico")
+    dati_tecnico = {}
+    for ticket in filtrati:
+        tecnico = ticket.get("assegnato_a") or "Non assegnato"
+        dati_tecnico[tecnico] = dati_tecnico.get(tecnico, 0) + 1
+    if dati_tecnico:
+        st.bar_chart(dati_tecnico)
+
+    # --------------------------------------------------------
+    # TICKET RECENTI / RISULTATI
+    # --------------------------------------------------------
+    st.divider()
+    st.subheader("🎫 Ticket risultanti")
+    st.caption(f"Visualizzati {len(filtrati)} ticket in base ai filtri selezionati.")
+
+    if not filtrati:
         st.info("Nessun ticket corrisponde ai filtri selezionati.")
+        return
+
+    for ticket in filtrati[:5]:
+        mostra_ticket(ticket)
+
+    if len(filtrati) > 5:
+        st.caption(f"Sono presenti altri {len(filtrati) - 5} ticket. Usa '🎫 Ticket Gestiti' per consultarli tutti.")
 
 
 # ============================================================
