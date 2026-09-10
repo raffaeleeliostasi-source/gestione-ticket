@@ -3,6 +3,7 @@ from streamlit_drawable_canvas import st_canvas
 from supabase import create_client, Client
 from datetime import datetime
 from io import BytesIO
+from html import escape
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -10,7 +11,8 @@ from reportlab.platypus import (
     Spacer,
     Table,
     TableStyle,
-    Image as RLImage
+    Image as RLImage,
+    KeepTogether
 )
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
