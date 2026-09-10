@@ -96,7 +96,7 @@ def mostra_dettaglio_ticket(ticket_id):
     desc_iniziale = intervento_esistente.get("descrizione", "") if intervento_esistente else ""
     stato_iniziale = intervento_esistente.get("stato", ticket.get("stato", "Aperto"))
 
-    stabili_stati = ["Aperto", "In Lavorazione", "In Attesa", "Risolto", "Chiuso"]
+    stabili_stati = ["In Lavorazione", "Risolto"]
     try:
         idx_stato = stabili_stati.index(stato_iniziale)
     except ValueError:
