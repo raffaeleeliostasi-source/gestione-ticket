@@ -259,7 +259,6 @@ def mostra_dettaglio_ticket(ticket_id):
                 )
 
                 if successo:
-                    # Aggiorna lo stato del ticket principale e chiudi la vista dettaglio tornando all'elenco
                     db.supabase.table("tickets").update({"stato": nuovo_stato}).eq("id", ticket_id).execute()
                     st.success("✅ Intervento salvato con successo!")
                     st.session_state.pop("ticket_aperto", None)
