@@ -68,8 +68,10 @@ def pagina_nuovo_ticket():
 
 def mostra_ticket(ticket):
     tid = ticket["id"]
-    chiuso = ticket.get("stato") == "Chiuso"
-    with st.expander(f"🎫 #{tid} - {ticket['titolo']} | {ticket.get('stato')}"):
+    stato_attuale = ticket.get("stato", "Aperto")
+    chiuso = stato_attuale == "Chiuso"
+    
+    with st.expander(f"🎫 #{tid} - {ticket['titolo']} | {stato_attuale}"):
         st.write(f"**Categoria:** {ticket.get('categoria')} | **Priorità:** {ticket.get('priorita')}")
         st.write(f"**Tecnico:** {ticket.get('assegnato_a')} | **Creato da:** {ticket.get('creato_da')}")
         st.write("### 📝 Descrizione", ticket.get("descrizione"))
@@ -78,6 +80,7 @@ def mostra_ticket(ticket):
         if intervento:
             st.success(f"Intervento eseguito da {intervento.get('tecnico')}: {intervento.get('descrizione')}")
 
+        # --- SEZIONE TECNICO ---
         if not is_admin() and ticket.get("assegnato_a") == st.session_state.username and not chiuso:
             st.subheader("🛠️ Registra Intervento")
             desc_int = st.text_area("Cosa hai fatto?", key=f"desc_{tid}")
@@ -86,7 +89,6 @@ def mostra_ticket(ticket):
 
             if st.button("💾 Salva intervento", key=f"btn_int_{tid}"):
                 firma_path = None
-                # Lettura sicura dei dati del canvas per evitare RuntimeError
                 if nuovo_stato == "Risolto":
                     try:
                         if canvas is not None and canvas.image_data is not None:
@@ -94,17 +96,35 @@ def mostra_ticket(ticket):
                             buf = BytesIO()
                             img.save(buf, format="PNG")
                             ok, firma_path = db.salva_firma_intervento(tid, buf.getvalue(), st.session_state.username)
-                    except Exception as e:
+                    except Exception:
                         st.warning("Impossibile salvare la firma, l'intervento verrà comunque registrato.")
 
                 db.salva_intervento_tecnico(tid, st.session_state.username, desc_int, nuovo_stato, firma_path)
                 st.rerun()
 
+        # --- AZIONI AMMINISTRATORE ---
         if is_admin():
-            col1, col2 = st.columns(2)
+            st.divider()
+            c1, c2, c3 = st.columns(3)
+            
+            # Scarica PDF
             pdf = pdf_generator.genera_pdf(ticket)
-            col1.download_button("📄 Scarica PDF", pdf, file_name=f"ticket_{tid}.pdf", mime="application/pdf", key=f"pdf_{tid}")
-            if col2.button("🗑️ Elimina", key=f"del_{tid}"):
+            c1.download_button("📄 Scarica PDF", pdf, file_name=f"ticket_{tid}.pdf", mime="application/pdf", key=f"pdf_{tid}")
+
+            # Chiusura / Riapertura Ticket
+            if chiuso:
+                if c2.button("🔄 Riapri Ticket", key=f"reopen_{tid}"):
+                    db.supabase.table("tickets").update({"stato": "Aperto"}).eq("id", tid).execute()
+                    st.success("Ticket riaperto!")
+                    st.rerun()
+            else:
+                if c2.button("🔒 Chiudi Ticket", key=f"close_{tid}"):
+                    db.supabase.table("tickets").update({"stato": "Chiuso"}).eq("id", tid).execute()
+                    st.success("Ticket chiuso definitamente!")
+                    st.rerun()
+
+            # Elimina Ticket
+            if c3.button("🗑️ Elimina", key=f"del_{tid}"):
                 db.elimina_ticket_completo(tid)
                 st.rerun()
 
