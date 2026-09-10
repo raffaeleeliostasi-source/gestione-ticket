@@ -158,7 +158,9 @@ def mostra_dettaglio_ticket(ticket_id):
         if ticket.get("stato") != "Chiuso":
             if col_chiudi.button("🔒 Chiudi Definitivamente", key=f"chiudi_{ticket_id}"):
                 db.supabase.table("tickets").update({"stato": "Chiuso"}).eq("id", ticket_id).execute()
+                db.supabase.table("ticket_interventi").update({"stato": "Chiuso"}).eq("ticket_id", ticket_id).execute()
                 st.success("Ticket chiuso con successo!")
+                st.session_state.pop("ticket_aperto", None)
                 st.rerun()
         else:
             col_chiudi.success("✅ Il ticket è attualmente chiuso.")
