@@ -1533,149 +1533,291 @@ def mostra_ticket(ticket):
 # ============================================================
 
 def genera_pdf(ticket):
-    """Genera un report PDF professionale del ticket."""
+    """Genera un report PDF professionale e leggibile del ticket."""
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=40,
-        leftMargin=40,
-        topMargin=55,
-        bottomMargin=45
+        rightMargin=42,
+        leftMargin=42,
+        topMargin=78,
+        bottomMargin=55,
+        title=f"Gestione Ticket - Ticket #{ticket.get('id', '')}",
+        author="Gestione Ticket"
     )
 
     styles = getSampleStyleSheet()
-    styles["Title"].fontSize = 18
-    styles["Title"].leading = 22
-    styles["Heading2"].fontSize = 13
-    styles["Heading2"].leading = 16
-    styles["BodyText"].fontSize = 9.5
-    styles["BodyText"].leading = 13
+
+    # --------------------------------------------------------
+    # Stili PDF
+    # --------------------------------------------------------
+    titolo_stile = styles["Title"].clone("TitoloTicket")
+    titolo_stile.fontName = "Helvetica-Bold"
+    titolo_stile.fontSize = 20
+    titolo_stile.leading = 24
+    titolo_stile.spaceAfter = 4
+
+    ticket_stile = styles["Heading2"].clone("NumeroTicket")
+    ticket_stile.fontName = "Helvetica-Bold"
+    ticket_stile.fontSize = 16
+    ticket_stile.leading = 19
+    ticket_stile.spaceBefore = 2
+    ticket_stile.spaceAfter = 4
+
+    titolo_problema_stile = styles["Heading2"].clone("TitoloProblema")
+    titolo_problema_stile.fontName = "Helvetica-Bold"
+    titolo_problema_stile.fontSize = 13
+    titolo_problema_stile.leading = 16
+    titolo_problema_stile.spaceBefore = 4
+    titolo_problema_stile.spaceAfter = 8
+
+    sezione_stile = styles["Heading2"].clone("SezioneTicket")
+    sezione_stile.fontName = "Helvetica-Bold"
+    sezione_stile.fontSize = 12
+    sezione_stile.leading = 15
+    sezione_stile.spaceBefore = 12
+    sezione_stile.spaceAfter = 8
+
+    corpo_stile = styles["BodyText"].clone("CorpoTicket")
+    corpo_stile.fontName = "Helvetica"
+    corpo_stile.fontSize = 9.5
+    corpo_stile.leading = 13.5
+    corpo_stile.spaceAfter = 4
+
+    piccolo_stile = styles["BodyText"].clone("PiccoloTicket")
+    piccolo_stile.fontName = "Helvetica"
+    piccolo_stile.fontSize = 8
+    piccolo_stile.leading = 10
+
+    foto_nome_stile = styles["BodyText"].clone("NomeFoto")
+    foto_nome_stile.fontName = "Helvetica-Bold"
+    foto_nome_stile.fontSize = 8.5
+    foto_nome_stile.leading = 11
+    foto_nome_stile.spaceAfter = 4
 
     elementi = []
     ticket_id = ticket.get("id", "")
-    stato = ticket.get("stato", "")
-    priorita = ticket.get("priorita", "")
+    stato = str(ticket.get("stato", ""))
+    priorita = str(ticket.get("priorita", ""))
+    titolo = str(ticket.get("titolo", ""))
 
-    elementi.append(Paragraph("GESTIONE TICKET", styles["Title"]))
-    elementi.append(Paragraph(
-        f"<b>Ticket #{ticket_id}</b> — {ticket.get('titolo', '')}",
-        styles["Heading2"]
-    ))
-    elementi.append(Spacer(1, 12))
+    def testo(valore, fallback="—"):
+        valore = "" if valore is None else str(valore).strip()
+        return escape(valore) if valore else fallback
+
+    def paragrafo_testo(valore, fallback="Nessun dato disponibile."):
+        valore = "" if valore is None else str(valore).strip()
+        if not valore:
+            valore = fallback
+        return Paragraph(escape(valore).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br/>"), corpo_stile)
+
+    # --------------------------------------------------------
+    # Intestazione documento
+    # --------------------------------------------------------
+    elementi.append(Paragraph("GESTIONE TICKET", titolo_stile))
+    elementi.append(Paragraph(f"TICKET #{escape(str(ticket_id))}", ticket_stile))
+    elementi.append(Paragraph(testo(titolo, "Titolo del problema non specificato"), titolo_problema_stile))
+    elementi.append(Spacer(1, 6))
+
+    # --------------------------------------------------------
+    # Riepilogo ticket
+    # --------------------------------------------------------
+    elementi.append(Paragraph("Riepilogo ticket", sezione_stile))
 
     dati = [
-        ["Categoria", ticket.get("categoria", "")],
-        ["Priorità", priorita],
-        ["Stato", stato],
-        ["Creato da", ticket.get("creato_da", "")],
-        ["Tecnico assegnato", ticket.get("assegnato_a", "")]
+        ["Categoria", testo(ticket.get("categoria"))],
+        ["Priorità", testo(priorita)],
+        ["Stato", testo(stato)],
+        ["Creato da", testo(ticket.get("creato_da"))],
+        ["Tecnico assegnato", testo(ticket.get("assegnato_a"))]
     ]
 
-    tabella = Table(dati, colWidths=[145, 365], repeatRows=0)
+    tabella = Table(dati, colWidths=[145, 365], repeatRows=1, hAlign="LEFT")
     tabella.setStyle(TableStyle([
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eeeeee")),
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E9EEF5")),
+        ("BACKGROUND", (1, 0), (1, -1), colors.HexColor("#F8FAFC")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1F2937")),
         ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
         ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("PADDING", (0, 0), (-1, -1), 7)
+        ("GRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+        ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#94A3B8")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
     ]))
     elementi.append(tabella)
-    elementi.append(Spacer(1, 16))
 
-    elementi.append(Paragraph("Problema segnalato", styles["Heading2"]))
-    descrizione = str(ticket.get("descrizione", "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
-    elementi.append(Paragraph(descrizione or "Nessuna descrizione.", styles["BodyText"]))
+    # --------------------------------------------------------
+    # Problema segnalato
+    # --------------------------------------------------------
+    elementi.append(Paragraph("Problema segnalato", sezione_stile))
+    elementi.append(paragrafo_testo(ticket.get("descrizione"), "Nessuna descrizione del problema."))
 
+    # --------------------------------------------------------
+    # Intervento tecnico
+    # --------------------------------------------------------
     intervento = get_intervento(ticket_id)
     if intervento:
-        elementi.append(Spacer(1, 18))
-        elementi.append(Paragraph("Intervento tecnico", styles["Heading2"]))
+        elementi.append(Paragraph("Intervento tecnico", sezione_stile))
+
         info_intervento = [
-            ["Tecnico", intervento.get("tecnico", "")],
-            ["Data intervento", format_data(intervento.get("data_intervento"))],
-            ["Esito", intervento.get("stato", "")]
+            ["Tecnico", testo(intervento.get("tecnico"))],
+            ["Data dell'intervento", testo(format_data(intervento.get("data_intervento")))],
+            ["Esito dell'intervento", testo(intervento.get("stato"))]
         ]
-        tab_intervento = Table(info_intervento, colWidths=[145, 365])
+
+        tab_intervento = Table(info_intervento, colWidths=[170, 340], hAlign="LEFT")
         tab_intervento.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eeeeee")),
+            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E9EEF5")),
+            ("BACKGROUND", (1, 0), (1, -1), colors.HexColor("#F8FAFC")),
             ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
             ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("PADDING", (0, 0), (-1, -1), 7),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE")
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+            ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#94A3B8")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 9),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ]))
         elementi.append(tab_intervento)
-        elementi.append(Spacer(1, 10))
+        elementi.append(Spacer(1, 9))
 
-        testo_intervento = str(intervento.get("descrizione", "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
-        elementi.append(Paragraph(testo_intervento or "Nessuna descrizione dell'intervento.", styles["BodyText"]))
+        elementi.append(Paragraph("Descrizione dell'intervento", piccolo_stile))
+        elementi.append(paragrafo_testo(
+            intervento.get("descrizione"),
+            "Nessuna descrizione dell'intervento."
+        ))
 
+        # Firma grafica del tecnico
         firma_path = intervento.get("firma_path")
         if firma_path:
             firma_bytes = scarica_firma_intervento(firma_path)
             if firma_bytes:
                 try:
-                    elementi.append(Spacer(1, 14))
-                    elementi.append(Paragraph("Firma del tecnico", styles["Heading2"]))
+                    elementi.append(Spacer(1, 10))
+                    elementi.append(Paragraph("✍ Firma grafica del tecnico", sezione_stile))
                     firma_reader = ImageReader(BytesIO(firma_bytes))
                     larghezza, altezza = firma_reader.getSize()
-                    rapporto = min(260 / larghezza, 100 / altezza, 1)
-                    elementi.append(RLImage(
-                        BytesIO(firma_bytes),
-                        width=larghezza * rapporto,
-                        height=altezza * rapporto
-                    ))
+                    if larghezza > 0 and altezza > 0:
+                        rapporto = min(250 / larghezza, 85 / altezza, 1)
+                        elementi.append(RLImage(
+                            BytesIO(firma_bytes),
+                            width=larghezza * rapporto,
+                            height=altezza * rapporto
+                        ))
+                        elementi.append(Spacer(1, 3))
+                        elementi.append(Paragraph(
+                            f"Tecnico: {testo(intervento.get('tecnico'))}",
+                            piccolo_stile
+                        ))
                 except Exception:
                     pass
+    else:
+        elementi.append(Paragraph("Intervento tecnico", sezione_stile))
+        elementi.append(Paragraph("Nessun intervento tecnico registrato.", corpo_stile))
 
-    allegati = get_allegati(ticket_id)
+    # --------------------------------------------------------
+    # Allegati e documentazione fotografica
+    # --------------------------------------------------------
+    allegati = get_allegati(ticket_id) or []
     immagini = [
         a for a in allegati
-        if a.get("tipo_file", "").startswith("image/") and a.get("percorso_file")
+        if str(a.get("tipo_file", "")).startswith("image/")
+        and a.get("percorso_file")
     ]
 
-    if immagini:
-        elementi.append(Spacer(1, 18))
-        elementi.append(Paragraph("Documentazione fotografica", styles["Heading2"]))
-        elementi.append(Paragraph(
-            f"Immagini allegate: {len(immagini)}",
-            styles["BodyText"]
-        ))
+    elementi.append(Paragraph("Documentazione fotografica", sezione_stile))
+    elementi.append(Paragraph(
+        f"Numero allegati: <b>{len(allegati)}</b> &nbsp;&nbsp;|&nbsp;&nbsp; "
+        f"Fotografie: <b>{len(immagini)}</b>",
+        corpo_stile
+    ))
 
-        for allegato in immagini:
+    if immagini:
+        for indice, allegato in enumerate(immagini, start=1):
             contenuto = scarica_allegato(allegato.get("percorso_file"))
             if not contenuto:
                 continue
             try:
                 reader = ImageReader(BytesIO(contenuto))
                 larghezza, altezza = reader.getSize()
-                rapporto = min(500 / larghezza, 600 / altezza, 1)
-                nome = str(allegato.get("nome_file", "Foto")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                elementi.append(Spacer(1, 8))
-                elementi.append(Paragraph(nome, styles["BodyText"]))
-                elementi.append(RLImage(
-                    BytesIO(contenuto),
-                    width=larghezza * rapporto,
-                    height=altezza * rapporto
-                ))
+                if larghezza <= 0 or altezza <= 0:
+                    continue
+
+                # Dimensioni massime per evitare immagini enormi e mantenere
+                # proporzioni originali. ReportLab gestisce il salto pagina.
+                rapporto = min(480 / larghezza, 410 / altezza, 1)
+                nome = testo(allegato.get("nome_file"), f"Fotografia {indice}")
+
+                blocco_foto = [
+                    Spacer(1, 7),
+                    Paragraph(f"Foto {indice} — {nome}", foto_nome_stile),
+                    RLImage(
+                        BytesIO(contenuto),
+                        width=larghezza * rapporto,
+                        height=altezza * rapporto,
+                        hAlign="LEFT"
+                    )
+                ]
+                elementi.append(KeepTogether(blocco_foto))
             except Exception:
                 elementi.append(Paragraph(
-                    "Impossibile inserire una delle immagini allegate.",
-                    styles["BodyText"]
+                    f"Foto {indice}: impossibile inserire l'immagine nel PDF.",
+                    piccolo_stile
                 ))
+    else:
+        elementi.append(Paragraph("Nessuna fotografia allegata.", corpo_stile))
 
+    # --------------------------------------------------------
+    # Intestazione e piè di pagina
+    # --------------------------------------------------------
     def intestazione_pagina(canvas, doc):
         canvas.saveState()
+        larghezza_pagina, altezza_pagina = A4
+
+        # Fascia superiore
+        canvas.setStrokeColor(colors.HexColor("#CBD5E1"))
+        canvas.setLineWidth(0.8)
+        canvas.line(42, altezza_pagina - 50, larghezza_pagina - 42, altezza_pagina - 50)
+
+        canvas.setFont("Helvetica-Bold", 8.5)
+        canvas.setFillColor(colors.HexColor("#334155"))
+        canvas.drawString(42, altezza_pagina - 39, "GESTIONE TICKET")
+
         canvas.setFont("Helvetica", 8)
-        canvas.drawString(40, 25, f"Gestione Ticket — Ticket #{ticket_id}")
-        canvas.drawRightString(555, 25, f"Pagina {doc.page}")
+        canvas.setFillColor(colors.HexColor("#64748B"))
+        canvas.drawRightString(
+            larghezza_pagina - 42,
+            altezza_pagina - 39,
+            f"Ticket #{ticket_id}"
+        )
+
+        # Piè di pagina
+        canvas.setStrokeColor(colors.HexColor("#CBD5E1"))
+        canvas.line(42, 39, larghezza_pagina - 42, 39)
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(colors.HexColor("#64748B"))
+        canvas.drawString(42, 25, "Generato automaticamente da Gestione Ticket")
+        canvas.drawRightString(
+            larghezza_pagina - 42,
+            25,
+            f"Pagina {doc.page}"
+        )
+
         canvas.restoreState()
 
-    doc.build(elementi, onFirstPage=intestazione_pagina, onLaterPages=intestazione_pagina)
+    doc.build(
+        elementi,
+        onFirstPage=intestazione_pagina,
+        onLaterPages=intestazione_pagina
+    )
+
     buffer.seek(0)
     return buffer.getvalue()
 
