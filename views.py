@@ -86,11 +86,17 @@ def mostra_ticket(ticket):
 
             if st.button("💾 Salva intervento", key=f"btn_int_{tid}"):
                 firma_path = None
-                if canvas.image_data is not None and nuovo_stato == "Risolto":
-                    img = Image.fromarray(canvas.image_data.astype("uint8"))
-                    buf = BytesIO()
-                    img.save(buf, format="PNG")
-                    ok, firma_path = db.salva_firma_intervento(tid, buf.getvalue(), st.session_state.username)
+                # Lettura sicura dei dati del canvas per evitare RuntimeError
+                if nuovo_stato == "Risolto":
+                    try:
+                        if canvas is not None and canvas.image_data is not None:
+                            img = Image.fromarray(canvas.image_data.astype("uint8"))
+                            buf = BytesIO()
+                            img.save(buf, format="PNG")
+                            ok, firma_path = db.salva_firma_intervento(tid, buf.getvalue(), st.session_state.username)
+                    except Exception as e:
+                        st.warning("Impossibile salvare la firma, l'intervento verrà comunque registrato.")
+
                 db.salva_intervento_tecnico(tid, st.session_state.username, desc_int, nuovo_stato, firma_path)
                 st.rerun()
 
@@ -110,7 +116,6 @@ def pagina_dashboard():
         st.info("Nessun ticket presente nel sistema.")
         return
 
-    # Se l'utente è un Tecnico, filtra per mostrare i ticket assegnati a lui o creati da lui
     if not is_admin():
         utente_attuale = st.session_state.username.lower()
         tickets = [
