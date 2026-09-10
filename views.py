@@ -163,6 +163,19 @@ def mostra_dettaglio_ticket(ticket_id):
         else:
             col_chiudi.success("✅ Il ticket è attualmente chiuso.")
 
+        # --- SEZIONE ELIMINAZIONE TICKET (ADMIN) ---
+        st.markdown("---")
+        with st.expander("⚠️ Zona Pericolosa - Eliminazione Ticket"):
+            st.warning("L'eliminazione di un ticket è irreversibile.")
+            if st.button("🗑️ Elimina definitivamente questo ticket", key=f"elimina_{ticket_id}", type="secondary"):
+                try:
+                    db.supabase.table("tickets").delete().eq("id", ticket_id).execute()
+                    st.success("Ticket eliminato con successo!")
+                    st.session_state.pop("ticket_aperto", None)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Errore durante l'eliminazione: {e}")
+
     # --- SEZIONE TECNICO ---
     else:
         st.subheader("🛠️ Gestione Intervento Tecnico")
