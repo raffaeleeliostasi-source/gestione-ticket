@@ -187,6 +187,7 @@ def mostra_dettaglio_ticket(ticket_id):
                 height=150,
                 width=400,
                 drawing_mode="freedraw",
+                return_image_data=True,
                 key=f"canvas_firma_{ticket_id}"
             )
 
