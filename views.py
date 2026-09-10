@@ -103,13 +103,51 @@ def mostra_ticket(ticket):
                 st.rerun()
 
 def pagina_dashboard():
-    st.title("🏠 Dashboard")
+    st.title("🏠 Dashboard Ticket")
+    
     tickets = db.get_tickets()
     if not tickets:
-        st.info("Nessun ticket presente.")
+        st.info("Nessun ticket presente nel sistema.")
         return
-    st.metric("Totale Ticket", len(tickets))
-    for t in tickets[:10]:
+
+    # --- BARRA DI RICERCA E FILTRI ---
+    with st.expander("🔍 Filtri e Ricerca", expanded=True):
+        col_search, col_stato, col_prio = st.columns([2, 1, 1])
+        
+        testo_ricerca = col_search.text_input("Cerca (Titolo, Descrizione, ID o Creatore)", "").lower()
+        stato_selezionato = col_stato.selectbox("Stato", ["Tutti", "Aperto", "In lavorazione", "Risolto", "Chiuso"])
+        priorita_selezionata = col_prio.selectbox("Priorità", ["Tutte", "Bassa", "Media", "Alta", "Urgente"])
+
+    # --- LOGICA DI FILTRAGGIO ---
+    tickets_filtrati = []
+    for t in tickets:
+        match_testo = (
+            testo_ricerca in str(t.get("id", "")).lower() or
+            testo_ricerca in t.get("titolo", "").lower() or
+            testo_ricerca in t.get("descrizione", "").lower() or
+            testo_ricerca in t.get("creato_da", "").lower()
+        )
+        
+        match_stato = (stato_selezionato == "Tutti") or (t.get("stato") == stato_selezionato)
+        match_prio = (priorita_selezionata == "Tutte") or (t.get("priorita") == priorita_selezionata)
+
+        if match_testo and match_stato and match_prio:
+            tickets_filtrati.append(t)
+
+    # --- METRICHE RAPIDE ---
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Totale Ticket Visualizzati", len(tickets_filtrati))
+    col2.metric("Aperti / In corso", len([t for t in tickets_filtrati if t.get("stato") in ["Aperto", "In lavorazione"]]))
+    col3.metric("Risolti / Chiusi", len([t for t in tickets_filtrati if t.get("stato") in ["Risolto", "Chiuso"]]))
+
+    st.divider()
+
+    # --- LISTA TICKET ---
+    if not tickets_filtrati:
+        st.warning("Nessun ticket trovato con i criteri di ricerca selezionati.")
+        return
+
+    for t in tickets_filtrati:
         mostra_ticket(t)
 
 def pagina_amministrazione():
