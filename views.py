@@ -75,10 +75,8 @@ def mostra_ticket(ticket):
     risolto = stato_attuale == "Risolto"
     admin_status = is_admin()
     
-    # Mantiene aperto l'expander se il ticket era quello appena salvato/modificato
     expander_aperto = st.session_state.get("ticket_aperto") == tid
 
-    # Ancora HTML per lo scorrimento automatico al ticket
     st.markdown(f'<div id="ticket_{tid}"></div>', unsafe_allow_html=True)
 
     with st.expander(f"🎫 #{tid} - {ticket['titolo']} | {stato_attuale}", expanded=expander_aperto):
@@ -90,7 +88,6 @@ def mostra_ticket(ticket):
         if intervento:
             st.success(f"Intervento eseguito da {intervento.get('tecnico')}: {intervento.get('descrizione')}")
 
-        # --- SEZIONE TECNICO ---
         if not admin_status and str(ticket.get("assegnato_a", "")).lower() == str(st.session_state.get("username", "")).lower() and not chiuso:
             st.subheader("🛠️ Registra Intervento")
             desc_int = st.text_area("Cosa hai fatto?", key=f"desc_{tid}")
@@ -120,28 +117,22 @@ def mostra_ticket(ticket):
                             buf = BytesIO()
                             img.save(buf, format="PNG")
                             ok, firma_path = db.salva_firma_intervento(tid, buf.getvalue(), st.session_state.username)
-                            if not ok:
-                                st.warning("⚠️ Impossibile salvare la firma su Supabase. L'intervento verrà salvato senza firma.")
                         except Exception as e:
                             print(f"Errore generazione firma: {e}")
-                            st.warning("⚠️ Si è verificato un problema con l'immagine della firma.")
 
                 db.salva_intervento_tecnico(tid, st.session_state.username, desc_int, nuovo_stato, firma_path)
                 st.session_state["ticket_aperto"] = tid
                 st.success("✅ Intervento salvato con successo!")
                 st.rerun()
 
-        # --- AZIONI AMMINISTRATORE ---
         if admin_status:
             st.divider()
             st.markdown("### ⚙️ Azioni Amministratore")
             c1, c2, c3 = st.columns(3)
             
-            # Scarica PDF
             pdf = pdf_generator.genera_pdf(ticket)
             c1.download_button("📄 Scarica PDF", pdf, file_name=f"ticket_{tid}.pdf", mime="application/pdf", key=f"pdf_{tid}")
 
-            # Chiusura / Riapertura Ticket
             if chiuso:
                 if c2.button("🔄 Riapri Ticket", key=f"reopen_{tid}"):
                     db.supabase.table("tickets").update({"stato": "Aperto"}).eq("id", tid).execute()
@@ -153,9 +144,8 @@ def mostra_ticket(ticket):
                     st.session_state["ticket_aperto"] = tid
                     st.rerun()
             else:
-                c2.info("⏳ In attesa che il tecnico risolva il ticket per la chiusura.")
+                c2.info("⏳ In attesa che il tecnico risolva il ticket.")
 
-            # Elimina Ticket
             if c3.button("🗑️ Elimina", key=f"del_{tid}"):
                 db.elimina_ticket_completo(tid)
                 if "ticket_aperto" in st.session_state:
@@ -184,15 +174,12 @@ def pagina_dashboard():
         st.info("Non ci sono ticket assegnati a te o creati da te al momento.")
         return
 
-    # --- BARRA DI RICERCA E FILTRI ---
     with st.expander("🔍 Filtri e Ricerca", expanded=False):
         col_search, col_stato, col_prio = st.columns([2, 1, 1])
-        
         testo_ricerca = col_search.text_input("Cerca (Titolo, Descrizione, ID o Creatore)", "").lower()
         stato_selezionato = col_stato.selectbox("Stato", ["Tutti", "Aperto", "In lavorazione", "Risolto", "Chiuso"])
         priorita_selezionata = col_prio.selectbox("Priorità", ["Tutte", "Bassa", "Media", "Alta", "Urgente"])
 
-    # --- LOGICA DI FILTRAGGIO ---
     tickets_filtrati = []
     for t in tickets:
         match_testo = (
@@ -201,14 +188,12 @@ def pagina_dashboard():
             testo_ricerca in t.get("descrizione", "").lower() or
             testo_ricerca in t.get("creato_da", "").lower()
         )
-        
         match_stato = (stato_selezionato == "Tutti") or (t.get("stato") == stato_selezionato)
         match_prio = (priorita_selezionata == "Tutte") or (t.get("priorita") == priorita_selezionata)
 
         if match_testo and match_stato and match_prio:
             tickets_filtrati.append(t)
 
-    # --- METRICHE RAPIDE ---
     col1, col2, col3 = st.columns(3)
     col1.metric("Totale Visualizzati", len(tickets_filtrati))
     col2.metric("Aperti / In corso", len([t for t in tickets_filtrati if t.get("stato") in ["Aperto", "In lavorazione"]]))
@@ -216,7 +201,6 @@ def pagina_dashboard():
 
     st.divider()
 
-    # --- LISTA TICKET ---
     if not tickets_filtrati:
         st.warning("Nessun ticket trovato con i criteri di ricerca selezionati.")
         return
@@ -230,29 +214,20 @@ def pagina_statistiche():
         return
 
     st.title("📊 Statistiche & Report")
-    
     tickets = db.get_tickets()
     if not tickets:
         st.info("Nessun ticket presente per generare statistiche.")
         return
 
     df = pd.DataFrame(tickets)
-
     colonne_utili = {
-        'id': 'ID Ticket',
-        'titolo': 'Titolo',
-        'categoria': 'Categoria',
-        'priorita': 'Priorità',
-        'stato': 'Stato',
-        'assegnato_a': 'Tecnico Assegnato',
-        'creato_da': 'Creato Da',
-        'created_at': 'Data Creazione'
+        'id': 'ID Ticket', 'titolo': 'Titolo', 'categoria': 'Categoria',
+        'priorita': 'Priorità', 'stato': 'Stato', 'assegnato_a': 'Tecnico Assegnato',
+        'creato_da': 'Creato Da', 'created_at': 'Data Creazione'
     }
-    
     cols = [c for c in colonne_utili.keys() if c in df.columns]
     df_export = df[cols].rename(columns=colonne_utili)
 
-    # KPI Generali
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     kpi1.metric("Totale Ticket", len(df))
     kpi2.metric("Ticket Aperti", len(df[df['stato'] == 'Aperto']))
@@ -261,38 +236,17 @@ def pagina_statistiche():
 
     st.divider()
 
-    # Grafici
     col_g1, col_g2 = st.columns(2)
-
     with col_g1:
         st.subheader("📌 Ticket per Categoria")
         if 'categoria' in df.columns:
-            cat_counts = df['categoria'].value_counts()
-            st.bar_chart(cat_counts)
-
+            st.bar_chart(df['categoria'].value_counts())
     with col_g2:
         st.subheader("👷 Ticket per Tecnico")
         if 'assegnato_a' in df.columns:
-            tec_counts = df['assegnato_a'].value_counts()
-            st.bar_chart(tec_counts)
-
-    col_g3, col_g4 = st.columns(2)
-
-    with col_g3:
-        st.subheader("🚦 Ticket per Stato")
-        if 'stato' in df.columns:
-            st_counts = df['stato'].value_counts()
-            st.bar_chart(st_counts)
-
-    with col_g4:
-        st.subheader("⚡ Ticket per Priorità")
-        if 'priorita' in df.columns:
-            prio_counts = df['priorita'].value_counts()
-            st.bar_chart(prio_counts)
+            st.bar_chart(df['assegnato_a'].value_counts())
 
     st.divider()
-
-    # Esportazione in Excel
     st.subheader("📥 Esporta Report in Excel")
     st.dataframe(df_export, use_container_width=True)
 
@@ -316,7 +270,6 @@ def pagina_amministrazione():
     st.title("👨‍💼 Pannello Amministrazione")
     tab_utenti, tab_cat = st.tabs(["👥 Gestione Utenti", "🏷️ Gestione Categorie"])
 
-    # TAB UTENTI
     with tab_utenti:
         st.subheader("➕ Crea Nuovo Utente")
         with st.form("form_nuovo_utente"):
@@ -335,10 +288,8 @@ def pagina_amministrazione():
                     try:
                         pass_hash = auth.genera_hash_password(new_pass)
                         db.supabase.table("utenti").insert({
-                            "username": new_user,
-                            "password": pass_hash,
-                            "ruolo": new_role,
-                            "attivo": True
+                            "username": new_user, "password": pass_hash,
+                            "ruolo": new_role, "attivo": True
                         }).execute()
                         st.success(f"Utente '{new_user}' creato correttamente!")
                         st.rerun()
@@ -348,9 +299,7 @@ def pagina_amministrazione():
         st.divider()
         st.subheader("📋 Lista Utenti")
         res = db.supabase.table("utenti").select("*").order("username").execute()
-        utenti = res.data or []
-
-        for u in utenti:
+        for u in (res.data or []):
             uid = u["id"]
             uname = u["username"]
             attivo = u.get("attivo", True)
@@ -363,26 +312,11 @@ def pagina_amministrazione():
 
                 if c3.button("💾 Aggiorna", key=f"up_{uid}"):
                     db.supabase.table("utenti").update({
-                        "ruolo": nuovo_ruolo,
-                        "attivo": (stato_str == "Attivo")
+                        "ruolo": nuovo_ruolo, "attivo": (stato_str == "Attivo")
                     }).eq("id", uid).execute()
                     st.success("Utente aggiornato!")
                     st.rerun()
 
-                st.markdown("**Reset Password**")
-                p1, p2 = st.columns([3, 1])
-                reset_pass = p1.text_input("Nuova password", type="password", key=f"p_{uid}")
-                if p2.button("🔑 Reset", key=f"res_{uid}"):
-                    err = auth.valida_password(reset_pass)
-                    if err:
-                        for e in err: st.error(e)
-                    else:
-                        db.supabase.table("utenti").update({
-                            "password": auth.genera_hash_password(reset_pass)
-                        }).eq("id", uid).execute()
-                        st.success("Password aggiornata!")
-
-    # TAB CATEGORIE
     with tab_cat:
         st.subheader("➕ Nuova Categoria")
         c_i, c_b = st.columns([3, 1])
@@ -394,22 +328,3 @@ def pagina_amministrazione():
                 st.rerun()
             else:
                 st.error(msg)
-
-        st.divider()
-        st.subheader("📋 Categorie Esistenti")
-        categorie = db.get_categorie(solo_attive=False)
-        for cat in categorie:
-            cid = cat["id"]
-            cnome = cat["nome"]
-            cattiva = cat.get("attivo", True)
-
-            col_n, col_s, col_b = st.columns([2, 1, 1])
-            nuovo_nome = col_n.text_input("Nome", value=cnome, key=f"cname_{cid}")
-            stato_cat = col_s.selectbox("Stato", ["Attiva", "Disattivata"], index=0 if cattiva else 1, key=f"cs_{cid}")
-
-            if col_b.button("💾 Salva", key=f"cbtn_{cid}"):
-                if nuovo_nome != cnome:
-                    db.modifica_categoria(cid, cnome, nuovo_nome)
-                db.cambia_stato_categoria(cid, (stato_cat == "Attiva"))
-                st.success("Categoria aggiornata!")
-                st.rerun()
