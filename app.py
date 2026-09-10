@@ -1208,6 +1208,7 @@ def mostra_ticket(ticket):
                     height=180,
                     width=500,
                     drawing_mode="freedraw",
+                    return_image_data=True,
                     key=f"firma_canvas_{ticket_id}"
                 )
 
@@ -1228,10 +1229,8 @@ def mostra_ticket(ticket):
                         firma_png = None
                         firma_path = None
 
-                        # Verifica prima se il tecnico ha effettivamente
-                        # disegnato qualcosa. NON accediamo a image_data finché
-                        # il canvas non contiene oggetti: su Streamlit Cloud,
-                        # con il canvas vuoto, image_data può generare RuntimeError.
+                        # Verifica se il tecnico ha effettivamente
+                        # disegnato una firma.
                         canvas_json = firma_canvas.json_data
 
                         if (
@@ -1239,24 +1238,38 @@ def mostra_ticket(ticket):
                             and canvas_json.get("objects")
                         ):
 
-                            from PIL import Image
+                            # Recuperiamo l'immagine della firma in modo
+                            # compatibile con le versioni della libreria.
+                            # L'accesso a image_data può sollevare RuntimeError
+                            # quando il canvas non ha un'immagine disponibile.
+                            firma_png = getattr(
+                                firma_canvas,
+                                "image_bytes",
+                                None
+                            )
 
-                            canvas_image = firma_canvas.image_data
+                            # Compatibilità con versioni che espongono
+                            # image_data invece di image_bytes.
+                            if not firma_png:
+                                try:
+                                    canvas_image = firma_canvas.image_data
+                                except (RuntimeError, AttributeError):
+                                    canvas_image = None
 
-                            if canvas_image is not None:
+                                if canvas_image is not None:
+                                    from PIL import Image
 
-                                firma_immagine = Image.fromarray(
-                                    canvas_image.astype("uint8")
-                                )
+                                    firma_immagine = Image.fromarray(
+                                        canvas_image.astype("uint8")
+                                    )
 
-                                buffer_firma = BytesIO()
+                                    buffer_firma = BytesIO()
+                                    firma_immagine.save(
+                                        buffer_firma,
+                                        format="PNG"
+                                    )
 
-                                firma_immagine.save(
-                                    buffer_firma,
-                                    format="PNG"
-                                )
-
-                                firma_png = buffer_firma.getvalue()
+                                    firma_png = buffer_firma.getvalue()
 
                         # La firma è obbligatoria solo per la risoluzione finale.
                         if nuovo_stato == "Risolto" and not firma_png:
