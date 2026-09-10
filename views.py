@@ -158,7 +158,7 @@ def mostra_dettaglio_ticket(ticket_id):
         if ticket.get("stato") != "Chiuso":
             if col_chiudi.button("🔒 Chiudi Definitivamente", key=f"chiudi_{ticket_id}"):
                 db.supabase.table("tickets").update({"stato": "Chiuso"}).eq("id", ticket_id).execute()
-                db.supabase.table("ticket_interventi").upsert({"ticket_id": ticket_id, "stato": "Chiuso"}, on_conflict="ticket_id").execute()
+                db.supabase.table("ticket_interventi").update({"stato": "Chiuso"}).eq("ticket_id", ticket_id).execute()
                 st.success("Ticket chiuso con successo!")
                 st.session_state.pop("ticket_aperto", None)
                 st.rerun()
@@ -169,7 +169,7 @@ def mostra_dettaglio_ticket(ticket_id):
         if ticket.get("stato") in ["Risolto", "Chiuso"]:
             if st.button("🔄 Riapri Ticket", key=f"riapri_{ticket_id}"):
                 db.supabase.table("tickets").update({"stato": "In Lavorazione"}).eq("id", ticket_id).execute()
-                db.supabase.table("ticket_interventi").upsert({"ticket_id": ticket_id, "stato": "In Lavorazione"}, on_conflict="ticket_id").execute()
+                db.supabase.table("ticket_interventi").update({"stato": "In Lavorazione"}).eq("ticket_id", ticket_id).execute()
                 st.success("Ticket riaperto con successo!")
                 st.rerun()
 
