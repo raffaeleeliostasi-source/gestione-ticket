@@ -1,3 +1,9 @@
+import streamlit as st
+
+def is_admin():
+    ruolo = str(st.session_state.get("ruolo", "")).strip().lower()
+    return ruolo in ["amministratore", "admin"]
+
 def pagina_nuovo_ticket():
     st.title("➕ Nuovo Ticket")
     
