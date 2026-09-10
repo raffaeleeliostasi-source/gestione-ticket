@@ -8,6 +8,9 @@ import auth
 import database as db
 import pdf_generator
 
+intervento = db.get_intervento(tid)
+st.write("Dati intervento dal DB:", intervento)
+
 def is_admin():
     ruolo = str(st.session_state.get("ruolo", "")).strip().lower()
     return ruolo in ["amministratore", "admin"]
