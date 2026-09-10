@@ -75,7 +75,13 @@ def mostra_ticket(ticket):
     risolto = stato_attuale == "Risolto"
     admin_status = is_admin()
     
-    with st.expander(f"🎫 #{tid} - {ticket['titolo']} | {stato_attuale}"):
+    # Mantiene aperto l'expander se il ticket era quello appena salvato/modificato
+    expander_aperto = st.session_state.get("ticket_aperto") == tid
+
+    # Ancora HTML per lo scorrimento automatico al ticket
+    st.markdown(f'<div id="ticket_{tid}"></div>', unsafe_allow_html=True)
+
+    with st.expander(f"🎫 #{tid} - {ticket['titolo']} | {stato_attuale}", expanded=expander_aperto):
         st.write(f"**Categoria:** {ticket.get('categoria')} | **Priorità:** {ticket.get('priorita')}")
         st.write(f"**Tecnico:** {ticket.get('assegnato_a')} | **Creato da:** {ticket.get('creato_da')}")
         st.write("### 📝 Descrizione", ticket.get("descrizione"))
@@ -94,7 +100,6 @@ def mostra_ticket(ticket):
             if st.button("💾 Salva intervento", key=f"btn_int_{tid}"):
                 firma_path = None
                 if nuovo_stato == "Risolto":
-                    # Estrazione sicura dell'immagine per evitare RuntimeError
                     img_data = None
                     try:
                         if canvas is not None:
@@ -122,6 +127,8 @@ def mostra_ticket(ticket):
                             st.warning("⚠️ Si è verificato un problema con l'immagine della firma.")
 
                 db.salva_intervento_tecnico(tid, st.session_state.username, desc_int, nuovo_stato, firma_path)
+                st.session_state["ticket_aperto"] = tid
+                st.success("✅ Intervento salvato con successo!")
                 st.rerun()
 
         # --- AZIONI AMMINISTRATORE ---
@@ -138,12 +145,12 @@ def mostra_ticket(ticket):
             if chiuso:
                 if c2.button("🔄 Riapri Ticket", key=f"reopen_{tid}"):
                     db.supabase.table("tickets").update({"stato": "Aperto"}).eq("id", tid).execute()
-                    st.success("Ticket riaperto!")
+                    st.session_state["ticket_aperto"] = tid
                     st.rerun()
             elif risolto:
                 if c2.button("🔒 Chiudi Ticket", key=f"close_{tid}"):
                     db.supabase.table("tickets").update({"stato": "Chiuso"}).eq("id", tid).execute()
-                    st.success("Ticket chiuso definitivamente!")
+                    st.session_state["ticket_aperto"] = tid
                     st.rerun()
             else:
                 c2.info("⏳ In attesa che il tecnico risolva il ticket per la chiusura.")
@@ -151,6 +158,8 @@ def mostra_ticket(ticket):
             # Elimina Ticket
             if c3.button("🗑️ Elimina", key=f"del_{tid}"):
                 db.elimina_ticket_completo(tid)
+                if "ticket_aperto" in st.session_state:
+                    del st.session_state["ticket_aperto"]
                 st.rerun()
 
 def pagina_dashboard():
@@ -176,7 +185,7 @@ def pagina_dashboard():
         return
 
     # --- BARRA DI RICERCA E FILTRI ---
-    with st.expander("🔍 Filtri e Ricerca", expanded=True):
+    with st.expander("🔍 Filtri e Ricerca", expanded=False):
         col_search, col_stato, col_prio = st.columns([2, 1, 1])
         
         testo_ricerca = col_search.text_input("Cerca (Titolo, Descrizione, ID o Creatore)", "").lower()
