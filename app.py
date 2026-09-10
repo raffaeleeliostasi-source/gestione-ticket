@@ -1238,25 +1238,27 @@ def mostra_ticket(ticket):
                             and canvas_json.get("objects")
                         ):
 
-                            # Recuperiamo l'immagine della firma in modo
-                            # compatibile con le versioni della libreria.
-                            # L'accesso a image_data può sollevare RuntimeError
-                            # quando il canvas non ha un'immagine disponibile.
+                            # Nelle versioni recenti della libreria i dati
+                            # immagine sono opt-in. return_image_data=True
+                            # abilita image_bytes direttamente in formato PNG.
                             firma_png = getattr(
                                 firma_canvas,
                                 "image_bytes",
                                 None
                             )
 
-                            # Compatibilità con versioni che espongono
-                            # image_data invece di image_bytes.
-                            if not firma_png:
-                                try:
-                                    canvas_image = firma_canvas.image_data
-                                except (RuntimeError, AttributeError):
-                                    canvas_image = None
+                            # Fallback compatibile con eventuali versioni
+                            # che espongono solo image_data.
+                            if firma_png is None:
+
+                                canvas_image = getattr(
+                                    firma_canvas,
+                                    "image_data",
+                                    None
+                                )
 
                                 if canvas_image is not None:
+
                                     from PIL import Image
 
                                     firma_immagine = Image.fromarray(
@@ -1264,6 +1266,7 @@ def mostra_ticket(ticket):
                                     )
 
                                     buffer_firma = BytesIO()
+
                                     firma_immagine.save(
                                         buffer_firma,
                                         format="PNG"
