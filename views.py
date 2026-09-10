@@ -1,6 +1,7 @@
 import hmac
 from io import BytesIO
 import streamlit as st
+import pandas as pd
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 import auth
@@ -192,6 +193,92 @@ def pagina_dashboard():
 
     for t in tickets_filtrati:
         mostra_ticket(t)
+
+def pagina_statistiche():
+    if not is_admin():
+        st.error("Accesso riservato agli amministratori.")
+        return
+
+    st.title("📊 Statistiche & Report")
+    
+    tickets = db.get_tickets()
+    if not tickets:
+        st.info("Nessun ticket presente per generare statistiche.")
+        return
+
+    df = pd.DataFrame(tickets)
+
+    # Pulizia e formattazione dei dati per il DataFrame
+    colonne_utili = {
+        'id': 'ID Ticket',
+        'titolo': 'Titolo',
+        'categoria': 'Categoria',
+        'priorita': 'Priorità',
+        'stato': 'Stato',
+        'assegnato_a': 'Tecnico Assegnato',
+        'creato_da': 'Creato Da',
+        'created_at': 'Data Creazione'
+    }
+    
+    # Seleziona solo colonne esistenti
+    cols = [c for c in colonne_utili.keys() if c in df.columns]
+    df_export = df[cols].rename(columns=colonne_utili)
+
+    # KPI Generali
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    kpi1.metric("Totale Ticket", len(df))
+    kpi2.metric("Ticket Aperti", len(df[df['stato'] == 'Aperto']))
+    kpi3.metric("In Lavorazione", len(df[df['stato'] == 'In lavorazione']))
+    kpi4.metric("Risolti / Chiusi", len(df[df['stato'].isin(['Risolto', 'Chiuso'])]))
+
+    st.divider()
+
+    # Grafici
+    col_g1, col_g2 = st.columns(2)
+
+    with col_g1:
+        st.subheader("📌 Ticket per Categoria")
+        if 'categoria' in df.columns:
+            cat_counts = df['categoria'].value_counts()
+            st.bar_chart(cat_counts)
+
+    with col_g2:
+        st.subheader("👷 Ticket per Tecnico")
+        if 'assegnato_a' in df.columns:
+            tec_counts = df['assegnato_a'].value_counts()
+            st.bar_chart(tec_counts)
+
+    col_g3, col_g4 = st.columns(2)
+
+    with col_g3:
+        st.subheader("🚦 Ticket per Stato")
+        if 'stato' in df.columns:
+            st_counts = df['stato'].value_counts()
+            st.bar_chart(st_counts)
+
+    with col_g4:
+        st.subheader("⚡ Ticket per Priorità")
+        if 'priorita' in df.columns:
+            prio_counts = df['priorita'].value_counts()
+            st.bar_chart(prio_counts)
+
+    st.divider()
+
+    # Esportazione in Excel
+    st.subheader("📥 Esporta Report in Excel")
+    st.dataframe(df_export, use_container_width=True)
+
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df_export.to_excel(writer, index=False, sheet_name='Report Ticket')
+    
+    st.download_button(
+        label="📊 Scarica Report Excel (.xlsx)",
+        data=buffer.getvalue(),
+        file_name="report_tickets.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 
 def pagina_amministrazione():
     if not is_admin():
