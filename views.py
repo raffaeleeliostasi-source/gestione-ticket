@@ -114,7 +114,106 @@ def pagina_dashboard():
 
 def pagina_amministrazione():
     if not is_admin():
-        st.error("Accesso riservato.")
+        st.error("Accesso riservato agli amministratori.")
         return
-    st.title("👨‍💼 Amministrazione")
-    st.write("Gestione Utenti e Categorie.")
+
+    st.title("👨‍💼 Pannello Amministrazione")
+    tab_utenti, tab_cat = st.tabs(["👥 Gestione Utenti", "🏷️ Gestione Categorie"])
+
+    # TAB UTENTI
+    with tab_utenti:
+        st.subheader("➕ Crea Nuovo Utente")
+        with st.form("form_nuovo_utente"):
+            new_user = st.text_input("Username").strip().lower()
+            new_pass = st.text_input("Password", type="password")
+            auth.mostra_regole_password()
+            new_role = st.selectbox("Ruolo", ["Tecnico", "Amministratore"])
+
+            if st.form_submit_button("➕ Aggiungi Utente"):
+                err = auth.valida_password(new_pass)
+                if err:
+                    for e in err: st.error(e)
+                elif not new_user:
+                    st.warning("Inserisci uno username.")
+                else:
+                    try:
+                        pass_hash = auth.genera_hash_password(new_pass)
+                        db.supabase.table("utenti").insert({
+                            "username": new_user,
+                            "password": pass_hash,
+                            "ruolo": new_role,
+                            "attivo": True
+                        }).execute()
+                        st.success(f"Utente '{new_user}' creato correttamente!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Errore creazione utente: {e}")
+
+        st.divider()
+        st.subheader("📋 Lista Utenti")
+        res = db.supabase.table("utenti").select("*").order("username").execute()
+        utenti = res.data or []
+
+        for u in utenti:
+            uid = u["id"]
+            uname = u["username"]
+            attivo = u.get("attivo", True)
+            ruolo = u.get("ruolo", "Tecnico")
+
+            with st.expander(f"👤 {uname} ({ruolo}) - {'🟢 Attivo' if attivo else '🔴 Disattivato'}"):
+                c1, c2, c3 = st.columns(3)
+                nuovo_ruolo = c1.selectbox("Ruolo", ["Tecnico", "Amministratore"], index=0 if ruolo == "Tecnico" else 1, key=f"r_{uid}")
+                stato_str = c2.selectbox("Stato", ["Attivo", "Disattivato"], index=0 if attivo else 1, key=f"s_{uid}")
+
+                if c3.button("💾 Aggiorna", key=f"up_{uid}"):
+                    db.supabase.table("utenti").update({
+                        "ruolo": nuovo_ruolo,
+                        "attivo": (stato_str == "Attivo")
+                    }).eq("id", uid).execute()
+                    st.success("Utente aggiornato!")
+                    st.rerun()
+
+                st.markdown("**Reset Password**")
+                p1, p2 = st.columns([3, 1])
+                reset_pass = p1.text_input("Nuova password", type="password", key=f"p_{uid}")
+                if p2.button("🔑 Reset", key=f"res_{uid}"):
+                    err = auth.valida_password(reset_pass)
+                    if err:
+                        for e in err: st.error(e)
+                    else:
+                        db.supabase.table("utenti").update({
+                            "password": auth.genera_hash_password(reset_pass)
+                        }).eq("id", uid).execute()
+                        st.success("Password aggiornata!")
+
+    # TAB CATEGORIE
+    with tab_cat:
+        st.subheader("➕ Nuova Categoria")
+        c_i, c_b = st.columns([3, 1])
+        nuova_cat = c_i.text_input("Nome Categoria")
+        if c_b.button("➕ Aggiungi"):
+            ok, msg = db.aggiungi_categoria(nuova_cat)
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+        st.divider()
+        st.subheader("📋 Categorie Esistenti")
+        categorie = db.get_categorie(solo_attive=False)
+        for cat in categorie:
+            cid = cat["id"]
+            cnome = cat["nome"]
+            cattiva = cat.get("attivo", True)
+
+            col_n, col_s, col_b = st.columns([2, 1, 1])
+            nuovo_nome = col_n.text_input("Nome", value=cnome, key=f"cname_{cid}")
+            stato_cat = col_s.selectbox("Stato", ["Attiva", "Disattivata"], index=0 if cattiva else 1, key=f"cs_{cid}")
+
+            if col_b.button("💾 Salva", key=f"cbtn_{cid}"):
+                if nuovo_nome != cnome:
+                    db.modifica_categoria(cid, cnome, nuovo_nome)
+                db.cambia_stato_categoria(cid, (stato_cat == "Attiva"))
+                st.success("Categoria aggiornata!")
+                st.rerun()
