@@ -1543,65 +1543,150 @@ def genera_pdf(ticket):
 
     buffer = BytesIO()
 
+    # ========================================================
+    # STILI PDF
+    # ========================================================
+
+    styles = getSampleStyleSheet()
+
+    stile_titolo = styles["Title"].clone("TicketTitle")
+    stile_titolo.fontName = "Helvetica-Bold"
+    stile_titolo.fontSize = 20
+    stile_titolo.leading = 24
+    stile_titolo.spaceAfter = 4
+
+    stile_sottotitolo = styles["Normal"].clone("TicketSubtitle")
+    stile_sottotitolo.fontName = "Helvetica"
+    stile_sottotitolo.fontSize = 9
+    stile_sottotitolo.textColor = colors.grey
+    stile_sottotitolo.spaceAfter = 12
+
+    stile_sezione = styles["Heading2"].clone("TicketSection")
+    stile_sezione.fontName = "Helvetica-Bold"
+    stile_sezione.fontSize = 13
+    stile_sezione.leading = 16
+    stile_sezione.spaceBefore = 10
+    stile_sezione.spaceAfter = 8
+
+    stile_testo = styles["BodyText"].clone("TicketBody")
+    stile_testo.fontName = "Helvetica"
+    stile_testo.fontSize = 9.5
+    stile_testo.leading = 14
+    stile_testo.spaceAfter = 6
+
+    def testo_pdf(valore):
+        """Converte il testo in una forma sicura per ReportLab."""
+        if valore is None:
+            return "-"
+        valore = str(valore).strip()
+        if not valore:
+            return "-"
+        return (valore.replace("&", "&amp;")
+                      .replace("<", "&lt;")
+                      .replace(">", "&gt;")
+                      .replace("\n", "<br/>"))
+
+    def intestazione_pagina(canvas, doc):
+        canvas.saveState()
+        larghezza, altezza = A4
+
+        canvas.setStrokeColor(colors.HexColor("#D9D9D9"))
+        canvas.line(40, altezza - 42, larghezza - 40, altezza - 42)
+
+        canvas.setFont("Helvetica-Bold", 8)
+        canvas.setFillColor(colors.HexColor("#555555"))
+        canvas.drawString(40, altezza - 32, "GESTIONE TICKET")
+        canvas.setFont("Helvetica", 8)
+        canvas.drawRightString(
+            larghezza - 40,
+            altezza - 32,
+            f"Ticket #{ticket.get('id', '')}"
+        )
+
+        canvas.line(40, 35, larghezza - 40, 35)
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(colors.HexColor("#777777"))
+        canvas.drawString(40, 23, "Report generato automaticamente da Gestione Ticket")
+        canvas.drawRightString(larghezza - 40, 23, f"Pagina {doc.page}")
+        canvas.restoreState()
+
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=A4
+        pagesize=A4,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=58,
+        bottomMargin=48
     )
 
     elementi = []
 
-    styles = getSampleStyleSheet()
+    # ========================================================
+    # INTESTAZIONE TICKET
+    # ========================================================
 
-    titolo = Paragraph(
-        f"Ticket #{ticket['id']} - {ticket['titolo']}",
-        styles["Title"]
+    elementi.append(
+        Paragraph(
+            f"Ticket #{testo_pdf(ticket.get('id', ''))}",
+            stile_titolo
+        )
+    )
+    elementi.append(
+        Paragraph(
+            testo_pdf(ticket.get("titolo", "Senza titolo")),
+            stile_sottotitolo
+        )
     )
 
-    elementi.append(titolo)
-    elementi.append(Spacer(1, 20))
+    # ========================================================
+    # RIEPILOGO
+    # ========================================================
+
+    elementi.append(Paragraph("Riepilogo ticket", stile_sezione))
 
     dati = [
-
-        ["Categoria", ticket.get("categoria", "")],
-        ["Priorità", ticket.get("priorita", "")],
-        ["Stato", ticket.get("stato", "")],
-        ["Creato da", ticket.get("creato_da", "")],
-        ["Assegnato a", ticket.get("assegnato_a", "")]
+        ["Categoria", testo_pdf(ticket.get("categoria", ""))],
+        ["Priorità", testo_pdf(ticket.get("priorita", ""))],
+        ["Stato", testo_pdf(ticket.get("stato", ""))],
+        ["Creato da", testo_pdf(ticket.get("creato_da", ""))],
+        ["Assegnato a", testo_pdf(ticket.get("assegnato_a", ""))]
     ]
 
     tabella = Table(
         dati,
-        colWidths=[150, 350]
+        colWidths=[125, 365],
+        repeatRows=0
     )
 
     tabella.setStyle(
         TableStyle([
-            ("GRID", (0, 0), (-1, -1), 1, colors.grey),
-            ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F3F5")),
+            ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#333333")),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D0D4D8")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("PADDING", (0, 0), (-1, -1), 8)
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7)
         ])
     )
 
     elementi.append(tabella)
-    elementi.append(Spacer(1, 20))
 
+    # ========================================================
+    # PROBLEMA SEGNALATO
+    # ========================================================
+
+    elementi.append(Paragraph("Problema segnalato", stile_sezione))
     elementi.append(
         Paragraph(
-            "Problema segnalato",
-            styles["Heading2"]
+            testo_pdf(ticket.get("descrizione", "")),
+            stile_testo
         )
     )
-
-    elementi.append(
-        Paragraph(
-            ticket.get("descrizione", ""),
-            styles["BodyText"]
-        )
-    )
-
-    elementi.append(Spacer(1, 20))
 
     # ========================================================
     # INTERVENTO TECNICO
@@ -1611,56 +1696,63 @@ def genera_pdf(ticket):
 
     if intervento:
 
-        elementi.append(
-            Paragraph(
-                "Intervento tecnico",
-                styles["Heading2"]
-            )
-        )
+        elementi.append(Paragraph("Intervento tecnico", stile_sezione))
 
-        elementi.append(
-            Paragraph(
-                f"<b>Tecnico:</b> {intervento.get('tecnico', '')}",
-                styles["BodyText"]
-            )
-        )
+        dati_intervento = [
+            ["Tecnico", testo_pdf(intervento.get("tecnico", ""))],
+            [
+                "Data intervento",
+                testo_pdf(format_data(intervento.get("data_intervento")))
+            ],
+            ["Esito", testo_pdf(intervento.get("stato", ""))]
+        ]
 
-        elementi.append(
-            Paragraph(
-                f"<b>Data intervento:</b> "
-                f"{format_data(intervento.get('data_intervento'))}",
-                styles["BodyText"]
-            )
+        tabella_intervento = Table(
+            dati_intervento,
+            colWidths=[125, 365]
         )
-
-        elementi.append(
-            Paragraph(
-                f"<b>Stato:</b> {intervento.get('stato', '')}",
-                styles["BodyText"]
-            )
+        tabella_intervento.setStyle(
+            TableStyle([
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F3F5")),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D0D4D8")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7)
+            ])
         )
-
+        elementi.append(tabella_intervento)
         elementi.append(Spacer(1, 10))
 
         elementi.append(
             Paragraph(
-                intervento.get("descrizione", ""),
-                styles["BodyText"]
+                "Descrizione dell'intervento",
+                styles["Heading3"]
             )
         )
+        elementi.append(
+            Paragraph(
+                testo_pdf(intervento.get("descrizione", "")),
+                stile_testo
+            )
+        )
+
+        # ====================================================
+        # FIRMA TECNICO
+        # ====================================================
 
         firma_path = intervento.get("firma_path")
 
         if firma_path:
-
             firma_bytes = scarica_firma_intervento(firma_path)
 
             if firma_bytes:
-
                 try:
-
-                    elementi.append(Spacer(1, 15))
-
+                    elementi.append(Spacer(1, 10))
                     elementi.append(
                         Paragraph(
                             "Firma del tecnico",
@@ -1670,10 +1762,8 @@ def genera_pdf(ticket):
 
                     firma_reader = ImageReader(BytesIO(firma_bytes))
                     larghezza, altezza = firma_reader.getSize()
-
-                    max_larghezza = 300
-                    max_altezza = 120
-
+                    max_larghezza = 250
+                    max_altezza = 90
                     rapporto = min(
                         max_larghezza / larghezza,
                         max_altezza / altezza,
@@ -1687,24 +1777,38 @@ def genera_pdf(ticket):
                             height=altezza * rapporto
                         )
                     )
-
-                except Exception as e:
-
+                    elementi.append(Spacer(1, 5))
                     elementi.append(
                         Paragraph(
-                            f"Firma non disponibile nel PDF: {e}",
-                            styles["BodyText"]
+                            testo_pdf(intervento.get("tecnico", "")),
+                            stile_sottotitolo
                         )
                     )
 
-        elementi.append(Spacer(1, 20))
+                except Exception:
+                    elementi.append(
+                        Paragraph(
+                            "Firma del tecnico non disponibile nel PDF.",
+                            stile_testo
+                        )
+                    )
 
     # ========================================================
-    # FOTO ALLEGATE
+    # FOTO E ALLEGATI
     # ========================================================
 
     allegati = get_allegati(ticket["id"])
     immagini_aggiunte = False
+    numero_allegati = len(allegati)
+
+    if numero_allegati:
+        elementi.append(Paragraph("Allegati", stile_sezione))
+        elementi.append(
+            Paragraph(
+                f"Numero allegati: {numero_allegati}",
+                stile_sottotitolo
+            )
+        )
 
     for allegato in allegati:
 
@@ -1719,26 +1823,21 @@ def genera_pdf(ticket):
             if contenuto:
 
                 if not immagini_aggiunte:
-
                     elementi.append(
                         Paragraph(
-                            "Foto e allegati",
-                            styles["Heading2"]
+                            "Documentazione fotografica",
+                            styles["Heading3"]
                         )
                     )
-
-                    elementi.append(Spacer(1, 10))
                     immagini_aggiunte = True
 
                 try:
-
                     immagine_buffer = BytesIO(contenuto)
                     image_reader = ImageReader(immagine_buffer)
                     larghezza, altezza = image_reader.getSize()
 
-                    max_larghezza = 500
-                    max_altezza = 600
-
+                    max_larghezza = 490
+                    max_altezza = 520
                     rapporto = min(
                         max_larghezza / larghezza,
                         max_altezza / altezza,
@@ -1747,13 +1846,10 @@ def genera_pdf(ticket):
 
                     elementi.append(
                         Paragraph(
-                            nome_file,
-                            styles["BodyText"]
+                            testo_pdf(nome_file),
+                            stile_sottotitolo
                         )
                     )
-
-                    elementi.append(Spacer(1, 5))
-
                     elementi.append(
                         RLImage(
                             BytesIO(contenuto),
@@ -1761,19 +1857,25 @@ def genera_pdf(ticket):
                             height=altezza * rapporto
                         )
                     )
+                    elementi.append(Spacer(1, 12))
 
-                    elementi.append(Spacer(1, 15))
-
-                except Exception as e:
-
+                except Exception:
                     elementi.append(
                         Paragraph(
-                            f"Impossibile inserire l'immagine {nome_file}: {e}",
-                            styles["BodyText"]
+                            f"Impossibile inserire l'immagine {testo_pdf(nome_file)}.",
+                            stile_testo
                         )
                     )
 
-    doc.build(elementi)
+    # ========================================================
+    # GENERAZIONE
+    # ========================================================
+
+    doc.build(
+        elementi,
+        onFirstPage=intestazione_pagina,
+        onLaterPages=intestazione_pagina
+    )
 
     buffer.seek(0)
 
