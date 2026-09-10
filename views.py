@@ -116,12 +116,14 @@ def mostra_dettaglio_ticket(ticket_id):
     st.markdown("---")
 
     intervento_esistente = db.get_intervento(ticket_id)
+    if intervento_esistente is None:
+        intervento_esistente = {}
 
     # --- SEZIONE AMMINISTRATORE ---
     if is_admin():
         st.subheader("⚙️ Dettagli Intervento e Pannello Amministratore")
         
-        if intervento_esistente:
+        if intervento_esistente and intervento_esistente.get('tecnico'):
             st.write(f"**Tecnico Esecutore:** {intervento_esistente.get('tecnico', 'N/D')}")
             st.write(f"**Stato Intervento:** {intervento_esistente.get('stato', 'N/D')}")
             st.write(f"**Note Lavoro:** {intervento_esistente.get('descrizione', 'Nessuna nota')}")
@@ -165,7 +167,7 @@ def mostra_dettaglio_ticket(ticket_id):
     else:
         st.subheader("🛠️ Gestione Intervento Tecnico")
         
-        desc_iniziale = intervento_esistente.get("descrizione", "") if intervento_esistente else ""
+        desc_iniziale = intervento_esistente.get("descrizione", "")
         stabili_stati = ["Aperto", "In Lavorazione", "Risolto"]
         stato_attuale_db = intervento_esistente.get("stato", ticket.get("stato", "Aperto"))
         if stato_attuale_db not in stabili_stati:
