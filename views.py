@@ -72,6 +72,7 @@ def mostra_ticket(ticket):
     tid = ticket["id"]
     stato_attuale = ticket.get("stato", "Aperto")
     chiuso = stato_attuale == "Chiuso"
+    risolto = stato_attuale == "Risolto"
     admin_status = is_admin()
     
     with st.expander(f"🎫 #{tid} - {ticket['titolo']} | {stato_attuale}"):
@@ -121,11 +122,13 @@ def mostra_ticket(ticket):
                     db.supabase.table("tickets").update({"stato": "Aperto"}).eq("id", tid).execute()
                     st.success("Ticket riaperto!")
                     st.rerun()
-            else:
+            elif risolto:
                 if c2.button("🔒 Chiudi Ticket", key=f"close_{tid}"):
                     db.supabase.table("tickets").update({"stato": "Chiuso"}).eq("id", tid).execute()
                     st.success("Ticket chiuso definitivamente!")
                     st.rerun()
+            else:
+                c2.info("⏳ In attesa che il tecnico risolva il ticket.")
 
             # Elimina Ticket
             if c3.button("🗑️ Elimina", key=f"del_{tid}"):
@@ -208,7 +211,6 @@ def pagina_statistiche():
 
     df = pd.DataFrame(tickets)
 
-    # Pulizia e formattazione dei dati per il DataFrame
     colonne_utili = {
         'id': 'ID Ticket',
         'titolo': 'Titolo',
@@ -220,7 +222,6 @@ def pagina_statistiche():
         'created_at': 'Data Creazione'
     }
     
-    # Seleziona solo colonne esistenti
     cols = [c for c in colonne_utili.keys() if c in df.columns]
     df_export = df[cols].rename(columns=colonne_utili)
 
