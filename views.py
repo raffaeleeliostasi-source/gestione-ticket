@@ -139,6 +139,7 @@ def pagina_dashboard():
 
 def pagina_nuovo_ticket():
     st.title("➕ Nuovo Ticket")
+    st.markdown("Compila i campi sottostanti per aprire una nuova segnalazione nel sistema.")
 
     messaggio_ticket = st.session_state.pop("ticket_creato_msg", None)
     if messaggio_ticket:
@@ -155,18 +156,30 @@ def pagina_nuovo_ticket():
         return
 
     with st.form("nuovo_ticket_form", clear_on_submit=True):
-        titolo = st.text_input("Titolo")
-        descrizione = st.text_area("Descrizione", height=150)
-        c1, c2 = st.columns(2)
+        st.markdown("### 📝 Dettagli Principali")
+        titolo = st.text_input("Titolo del ticket", placeholder="Es. Problema stampante piano terra")
+        descrizione = st.text_area("Descrizione dettagliata", height=130, placeholder="Fornisci quanti più dettagli possibili sul problema...")
+        
+        st.markdown("---")
+        st.markdown("### ⚙️ Classificazione e Assegnazione")
+        c1, c2, c3 = st.columns(3)
         categoria = c1.selectbox("Categoria", categorie)
         priorita = c2.selectbox("Priorità", PRIORITA)
-        assegnato_a = st.selectbox("Assegnato a", tecnici)
-        allegati = st.file_uploader(
-            "📎 Allegati",
-            type=["jpg", "jpeg", "png", "pdf", "doc", "docx", "xls", "xlsx", "txt"],
-            accept_multiple_files=True,
-        )
-        foto = st.camera_input("📷 Foto del problema")
+        assegnato_a = c3.selectbox("Assegna a tecnico", tecnici)
+        
+        st.markdown("---")
+        st.markdown("### 📎 Allegati e Contenuti Multimediali")
+        c_file, c_foto = st.columns(2)
+        with c_file:
+            allegati = st.file_uploader(
+                "Documenti o file",
+                type=["jpg", "jpeg", "png", "pdf", "doc", "docx", "xls", "xlsx", "txt"],
+                accept_multiple_files=True,
+            )
+        with c_foto:
+            foto = st.camera_input("Scatta foto del problema")
+            
+        st.markdown("")
         submit = st.form_submit_button("💾 Crea Ticket", use_container_width=True)
 
     if not submit:
@@ -193,7 +206,6 @@ def pagina_nuovo_ticket():
         if foto is not None:
             db.salva_allegato(ticket_id, foto)
 
-        # Mostra il messaggio dopo il rerun, così non scompare immediatamente.
         st.session_state["ticket_creato_msg"] = (
             f"✅ Ticket #{ticket_id} creato correttamente!"
         )
@@ -243,8 +255,6 @@ def _firma_da_canvas(canvas_result):
     if canvas_result is None:
         return None
 
-    # image_data è disponibile solo quando st_canvas viene chiamato
-    # con return_image_data=True.
     image_data = getattr(canvas_result, "image_data", None)
     if image_data is None:
         return None
@@ -291,53 +301,59 @@ def mostra_dettaglio_ticket(ticket_id):
     intervento = db.get_intervento(ticket_id)
 
     if admin:
-        st.markdown("### 🛠️ Intervento tecnico")
-        tecnico = st.text_input("Tecnico", value=assegnato, disabled=True)
-        stato_options = STATI
-        stato = st.selectbox(
-            "Stato",
-            stato_options,
-            index=stato_options.index(stato_attuale) if stato_attuale in stato_options else 0,
-            key=f"admin_state_{ticket_id}",
-        )
-        note = st.text_area(
-            "Note / intervento",
-            value=_safe(intervento.get("descrizione") if intervento else ""),
-            key=f"admin_note_{ticket_id}",
-        )
+        with st.container(border=True):
+            st.markdown("### 🛠️ Gestione Amministrativa Intervento")
+            tecnico = st.text_input("Tecnico Assegnato", value=assegnato, disabled=True)
+            stato_options = STATI
+            
+            c_st, _ = st.columns(2)
+            with c_st:
+                stato = st.selectbox(
+                    "Stato del Ticket",
+                    stato_options,
+                    index=stato_options.index(stato_attuale) if stato_attuale in stato_options else 0,
+                    key=f"admin_state_{ticket_id}",
+                )
+                
+            note = st.text_area(
+                "Note / Intervento registrato",
+                value=_safe(intervento.get("descrizione") if intervento else ""),
+                key=f"admin_note_{ticket_id}",
+                height=100
+            )
 
-        if st.button("💾 Salva intervento", key=f"admin_save_{ticket_id}"):
-            try:
-                mappa_stato_intervento = {
-                    "Aperto": "In lavorazione",
-                    "In Lavorazione": "In lavorazione",
-                    "Risolto": "Risolto",
-                    "Chiuso": "Risolto",
-                }
-                stato_intervento = mappa_stato_intervento.get(stato, "In lavorazione")
-                db.supabase.table("ticket_interventi").upsert({
-                    "ticket_id": ticket_id,
-                    "tecnico": tecnico,
-                    "descrizione": note,
-                    "stato": stato_intervento,
-                    "firma_path": intervento.get("firma_path") if intervento else None,
-                    "data_intervento": __import__("datetime").datetime.now().isoformat(),
-                }, on_conflict="ticket_id").execute()
+            if st.button("💾 Salva modifiche intervento", key=f"admin_save_{ticket_id}", use_container_width=True):
+                try:
+                    mappa_stato_intervento = {
+                        "Aperto": "In lavorazione",
+                        "In Lavorazione": "In lavorazione",
+                        "Risolto": "Risolto",
+                        "Chiuso": "Risolto",
+                    }
+                    stato_intervento = mappa_stato_intervento.get(stato, "In lavorazione")
+                    db.supabase.table("ticket_interventi").upsert({
+                        "ticket_id": ticket_id,
+                        "tecnico": tecnico,
+                        "descrizione": note,
+                        "stato": stato_intervento,
+                        "firma_path": intervento.get("firma_path") if intervento else None,
+                        "data_intervento": __import__("datetime").datetime.now().isoformat(),
+                    }, on_conflict="ticket_id").execute()
 
-                if stato == "Chiuso":
-                    db.chiudi_ticket(ticket_id, username)
-                else:
-                    db.supabase.table("tickets").update({
-                        "stato": stato,
-                        "data_chiusura": None,
-                        "chiuso_da": None,
-                    }).eq("id", ticket_id).execute()
+                    if stato == "Chiuso":
+                        db.chiudi_ticket(ticket_id, username)
+                    else:
+                        db.supabase.table("tickets").update({
+                            "stato": stato,
+                            "data_chiusura": None,
+                            "chiuso_da": None,
+                        }).eq("id", ticket_id).execute()
 
-                st.success("Intervento aggiornato.")
-                st.rerun()
-            except Exception as e:
-                st.error("Errore nel salvataggio.")
-                st.exception(e)
+                    st.success("Intervento aggiornato con successo.")
+                    st.rerun()
+                except Exception as e:
+                    st.error("Errore nel salvataggio.")
+                    st.exception(e)
 
         if intervento and intervento.get("firma_path"):
             try:
@@ -356,6 +372,7 @@ def mostra_dettaglio_ticket(ticket_id):
                     file_name=f"ticket_{ticket_id}.pdf",
                     mime="application/pdf",
                     key=f"pdf_{ticket_id}",
+                    use_container_width=True,
                 )
             except Exception as e:
                 st.error("Errore nella generazione PDF.")
@@ -363,7 +380,7 @@ def mostra_dettaglio_ticket(ticket_id):
 
         with col_close:
             if stato_attuale != "Chiuso":
-                if st.button("🔒 Chiudi ticket", key=f"close_{ticket_id}"):
+                if st.button("🔒 Chiudi ticket", key=f"close_{ticket_id}", use_container_width=True):
                     try:
                         db.chiudi_ticket(ticket_id, username)
                         st.success("Ticket chiuso.")
@@ -373,74 +390,76 @@ def mostra_dettaglio_ticket(ticket_id):
                         st.exception(e)
 
     else:
-        st.markdown("### 🛠️ Intervento tecnico")
+        with st.container(border=True):
+            st.markdown("### 🛠️ Intervento tecnico")
 
-        if stato_attuale in {"Risolto", "Chiuso"}:
-            st.success(f"Ticket {stato_attuale.lower()}: modifica non consentita.")
-            if intervento:
-                st.write(_safe(intervento.get("descrizione")))
-            if intervento and intervento.get("firma_path"):
-                try:
-                    firma = db.scarica_firma_intervento(intervento["firma_path"])
-                    st.image(firma, caption="Firma del tecnico", width=350)
-                except Exception:
-                    pass
-            return
+            if stato_attuale in {"Risolto", "Chiuso"}:
+                st.success(f"Ticket {stato_attuale.lower()}: modifica non consentita.")
+                if intervento:
+                    st.write(_safe(intervento.get("descrizione")))
+                if intervento and intervento.get("firma_path"):
+                    try:
+                        firma = db.scarica_firma_intervento(intervento["firma_path"])
+                        st.image(firma, caption="Firma del tecnico", width=350)
+                    except Exception:
+                        pass
+                return
 
-        stato_options = ["Aperto", "In Lavorazione", "Risolto"]
-        stato = st.selectbox(
-            "Stato",
-            stato_options,
-            index=stato_options.index(stato_attuale) if stato_attuale in stato_options else 0,
-            key=f"tech_state_{ticket_id}",
-        )
-        note = st.text_area(
-            "Note intervento",
-            value=_safe(intervento.get("descrizione") if intervento else ""),
-            key=f"tech_note_{ticket_id}",
-        )
-
-        canvas_result = None
-        if stato == "Risolto":
-            st.info("Per risolvere il ticket è richiesta la firma grafica del tecnico.")
-            canvas_result = st_canvas(
-                fill_color="rgba(255,255,255,0)",
-                stroke_width=2,
-                stroke_color="#000000",
-                background_color="#FFFFFF",
-                height=180,
-                width=600,
-                drawing_mode="freedraw",
-                key=f"firma_{ticket_id}",
-                return_image_data=True,
+            stato_options = ["Aperto", "In Lavorazione", "Risolto"]
+            stato = st.selectbox(
+                "Stato",
+                stato_options,
+                index=stato_options.index(stato_attuale) if stato_attuale in stato_options else 0,
+                key=f"tech_state_{ticket_id}",
+            )
+            note = st.text_area(
+                "Note intervento",
+                value=_safe(intervento.get("descrizione") if intervento else ""),
+                key=f"tech_note_{ticket_id}",
+                height=100
             )
 
-        if st.button("💾 Salva intervento", key=f"tech_save_{ticket_id}"):
-            try:
-                firma_path = intervento.get("firma_path") if intervento else None
-                if stato == "Risolto":
-                    firma_bytes = _firma_da_canvas(canvas_result)
-                    if not firma_bytes:
-                        st.error("Inserisci la firma prima di risolvere il ticket.")
-                        return
-                    firma_path = db.salva_firma_intervento(
-                        ticket_id, firma_bytes, f"firma_ticket_{ticket_id}.png"
-                    )
-
-                db.salva_intervento_tecnico(
-                    ticket_id,
-                    username,
-                    note,
-                    stato,
-                    firma_path=firma_path,
+            canvas_result = None
+            if stato == "Risolto":
+                st.info("Per risolvere il ticket è richiesta la firma grafica del tecnico.")
+                canvas_result = st_canvas(
+                    fill_color="rgba(255,255,255,0)",
+                    stroke_width=2,
+                    stroke_color="#000000",
+                    background_color="#FFFFFF",
+                    height=180,
+                    width=600,
+                    drawing_mode="freedraw",
+                    key=f"firma_{ticket_id}",
+                    return_image_data=True,
                 )
-                st.success("Intervento salvato.")
-                st.rerun()
-            except PermissionError as e:
-                st.error(str(e))
-            except Exception as e:
-                st.error("Errore nel salvataggio dell'intervento.")
-                st.exception(e)
+
+            if st.button("💾 Salva intervento", key=f"tech_save_{ticket_id}", use_container_width=True):
+                try:
+                    firma_path = intervento.get("firma_path") if intervento else None
+                    if stato == "Risolto":
+                        firma_bytes = _firma_da_canvas(canvas_result)
+                        if not firma_bytes:
+                            st.error("Inserisci la firma prima di risolvere il ticket.")
+                            return
+                        firma_path = db.salva_firma_intervento(
+                            ticket_id, firma_bytes, f"firma_ticket_{ticket_id}.png"
+                        )
+
+                    db.salva_intervento_tecnico(
+                        ticket_id,
+                        username,
+                        note,
+                        stato,
+                        firma_path=firma_path,
+                    )
+                    st.success("Intervento salvato.")
+                    st.rerun()
+                except PermissionError as e:
+                    st.error(str(e))
+                except Exception as e:
+                    st.error("Errore nel salvataggio dell'intervento.")
+                    st.exception(e)
 
 
 def pagina_statistiche():
@@ -480,14 +499,29 @@ def pagina_statistiche():
         st.subheader("Ticket per tecnico")
         st.bar_chart(df["assegnato_a"].fillna("Non assegnato").value_counts())
 
-    # Colonne dedicate alla chiusura: vengono valorizzate da Supabase
-    # quando un amministratore chiude il ticket.
     for col in ["data_chiusura", "chiuso_da"]:
         if col not in df.columns:
             df[col] = ""
 
     st.subheader("📋 Dati")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "id": st.column_config.NumberColumn("ID", width="small"),
+            "titolo": st.column_config.TextColumn("Titolo Ticket"),
+            "descrizione": st.column_config.TextColumn("Descrizione", width="large"),
+            "categoria": st.column_config.TextColumn("Categoria"),
+            "priorita": st.column_config.TextColumn("Priorità"),
+            "stato": st.column_config.TextColumn("Stato"),
+            "assegnato_a": st.column_config.TextColumn("Tecnico Assegnato"),
+            "creato_da": st.column_config.TextColumn("Creato da"),
+            "data_chiusura": st.column_config.TextColumn("Data Chiusura"),
+            "chiuso_da": st.column_config.TextColumn("Chiuso da"),
+        }
+    )
 
     excel_bytes = _excel_bytes(df)
     st.download_button(
@@ -495,6 +529,7 @@ def pagina_statistiche():
         data=excel_bytes,
         file_name="report_ticket.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
     )
 
 
@@ -502,7 +537,6 @@ def _excel_bytes(df):
     output = BytesIO()
     export_df = df.copy()
 
-    # Ordine consigliato per il report.
     preferred = [
         "id", "titolo", "descrizione", "categoria", "priorita",
         "stato", "assegnato_a", "creato_da", "data_chiusura", "chiuso_da"
@@ -539,7 +573,17 @@ def pagina_amministrazione():
         st.subheader("Utenti")
         utenti = db.get_utenti()
         if utenti:
-            st.dataframe(pd.DataFrame(utenti), use_container_width=True, hide_index=True)
+            df_utenti = pd.DataFrame(utenti)
+            st.dataframe(
+                df_utenti,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "username": st.column_config.TextColumn("Username", help="Nome utente per il login"),
+                    "ruolo": st.column_config.TextColumn("Ruolo di Sistema"),
+                    "attivo": st.column_config.CheckboxColumn("Stato Attivo", help="Indica se l'utente può accedere"),
+                }
+            )
 
         with st.expander("➕ Crea nuovo utente"):
             with st.form("crea_utente"):
@@ -548,7 +592,7 @@ def pagina_amministrazione():
                 password = st.text_input("Password iniziale", type="password")
                 conferma = st.text_input("Conferma password", type="password")
                 attivo = st.checkbox("Utente attivo", value=True)
-                crea = st.form_submit_button("Crea utente")
+                crea = st.form_submit_button("Crea utente", use_container_width=True)
 
             if crea:
                 username = username.strip().lower()
@@ -587,9 +631,8 @@ def pagina_amministrazione():
                     key=f"active_{username}",
                 )
                 col1, col2 = st.columns(2)
-                if col1.button("💾 Salva", key=f"user_save_{username}"):
+                if col1.button("💾 Salva", key=f"user_save_{username}", use_container_width=True):
                     try:
-                        # Impedisce di disattivare il proprio account.
                         if username == st.session_state.username and not new_active:
                             st.error("Non puoi disattivare il tuo stesso account.")
                         else:
@@ -605,7 +648,7 @@ def pagina_amministrazione():
                     type="password",
                     key=f"newpw_{username}",
                 )
-                if st.button("🔑 Imposta password", key=f"setpw_{username}"):
+                if st.button("🔑 Imposta password", key=f"setpw_{username}", use_container_width=True):
                     ok, msg = auth.password_valida(new_password)
                     if not ok:
                         st.error(msg)
@@ -646,11 +689,21 @@ def pagina_amministrazione():
         st.subheader("🗂️ Categorie")
         categorie = db.get_categorie()
         if categorie:
-            st.dataframe(pd.DataFrame(categorie), use_container_width=True, hide_index=True)
+            df_cat = pd.DataFrame(categorie)
+            st.dataframe(
+                df_cat,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "id": st.column_config.NumberColumn("ID", width="small"),
+                    "nome": st.column_config.TextColumn("Nome Categoria"),
+                    "attivo": st.column_config.CheckboxColumn("Attiva"),
+                }
+            )
 
         with st.form("nuova_categoria"):
             nome = st.text_input("Nuova categoria")
-            add = st.form_submit_button("➕ Aggiungi categoria")
+            add = st.form_submit_button("➕ Aggiungi categoria", use_container_width=True)
 
         if add:
             ok, msg = db.aggiungi_categoria(nome)
@@ -673,7 +726,7 @@ def pagina_amministrazione():
                     value=cat.get("attivo", True) is not False,
                     key=f"cat_active_{cid}",
                 )
-                if st.button("💾 Salva categoria", key=f"cat_save_{cid}"):
+                if st.button("💾 Salva categoria", key=f"cat_save_{cid}", use_container_width=True):
                     ok, msg = db.modifica_categoria(cid, new_name)
                     if ok:
                         db.cambia_stato_categoria(cid, active)
