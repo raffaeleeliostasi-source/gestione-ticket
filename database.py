@@ -306,8 +306,11 @@ def salva_intervento_tecnico(
     if nuovo_stato not in {"Aperto", "In Lavorazione", "Risolto"}:
         raise ValueError("Stato non consentito al tecnico.")
 
+    # ticket_interventi ammette solo gli stati previsti dal vincolo Supabase.
+    # "Aperto" e "In Lavorazione" del ticket corrispondono a "In lavorazione"
+    # nell'intervento; "Risolto" resta "Risolto".
     stato_intervento = (
-        "In lavorazione" if nuovo_stato == "In Lavorazione" else nuovo_stato
+        "Risolto" if nuovo_stato == "Risolto" else "In lavorazione"
     )
 
     dati = {
@@ -342,7 +345,6 @@ def salva_firma_intervento(ticket_id, file_bytes, filename="firma.png"):
 
     supabase.table("ticket_interventi").update({
         "firma_path": path,
-        "modificato_il": _now(),
     }).eq("ticket_id", ticket_id).execute()
 
     return path
