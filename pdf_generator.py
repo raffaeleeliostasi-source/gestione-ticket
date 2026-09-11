@@ -177,7 +177,7 @@ def genera_pdf(ticket):
         story.append(_p_label_value("Tecnico", intervento.get('tecnico', ''), body))
         story.append(_p_label_value("Stato", intervento.get('stato', ''), body))
         
-        # Descrizione Intervento tecnico come titolo di sezione e testo sotto
+        # Descrizione Intervento tecnico
         desc_intervento = intervento.get("descrizione", "")
         if desc_intervento:
             story.append(_p("Descrizione Intervento tecnico", heading))
@@ -197,6 +197,7 @@ def genera_pdf(ticket):
                 firma_data = db.scarica_firma_intervento(firma_path)
                 firma_flow = _image_flowable(firma_data, 70 * mm, 35 * mm)
                 if firma_flow:
+                    firma_flow.hAlign = 'LEFT'  # Allineamento a sinistra della firma
                     story += [firma_flow, Spacer(1, 4 * mm)]
             except Exception:
                 pass
