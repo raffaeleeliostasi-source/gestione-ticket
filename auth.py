@@ -1,55 +1,59 @@
 import hashlib
 import hmac
 import secrets
-import re
 import streamlit as st
 
-def genera_hash_password(password):
-    """Genera un hash PBKDF2-HMAC-SHA256 con salt casuale."""
+PBKDF2_ITERATIONS = 200_000
+PASSWORD_MIN_LENGTH = 8
+
+
+def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
-    password_hash = hashlib.pbkdf2_hmac(
+    digest = hashlib.pbkdf2_hmac(
         "sha256",
         password.encode("utf-8"),
         salt,
-        200_000
+        PBKDF2_ITERATIONS,
     )
-    return f"{salt.hex()}${password_hash.hex()}"
+    return f"{salt.hex()}${digest.hex()}"
 
-def verifica_password(password, password_salvata):
-    """Verifica la password con supporto a vecchi hash/plain-text."""
-    if not password_salvata:
+
+def verifica_password(password: str, stored_password: str) -> bool:
+    if not stored_password:
         return False
 
-    if "$" in password_salvata:
-        try:
-            salt_hex, hash_salvato = password_salvata.split("$", 1)
-            salt = bytes.fromhex(salt_hex)
-            nuovo_hash = hashlib.pbkdf2_hmac(
-                "sha256",
-                password.encode("utf-8"),
-                salt,
-                200_000
-            ).hex()
-            return hmac.compare_digest(nuovo_hash, hash_salvato)
-        except Exception:
-            return False
+    # Compatibilità con eventuali vecchie password salvate in chiaro.
+    if "$" not in stored_password:
+        return hmac.compare_digest(password, stored_password)
 
-    return hmac.compare_digest(password, password_salvata)
+    try:
+        salt_hex, digest_hex = stored_password.split("$", 1)
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(digest_hex)
+        actual = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt,
+            PBKDF2_ITERATIONS,
+        )
+        return hmac.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
 
-def password_da_migrare(password_salvata):
-    return bool(password_salvata and "$" not in password_salvata)
 
-def valida_password(password):
-    errori = []
-    if len(password) < 8:
-        errori.append("Almeno 8 caratteri.")
-    if not re.search(r"[A-Z]", password):
-        errori.append("Almeno una lettera maiuscola.")
-    if not re.search(r"[a-z]", password):
-        errori.append("Almeno una lettera minuscola.")
-    if not re.search(r"\d", password):
-        errori.append("Almeno un numero.")
-    return errori
+def password_valida(password: str) -> tuple[bool, str]:
+    if len(password) < PASSWORD_MIN_LENGTH:
+        return False, "La password deve contenere almeno 8 caratteri."
+    if not any(c.isupper() for c in password):
+        return False, "La password deve contenere almeno una lettera maiuscola."
+    if not any(c.islower() for c in password):
+        return False, "La password deve contenere almeno una lettera minuscola."
+    if not any(c.isdigit() for c in password):
+        return False, "La password deve contenere almeno un numero."
+    return True, ""
+
 
 def mostra_regole_password():
-    st.caption("La password deve contenere almeno 8 caratteri, una maiuscola, una minuscola e un numero.")
+    st.caption(
+        "Password: almeno 8 caratteri, una maiuscola, una minuscola e un numero."
+    )
