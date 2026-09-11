@@ -145,7 +145,7 @@ def get_categorie():
 def get_nomi_categorie_attive():
     return [
         r["nome"] for r in get_categorie()
-        if r.get("attiva", True) is not False
+        if r.get("attivo", True) is not False
     ]
 
 
@@ -154,7 +154,7 @@ def aggiungi_categoria(nome):
     if not nome:
         return False, "Nome categoria obbligatorio."
     try:
-        supabase.table("categorie").insert({"nome": nome, "attiva": True}).execute()
+        supabase.table("categorie").insert({"nome": nome, "attivo": True}).execute()
         return True, "Categoria aggiunta."
     except Exception as e:
         return False, str(e)
@@ -183,7 +183,7 @@ def modifica_categoria(categoria_id, nuovo_nome):
 
 def cambia_stato_categoria(categoria_id, attiva):
     try:
-        supabase.table("categorie").update({"attiva": bool(attiva)}).eq("id", categoria_id).execute()
+        supabase.table("categorie").update({"attivo": bool(attiva)}).eq("id", categoria_id).execute()
         return True, "Stato categoria aggiornato."
     except Exception as e:
         return False, str(e)
@@ -196,10 +196,8 @@ def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da
         "categoria": categoria,
         "priorita": priorita,
         "assegnato_a": assegnato_a,
-        "creato_da": creato_da,
         "stato": "Aperto",
-        "creato_il": _now(),
-        "modificato_il": _now(),
+        "creato_da": creato_da,
     }
     return supabase.table("tickets").insert(payload).execute().data[0]
 
@@ -207,7 +205,7 @@ def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da
 def aggiorna_stato_ticket(ticket_id, nuovo_stato):
     return (
         supabase.table("tickets")
-        .update({"stato": nuovo_stato, "modificato_il": _now()})
+        .update({"stato": nuovo_stato})
         .eq("id", ticket_id)
         .execute()
     )
@@ -233,10 +231,8 @@ def salva_allegato(ticket_id, uploaded_file):
     supabase.table("ticket_allegati").insert({
         "ticket_id": ticket_id,
         "nome_file": filename,
-        "percorso": path,
-        "tipo_mime": uploaded_file.type or "application/octet-stream",
-        "dimensione": len(content),
-        "creato_il": _now(),
+        "percorso_file": path,
+        "tipo_file": uploaded_file.type or "application/octet-stream",
     }).execute()
 
     return path
@@ -247,7 +243,7 @@ def get_allegati(ticket_id):
         supabase.table("ticket_allegati")
         .select("*")
         .eq("ticket_id", ticket_id)
-        .order("id")
+        .order("data_caricamento", desc=True)
         .execute()
         .data
         or []
@@ -259,40 +255,63 @@ def scarica_allegato(path):
 
 
 def get_intervento(ticket_id):
-    return (
-        supabase.table("ticket_interventi")
-        .select("*")
-        .eq("ticket_id", ticket_id)
-        .maybe_single()
-        .execute()
-        .data
-    )
+    try:
+        risposta = (
+            supabase.table("ticket_interventi")
+            .select("*")
+            .eq("ticket_id", ticket_id)
+            .execute()
+        )
+        return risposta.data[0] if risposta.data else None
+    except Exception as e:
+        st.error(f"Errore caricamento intervento: {e}")
+        return None
 
 
-def salva_intervento_tecnico(ticket_id, tecnico, descrizione_intervento, nuovo_stato, firma_path=None):
+def salva_intervento_tecnico(
+    ticket_id,
+    tecnico,
+    descrizione_intervento,
+    nuovo_stato,
+    firma_path=None,
+):
     ticket = get_ticket(ticket_id)
     if not ticket:
         raise ValueError("Ticket non trovato.")
 
-    assegnato = str(ticket.get("assegnato_a", "")).strip()
-    if assegnato != str(tecnico).strip():
-        raise PermissionError("Il tecnico può intervenire solo sui ticket a lui assegnati.")
+    if str(ticket.get("assegnato_a", "")).strip() != str(tecnico).strip():
+        raise PermissionError(
+            "Il tecnico può intervenire solo sui ticket a lui assegnati."
+        )
 
-    stato_attuale = ticket.get("stato")
-    if stato_attuale in {"Risolto", "Chiuso"}:
-        raise PermissionError("Un ticket risolto o chiuso non può essere modificato dal tecnico.")
+    if ticket.get("stato") in {"Risolto", "Chiuso"}:
+        raise PermissionError(
+            "Un ticket risolto o chiuso non può essere modificato dal tecnico."
+        )
 
     if nuovo_stato not in {"Aperto", "In Lavorazione", "Risolto"}:
         raise ValueError("Stato non consentito al tecnico.")
 
-    supabase.table("ticket_interventi").upsert({
+    stato_intervento = (
+        "In lavorazione" if nuovo_stato == "In Lavorazione" else nuovo_stato
+    )
+
+    dati = {
         "ticket_id": ticket_id,
         "tecnico": tecnico,
-        "descrizione_intervento": descrizione_intervento or "",
-        "stato": nuovo_stato,
+        "descrizione": (descrizione_intervento or "").strip(),
+        "stato": stato_intervento,
+        "data_intervento": datetime.now().isoformat(),
         "firma_path": firma_path,
-        "modificato_il": _now(),
-    }, on_conflict="ticket_id").execute()
+    }
+
+    esistente = get_intervento(ticket_id)
+    if esistente:
+        supabase.table("ticket_interventi").update(dati).eq(
+            "ticket_id", ticket_id
+        ).execute()
+    else:
+        supabase.table("ticket_interventi").insert(dati).execute()
 
     return aggiorna_stato_ticket(ticket_id, nuovo_stato)
 
