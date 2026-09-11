@@ -328,7 +328,6 @@ def salva_firma_intervento(ticket_id, file_bytes, filename="firma.png"):
 
     supabase.table("ticket_interventi").update({
         "firma_path": path,
-        "modificato_il": _now(),
     }).eq("ticket_id", ticket_id).execute()
 
     return path
@@ -342,7 +341,7 @@ def elimina_ticket_completo(ticket_id):
     allegati = get_allegati(ticket_id)
     for a in allegati:
         try:
-            supabase.storage.from_(BUCKET_ALLEGATI).remove([a["percorso"]])
+            supabase.storage.from_(BUCKET_ALLEGATI).remove([a["percorso_file"]])
         except Exception:
             pass
 
