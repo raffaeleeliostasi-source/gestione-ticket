@@ -211,6 +211,20 @@ def aggiorna_stato_ticket(ticket_id, nuovo_stato):
     )
 
 
+def chiudi_ticket(ticket_id, chiuso_da):
+    """Chiude definitivamente un ticket registrando data e utente."""
+    return (
+        supabase.table("tickets")
+        .update({
+            "stato": "Chiuso",
+            "data_chiusura": _now(),
+            "chiuso_da": chiuso_da,
+        })
+        .eq("id", ticket_id)
+        .execute()
+    )
+
+
 def salva_allegato(ticket_id, uploaded_file):
     if uploaded_file is None:
         return None
@@ -328,6 +342,7 @@ def salva_firma_intervento(ticket_id, file_bytes, filename="firma.png"):
 
     supabase.table("ticket_interventi").update({
         "firma_path": path,
+        "modificato_il": _now(),
     }).eq("ticket_id", ticket_id).execute()
 
     return path
@@ -341,7 +356,7 @@ def elimina_ticket_completo(ticket_id):
     allegati = get_allegati(ticket_id)
     for a in allegati:
         try:
-            supabase.storage.from_(BUCKET_ALLEGATI).remove([a["percorso_file"]])
+            supabase.storage.from_(BUCKET_ALLEGATI).remove([a["percorso"]])
         except Exception:
             pass
 
