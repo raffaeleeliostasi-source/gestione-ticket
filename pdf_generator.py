@@ -1,6 +1,5 @@
 import html
 import io
-from pathlib import Path
 
 from PIL import Image
 from reportlab.lib.enums import TA_CENTER
@@ -20,17 +19,37 @@ import database as db
 
 
 def _p(text, style):
-    return Paragraph(html.escape("" if text is None else str(text)).replace("\n", "<br/>"), style)
+    return Paragraph(
+        html.escape("" if text is None else str(text)).replace("\n", "<br/>"),
+        style,
+    )
 
 
-def _image_flowable(data, max_width=160 * mm, max_height=95 * mm):
-    image = Image.open(io.BytesIO(data))
-    width, height = image.size
+def _image_flowable(data, max_width=160 * mm, max_height=120 * mm):
+    """Converte i bytes di un'immagine in un elemento ReportLab ridimensionato."""
+    if not data:
+        return None
+
+    # Verifica che i bytes siano realmente un'immagine e ricava le dimensioni.
+    with Image.open(io.BytesIO(data)) as image:
+        width, height = image.size
+
     if not width or not height:
         return None
 
     scale = min(max_width / width, max_height / height, 1)
     return RLImage(io.BytesIO(data), width=width * scale, height=height * scale)
+
+
+def _is_image_attachment(allegato):
+    """Controlla il tipo usando i nomi reali delle colonne Supabase."""
+    tipo = str(allegato.get("tipo_file") or "").lower().strip()
+    nome = str(allegato.get("nome_file") or "").lower().strip()
+
+    if tipo.startswith("image/"):
+        return True
+
+    return nome.endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"))
 
 
 def genera_pdf(ticket):
@@ -96,21 +115,39 @@ def genera_pdf(ticket):
     story.append(_p("Descrizione", heading))
     story.append(_p(ticket.get("descrizione", ""), body))
 
+    # ============================================================
+    # FOTO ALLEGATE
+    # Mostriamo solo la foto nel PDF, senza il nome del file.
+    # Le colonne corrette sono: percorso_file e tipo_file.
+    # ============================================================
     allegati = db.get_allegati(ticket.get("id"))
+    immagini_inserite = 0
+
     if allegati:
-        story.append(_p("Allegati", heading))
         for allegato in allegati:
-            nome = allegato.get("nome_file", "allegato")
-            mime = allegato.get("tipo_mime", "")
-            story.append(_p(f"• {nome}", body))
-            if mime.startswith("image/"):
-                try:
-                    data = db.scarica_allegato(allegato.get("percorso"))
-                    flow = _image_flowable(data)
-                    if flow:
-                        story += [Spacer(1, 2 * mm), flow, Spacer(1, 3 * mm)]
-                except Exception:
-                    pass
+            if not _is_image_attachment(allegato):
+                continue
+
+            percorso = allegato.get("percorso_file")
+            if not percorso:
+                continue
+
+            try:
+                data = db.scarica_allegato(percorso)
+                flow = _image_flowable(data)
+                if flow:
+                    if immagini_inserite == 0:
+                        story.append(_p("Allegato", heading))
+                    story += [
+                        Spacer(1, 2 * mm),
+                        flow,
+                        Spacer(1, 5 * mm),
+                    ]
+                    immagini_inserite += 1
+            except Exception:
+                # Se un allegato non è leggibile, non blocchiamo la generazione
+                # del PDF e non mostriamo il nome del file.
+                continue
 
     intervento = db.get_intervento(ticket.get("id"))
     if intervento:
