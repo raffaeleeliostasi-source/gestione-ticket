@@ -27,7 +27,6 @@ def _p(text, style):
 
 
 def _p_label_value(label, value, style):
-    """Permette di avere etichette in grassetto senza che vengano espanse come testo."""
     safe_label = html.escape(str(label))
     safe_value = html.escape("" if value is None else str(value))
     return Paragraph(f"<b>{safe_label}:</b> {safe_value}".replace("\n", "<br/>"), style)
@@ -178,15 +177,17 @@ def genera_pdf(ticket):
         story.append(_p_label_value("Tecnico", intervento.get('tecnico', ''), body))
         story.append(_p_label_value("Stato", intervento.get('stato', ''), body))
         
-        data_int = intervento.get('data_intervento')
-        if data_int:
-            story.append(_p_label_value("Data Intervento", db.format_data(data_int), body))
-            
-        story.append(Spacer(1, 2 * mm))
-        
+        # Descrizione intervento posizionata subito sotto lo stato
         desc_intervento = intervento.get("descrizione", "")
         if desc_intervento:
+            story.append(Spacer(1, 2 * mm))
             story.append(_p(desc_intervento, body))
+        
+        # Data intervento posizionata prima della firma
+        data_int = intervento.get('data_intervento')
+        if data_int:
+            story.append(Spacer(1, 2 * mm))
+            story.append(_p_label_value("Data Intervento", db.format_data(data_int), body))
 
         firma_path = intervento.get("firma_path")
         if firma_path:
