@@ -239,9 +239,13 @@ def _mostra_allegati(ticket_id):
 
 
 def _firma_da_canvas(canvas_result):
-    if not canvas_result or not canvas_result.image_data is not None:
+    """Converte la firma del canvas in PNG, se presente."""
+    if canvas_result is None:
         return None
-    image_data = canvas_result.image_data
+
+    # image_data è disponibile solo quando st_canvas viene chiamato
+    # con return_image_data=True.
+    image_data = getattr(canvas_result, "image_data", None)
     if image_data is None:
         return None
     image = Image.fromarray(image_data.astype("uint8"), "RGBA")
@@ -389,6 +393,7 @@ def mostra_dettaglio_ticket(ticket_id):
                 width=600,
                 drawing_mode="freedraw",
                 key=f"firma_{ticket_id}",
+                return_image_data=True,
             )
 
         if st.button("💾 Salva intervento", key=f"tech_save_{ticket_id}"):
