@@ -140,6 +140,10 @@ def pagina_dashboard():
 def pagina_nuovo_ticket():
     st.title("➕ Nuovo Ticket")
 
+    messaggio_ticket = st.session_state.pop("ticket_creato_msg", None)
+    if messaggio_ticket:
+        st.success(messaggio_ticket)
+
     categorie = db.get_nomi_categorie_attive()
     tecnici = db.get_tecnici_attivi()
 
@@ -189,7 +193,10 @@ def pagina_nuovo_ticket():
         if foto is not None:
             db.salva_allegato(ticket_id, foto)
 
-        st.success(f"Ticket #{ticket_id} creato correttamente.")
+        # Mostra il messaggio dopo il rerun, così non scompare immediatamente.
+        st.session_state["ticket_creato_msg"] = (
+            f"✅ Ticket #{ticket_id} creato correttamente!"
+        )
         st.rerun()
     except Exception as e:
         st.error("Impossibile creare il ticket.")
