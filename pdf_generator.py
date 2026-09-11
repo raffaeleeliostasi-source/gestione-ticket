@@ -116,6 +116,9 @@ def genera_pdf(ticket):
         Spacer(1, 2 * mm),
     ]
 
+    # Cerca sia 'creato_il' che eventuali varianti come 'created_at'
+    data_creazione = ticket.get("creato_il") or ticket.get("created_at")
+
     rows = [
         ["Titolo", ticket.get("titolo", "")],
         ["Stato", ticket.get("stato", "")],
@@ -123,7 +126,7 @@ def genera_pdf(ticket):
         ["Categoria", ticket.get("categoria", "")],
         ["Creato da", ticket.get("creato_da", "")],
         ["Assegnato a", ticket.get("assegnato_a", "")],
-        ["Creato il", db.format_data(ticket.get("creato_il"))],
+        ["Creato il", db.format_data(data_creazione)],
     ]
 
     table_data = [[_p(k, body_bold), _p(v, body)] for k, v in rows]
@@ -197,7 +200,7 @@ def genera_pdf(ticket):
                 firma_data = db.scarica_firma_intervento(firma_path)
                 firma_flow = _image_flowable(firma_data, 70 * mm, 35 * mm)
                 if firma_flow:
-                    firma_flow.hAlign = 'LEFT'  # Allineamento a sinistra della firma
+                    firma_flow.hAlign = 'LEFT'
                     story += [firma_flow, Spacer(1, 4 * mm)]
             except Exception:
                 pass
