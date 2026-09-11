@@ -205,8 +205,8 @@ def _mostra_allegati(ticket_id):
     st.subheader("📎 Allegati")
     for allegato in allegati:
         nome = allegato.get("nome_file", "allegato")
-        path = allegato.get("percorso", "")
-        mime = allegato.get("tipo_mime", "")
+        path = allegato.get("percorso_file", "")
+        mime = allegato.get("tipo_file", "")
 
         col1, col2 = st.columns([4, 1])
         with col1:
@@ -272,8 +272,6 @@ def mostra_dettaglio_ticket(ticket_id):
     c4.write(f"**Tecnico:** {assegnato}")
 
     st.write(f"**Creato da:** {_safe(ticket.get('creato_da'))}")
-    st.write(f"**Creato il:** {db.format_data(ticket.get('creato_il'))}")
-    st.write(f"**Modificato il:** {db.format_data(ticket.get('modificato_il'))}")
     st.markdown("### Descrizione")
     st.write(_safe(ticket.get("descrizione")))
 
@@ -293,19 +291,20 @@ def mostra_dettaglio_ticket(ticket_id):
         )
         note = st.text_area(
             "Note / intervento",
-            value=_safe(intervento.get("descrizione_intervento") if intervento else ""),
+            value=_safe(intervento.get("descrizione") if intervento else ""),
             key=f"admin_note_{ticket_id}",
         )
 
         if st.button("💾 Salva intervento", key=f"admin_save_{ticket_id}"):
             try:
+                stato_intervento = "In lavorazione" if stato == "In Lavorazione" else stato
                 db.supabase.table("ticket_interventi").upsert({
                     "ticket_id": ticket_id,
                     "tecnico": tecnico,
-                    "descrizione_intervento": note,
-                    "stato": stato,
+                    "descrizione": note,
+                    "stato": stato_intervento,
                     "firma_path": intervento.get("firma_path") if intervento else None,
-                    "modificato_il": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+                    "data_intervento": __import__("datetime").datetime.now().isoformat(),
                 }, on_conflict="ticket_id").execute()
                 db.aggiorna_stato_ticket(ticket_id, stato)
                 st.success("Intervento aggiornato.")
@@ -349,7 +348,7 @@ def mostra_dettaglio_ticket(ticket_id):
         if stato_attuale in {"Risolto", "Chiuso"}:
             st.success(f"Ticket {stato_attuale.lower()}: modifica non consentita.")
             if intervento:
-                st.write(_safe(intervento.get("descrizione_intervento")))
+                st.write(_safe(intervento.get("descrizione")))
             if intervento and intervento.get("firma_path"):
                 try:
                     firma = db.scarica_firma_intervento(intervento["firma_path"])
@@ -367,7 +366,7 @@ def mostra_dettaglio_ticket(ticket_id):
         )
         note = st.text_area(
             "Note intervento",
-            value=_safe(intervento.get("descrizione_intervento") if intervento else ""),
+            value=_safe(intervento.get("descrizione") if intervento else ""),
             key=f"tech_note_{ticket_id}",
         )
 
@@ -619,7 +618,7 @@ def pagina_amministrazione():
                 )
                 active = st.checkbox(
                     "Attiva",
-                    value=cat.get("attiva", True) is not False,
+                    value=cat.get("attivo", True) is not False,
                     key=f"cat_active_{cid}",
                 )
                 if st.button("💾 Salva categoria", key=f"cat_save_{cid}"):
