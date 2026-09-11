@@ -1,60 +1,70 @@
 import streamlit as st
-import database as db
 import views
 
-# Configurazione della pagina Streamlit
 st.set_page_config(
     page_title="Gestione Ticket",
     page_icon="🎫",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# Inizializzazione dello stato di sessione per il login
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "username" not in st.session_state:
-    st.session_state.username = ""
-if "ruolo" not in st.session_state:
-    st.session_state.ruolo = ""
+for key, default in {
+    "logged_in": False,
+    "username": "",
+    "ruolo": "",
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
 
-def main():
-    # Gestione schermata di Login se non autenticato
-    if not st.session_state.logged_in:
-        views.pagina_login()
-        return
 
-    # --- SIDEBAR E NAVIGAZIONE ---
-    st.sidebar.title(f"👤 {st.session_state.username.capitalize()}")
-    st.sidebar.caption(f"Ruolo: **{st.session_state.ruolo}**")
-    st.sidebar.divider()
+def is_admin():
+    return str(st.session_state.get("ruolo", "")).strip().lower() in {
+        "amministratore", "admin"
+    }
 
-    # Opzioni di menu dinamiche in base al ruolo
-    if views.is_admin():
-        voci_menu = ["🏠 Dashboard", "➕ Nuovo Ticket", "📊 Statistiche & Report", "👨‍💼 Amministrazione"]
+
+def logout():
+    for key in ("logged_in", "username", "ruolo"):
+        st.session_state[key] = "" if key != "logged_in" else False
+    st.rerun()
+
+
+if not st.session_state.logged_in:
+    views.pagina_login()
+    st.stop()
+
+with st.sidebar:
+    st.title("🎫 Gestione Ticket")
+    st.write(f"**Utente:** {st.session_state.username}")
+    st.write(f"**Ruolo:** {st.session_state.ruolo}")
+    st.divider()
+
+    if is_admin():
+        menu = st.radio(
+            "Menu",
+            ["📊 Dashboard", "➕ Nuovo Ticket", "📈 Statistiche & Report", "⚙️ Amministrazione"],
+        )
     else:
-        voci_menu = ["🏠 Dashboard", "➕ Nuovo Ticket"]
+        menu = st.radio(
+            "Menu",
+            ["📊 Dashboard", "➕ Nuovo Ticket"],
+        )
 
-    scelta = st.sidebar.radio("Navigazione", voci_menu)
+    st.divider()
+    if st.button("🚪 Logout", use_container_width=True):
+        logout()
 
-    st.sidebar.divider()
-    
-    # Pulsante per il Logout
-    if st.sidebar.button("🚪 Logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.username = ""
-        st.session_state.ruolo = ""
-        st.rerun()
-
-    # --- ROUTING DELLE PAGINE ---
-    if scelta == "🏠 Dashboard":
-        views.pagina_dashboard()
-    elif scelta == "➕ Nuovo Ticket":
-        views.pagina_nuovo_ticket()
-    elif scelta == "📊 Statistiche & Report":
+if menu == "📊 Dashboard":
+    views.pagina_dashboard()
+elif menu == "➕ Nuovo Ticket":
+    views.pagina_nuovo_ticket()
+elif menu == "📈 Statistiche & Report":
+    if is_admin():
         views.pagina_statistiche()
-    elif scelta == "👨‍💼 Amministrazione":
+    else:
+        st.error("Accesso non autorizzato.")
+elif menu == "⚙️ Amministrazione":
+    if is_admin():
         views.pagina_amministrazione()
-
-if __name__ == "__main__":
-    main()
+    else:
+        st.error("Accesso non autorizzato.")
