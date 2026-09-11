@@ -198,7 +198,6 @@ def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da
         "assegnato_a": assegnato_a,
         "stato": "Aperto",
         "creato_da": creato_da,
-        "creato_il": _now(),
     }
     return supabase.table("tickets").insert(payload).execute().data[0]
 
@@ -208,7 +207,6 @@ def aggiorna_stato_ticket(ticket_id, nuovo_stato):
         supabase.table("tickets")
         .update({
             "stato": nuovo_stato,
-            "modificato_il": _now(),
         })
         .eq("id", ticket_id)
         .execute()
@@ -222,7 +220,6 @@ def chiudi_ticket(ticket_id, chiuso_da):
             "stato": "Chiuso",
             "data_chiusura": _now(),
             "chiuso_da": chiuso_da,
-            "modificato_il": _now(),
         })
         .eq("id", ticket_id)
         .execute()
