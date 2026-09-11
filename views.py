@@ -317,7 +317,16 @@ def mostra_dettaglio_ticket(ticket_id):
                     "firma_path": intervento.get("firma_path") if intervento else None,
                     "data_intervento": __import__("datetime").datetime.now().isoformat(),
                 }, on_conflict="ticket_id").execute()
-                db.aggiorna_stato_ticket(ticket_id, stato)
+
+                if stato == "Chiuso":
+                    db.chiudi_ticket(ticket_id, username)
+                else:
+                    db.supabase.table("tickets").update({
+                        "stato": stato,
+                        "data_chiusura": None,
+                        "chiuso_da": None,
+                    }).eq("id", ticket_id).execute()
+
                 st.success("Intervento aggiornato.")
                 st.rerun()
             except Exception as e:
@@ -349,9 +358,13 @@ def mostra_dettaglio_ticket(ticket_id):
         with col_close:
             if stato_attuale != "Chiuso":
                 if st.button("🔒 Chiudi ticket", key=f"close_{ticket_id}"):
-                    db.aggiorna_stato_ticket(ticket_id, "Chiuso")
-                    st.success("Ticket chiuso.")
-                    st.rerun()
+                    try:
+                        db.chiudi_ticket(ticket_id, username)
+                        st.success("Ticket chiuso.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error("Errore nella chiusura del ticket.")
+                        st.exception(e)
 
     else:
         st.markdown("### 🛠️ Intervento tecnico")
@@ -461,6 +474,12 @@ def pagina_statistiche():
         st.subheader("Ticket per tecnico")
         st.bar_chart(df["assegnato_a"].fillna("Non assegnato").value_counts())
 
+    # Colonne dedicate alla chiusura: vengono valorizzate da Supabase
+    # quando un amministratore chiude il ticket.
+    for col in ["data_chiusura", "chiuso_da"]:
+        if col not in df.columns:
+            df[col] = ""
+
     st.subheader("📋 Dati")
     st.dataframe(df, use_container_width=True, hide_index=True)
 
@@ -475,8 +494,23 @@ def pagina_statistiche():
 
 def _excel_bytes(df):
     output = BytesIO()
+    export_df = df.copy()
+
+    # Ordine consigliato per il report.
+    preferred = [
+        "id", "titolo", "descrizione", "categoria", "priorita",
+        "stato", "assegnato_a", "creato_da", "data_chiusura", "chiuso_da"
+    ]
+    ordered = [c for c in preferred if c in export_df.columns]
+    ordered += [c for c in export_df.columns if c not in ordered]
+    export_df = export_df[ordered]
+
+    for col in ["data_chiusura"]:
+        if col in export_df.columns:
+            export_df[col] = export_df[col].apply(db.format_data)
+
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Ticket")
+        export_df.to_excel(writer, index=False, sheet_name="Ticket")
         ws = writer.book["Ticket"]
         ws.freeze_panes = "A2"
         ws.auto_filter.ref = ws.dimensions
