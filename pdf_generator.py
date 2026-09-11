@@ -74,6 +74,8 @@ def genera_pdf(ticket):
         ["Categoria", ticket.get("categoria", "")],
         ["Creato da", ticket.get("creato_da", "")],
         ["Assegnato a", ticket.get("assegnato_a", "")],
+        ["Creato il", db.format_data(ticket.get("creato_il"))],
+        ["Modificato il", db.format_data(ticket.get("modificato_il"))],
     ]
 
     table_data = [[_p(k, body), _p(v, body)] for k, v in rows]
@@ -99,13 +101,11 @@ def genera_pdf(ticket):
         story.append(_p("Allegati", heading))
         for allegato in allegati:
             nome = allegato.get("nome_file", "allegato")
-            mime = allegato.get("tipo_file", "") or ""
-            ext = Path(nome).suffix.lower()
-            is_image = mime.startswith("image/") or ext in {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+            mime = allegato.get("tipo_mime", "")
             story.append(_p(f"• {nome}", body))
-            if is_image:
+            if mime.startswith("image/"):
                 try:
-                    data = db.scarica_allegato(allegato.get("percorso_file"))
+                    data = db.scarica_allegato(allegato.get("percorso"))
                     flow = _image_flowable(data)
                     if flow:
                         story += [Spacer(1, 2 * mm), flow, Spacer(1, 3 * mm)]
@@ -117,10 +117,7 @@ def genera_pdf(ticket):
         story.append(_p("Intervento tecnico", heading))
         story.append(_p(f"Tecnico: {intervento.get('tecnico', '')}", body))
         story.append(_p(f"Stato: {intervento.get('stato', '')}", body))
-        descrizione_intervento = intervento.get("descrizione", "")
-        if descrizione_intervento:
-            story.append(_p("Descrizione intervento:", body))
-            story.append(_p(descrizione_intervento, body))
+        story.append(_p(intervento.get("descrizione_intervento", ""), body))
 
         firma_path = intervento.get("firma_path")
         if firma_path:
