@@ -2,6 +2,7 @@ import html
 import io
 
 from PIL import Image
+from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -117,7 +118,6 @@ def genera_pdf(ticket):
         ["Creato da", ticket.get("creato_da", "")],
         ["Assegnato a", ticket.get("assegnato_a", "")],
         ["Creato il", db.format_data(ticket.get("creato_il"))],
-        ["Modificato il", db.format_data(ticket.get("modificato_il"))],
     ]
 
     table_data = [[_p(k, body_bold), _p(v, body)] for k, v in rows]
@@ -196,7 +196,7 @@ def genera_pdf(ticket):
     def footer(canvas, doc_obj):
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
-        canvas.setFillColorHex("#64748b")
+        canvas.setFillColor(colors.HexColor("#64748b"))
         canvas.drawString(15 * mm, 10 * mm, "Gestione Ticket — Report Ufficiale")
         canvas.drawRightString(195 * mm, 10 * mm, f"Pagina {doc_obj.page}")
         canvas.restoreState()
