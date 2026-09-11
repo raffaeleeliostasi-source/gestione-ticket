@@ -1,148 +1,141 @@
+import html
 import io
-import requests
+from pathlib import Path
+
 from PIL import Image
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    Image as RLImage,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
 import database as db
+
+
+def _p(text, style):
+    return Paragraph(html.escape("" if text is None else str(text)).replace("\n", "<br/>"), style)
+
+
+def _image_flowable(data, max_width=160 * mm, max_height=95 * mm):
+    image = Image.open(io.BytesIO(data))
+    width, height = image.size
+    if not width or not height:
+        return None
+
+    scale = min(max_width / width, max_height / height, 1)
+    return RLImage(io.BytesIO(data), width=width * scale, height=height * scale)
+
 
 def genera_pdf(ticket):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36
+        pagesize=A4,
+        rightMargin=15 * mm,
+        leftMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+        title=f"Ticket #{ticket.get('id', '')}",
     )
-    story = []
+
     styles = getSampleStyleSheet()
-
-    tid = ticket.get("id")
-
-    # Stili personalizzati
     title_style = ParagraphStyle(
-        'DocTitle',
-        parent=styles['Title'],
+        "TicketTitle",
+        parent=styles["Title"],
+        alignment=TA_CENTER,
         fontSize=18,
         leading=22,
-        textColor=colors.HexColor('#1E3A8A'),
-        alignment=0
+        spaceAfter=10,
     )
-    h2_style = ParagraphStyle(
-        'SectionHeader',
-        parent=styles['Heading2'],
-        fontSize=14,
-        leading=18,
-        textColor=colors.HexColor('#1E3A8A'),
+    heading = ParagraphStyle(
+        "Heading",
+        parent=styles["Heading2"],
         spaceBefore=10,
-        spaceAfter=10
+        spaceAfter=6,
     )
-    normal_style = styles['Normal']
+    body = styles["BodyText"]
 
-    # --- INTESTAZIONE ---
-    story.append(Paragraph(f"<b>REPORT TICKET #{tid}</b>", title_style))
-    story.append(Spacer(1, 12))
-
-    # --- TABELLA DETTAGLI TICKET ---
-    data_ticket = [
-        [Paragraph("<b>Titolo:</b>", normal_style), Paragraph(str(ticket.get("titolo", "")), normal_style)],
-        [Paragraph("<b>Stato:</b>", normal_style), Paragraph(str(ticket.get("stato", "")), normal_style)],
-        [Paragraph("<b>Priorità:</b>", normal_style), Paragraph(str(ticket.get("priorita", "")), normal_style)],
-        [Paragraph("<b>Categoria:</b>", normal_style), Paragraph(str(ticket.get("categoria", "")), normal_style)],
-        [Paragraph("<b>Creato da:</b>", normal_style), Paragraph(str(ticket.get("creato_da", "")), normal_style)],
-        [Paragraph("<b>Tecnico Assegnato:</b>", normal_style), Paragraph(str(ticket.get("assegnato_a", "")), normal_style)],
+    story = [
+        _p(f"GESTIONE TICKET — #{ticket.get('id', '')}", title_style),
+        Spacer(1, 4 * mm),
     ]
 
-    t_ticket = Table(data_ticket, colWidths=[130, 400])
-    t_ticket.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F3F4F6')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
-        ('PADDING', (0, 0), (-1, -1), 6),
-    ]))
-    story.append(t_ticket)
-    story.append(Spacer(1, 12))
+    rows = [
+        ["Titolo", ticket.get("titolo", "")],
+        ["Stato", ticket.get("stato", "")],
+        ["Priorità", ticket.get("priorita", "")],
+        ["Categoria", ticket.get("categoria", "")],
+        ["Creato da", ticket.get("creato_da", "")],
+        ["Assegnato a", ticket.get("assegnato_a", "")],
+        ["Creato il", db.format_data(ticket.get("creato_il"))],
+        ["Modificato il", db.format_data(ticket.get("modificato_il"))],
+    ]
 
-    # --- DESCRIZIONE PROBLEMA ---
-    story.append(Paragraph("<b>Descrizione del Problema:</b>", h2_style))
-    story.append(Paragraph(str(ticket.get("descrizione", "")), normal_style))
-    story.append(Spacer(1, 12))
+    table_data = [[_p(k, body), _p(v, body)] for k, v in rows]
+    table = Table(table_data, colWidths=[38 * mm, 137 * mm], repeatRows=0)
+    table.setStyle(
+        TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.4, "#999999"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BACKGROUND", (0, 0), (0, -1), "#eeeeee"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ])
+    )
+    story += [table, Spacer(1, 5 * mm)]
 
-    # --- FOTO / ALLEGATI (Tabella corretta: ticket_allegati) ---
-    try:
-        res_all = db.supabase.table("ticket_allegati").select("*").eq("ticket_id", tid).execute()
-        allegati = res_all.data if res_all and res_all.data else []
-    except Exception:
-        allegati = []
+    story.append(_p("Descrizione", heading))
+    story.append(_p(ticket.get("descrizione", ""), body))
 
+    allegati = db.get_allegati(ticket.get("id"))
     if allegati:
-        story.append(Paragraph("<b>Foto e Allegati:</b>", h2_style))
+        story.append(_p("Allegati", heading))
         for allegato in allegati:
-            file_path = allegato.get("percorso_file") or allegato.get("file_path") or allegato.get("url")
-            if file_path:
+            nome = allegato.get("nome_file", "allegato")
+            mime = allegato.get("tipo_mime", "")
+            story.append(_p(f"• {nome}", body))
+            if mime.startswith("image/"):
                 try:
-                    img_bytes = None
-                    if isinstance(file_path, str) and file_path.startswith("http"):
-                        res = requests.get(file_path, timeout=5)
-                        if res.status_code == 200:
-                            img_bytes = io.BytesIO(res.content)
-                    elif isinstance(file_path, str):
-                        # Scarica dal bucket "allegati"
-                        data = db.supabase.storage.from_("allegati").download(file_path)
-                        img_bytes = io.BytesIO(data)
+                    data = db.scarica_allegato(allegato.get("percorso"))
+                    flow = _image_flowable(data)
+                    if flow:
+                        story += [Spacer(1, 2 * mm), flow, Spacer(1, 3 * mm)]
+                except Exception:
+                    pass
 
-                    if img_bytes:
-                        story.append(RLImage(img_bytes, width=200, height=150))
-                        story.append(Spacer(1, 8))
-                except Exception as e:
-                    print(f"Errore caricamento allegato PDF: {e}")
-
-    # --- DETTAGLI INTERVENTO (Tabella corretta: ticket_interventi) ---
-    intervento = None
-    try:
-        res_int = db.supabase.table("ticket_interventi").select("*").eq("ticket_id", tid).execute()
-        if res_int and res_int.data:
-            intervento = res_int.data[0]
-    except Exception:
-        pass
-
+    intervento = db.get_intervento(ticket.get("id"))
     if intervento:
-        story.append(Paragraph("<b>Dettagli Intervento Tecnico:</b>", h2_style))
-        
-        desc_intervento = intervento.get("descrizione") or "Nessuna nota registrata."
-        tecnico_intervento = intervento.get("tecnico") or ticket.get("assegnato_a") or "N/D"
+        story.append(_p("Intervento tecnico", heading))
+        story.append(_p(f"Tecnico: {intervento.get('tecnico', '')}", body))
+        story.append(_p(f"Stato: {intervento.get('stato', '')}", body))
+        story.append(_p(intervento.get("descrizione_intervento", ""), body))
 
-        story.append(Paragraph(f"<b>Eseguito da:</b> {tecnico_intervento}", normal_style))
-        story.append(Spacer(1, 4))
-        story.append(Paragraph(f"<b>Descrizione lavoro:</b> {desc_intervento}", normal_style))
-        story.append(Spacer(1, 12))
-
-        # --- FIRMA (Salvata nel bucket "allegati") ---
         firma_path = intervento.get("firma_path")
-        
         if firma_path:
             try:
-                img_bytes = None
-                if isinstance(firma_path, str) and firma_path.startswith("http"):
-                    res = requests.get(firma_path, timeout=5)
-                    if res.status_code == 200:
-                        img_bytes = io.BytesIO(res.content)
-                elif isinstance(firma_path, str):
-                    # La firma si trova nel bucket "allegati" come visto in database.py
-                    img_data = db.supabase.storage.from_("allegati").download(firma_path)
-                    img_bytes = io.BytesIO(img_data)
-                elif isinstance(firma_path, bytes):
-                    img_bytes = io.BytesIO(firma_path)
+                story.append(_p("Firma del tecnico", heading))
+                firma_data = db.scarica_firma_intervento(firma_path)
+                firma_flow = _image_flowable(firma_data, 80 * mm, 40 * mm)
+                if firma_flow:
+                    story += [firma_flow, Spacer(1, 4 * mm)]
+            except Exception:
+                pass
 
-                if img_bytes:
-                    story.append(Paragraph("<b>Firma Intervento:</b>", normal_style))
-                    story.append(Spacer(1, 6))
-                    story.append(RLImage(img_bytes, width=180, height=70))
-            except Exception as e:
-                print(f"Errore caricamento firma PDF: {e}")
+    def footer(canvas, doc_obj):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.drawString(15 * mm, 8 * mm, "Gestione Ticket")
+        canvas.drawRightString(195 * mm, 8 * mm, f"Pagina {doc_obj.page}")
+        canvas.restoreState()
 
-    doc.build(story)
-    buffer.seek(0)
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
