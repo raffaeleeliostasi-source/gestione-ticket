@@ -30,7 +30,6 @@ def _image_flowable(data, max_width=160 * mm, max_height=120 * mm):
     if not data:
         return None
 
-    # Verifica che i bytes siano realmente un'immagine e ricava le dimensioni.
     with Image.open(io.BytesIO(data)) as image:
         width, height = image.size
 
@@ -42,7 +41,6 @@ def _image_flowable(data, max_width=160 * mm, max_height=120 * mm):
 
 
 def _is_image_attachment(allegato):
-    """Controlla il tipo usando i nomi reali delle colonne Supabase."""
     tipo = str(allegato.get("tipo_file") or "").lower().strip()
     nome = str(allegato.get("nome_file") or "").lower().strip()
 
@@ -65,25 +63,50 @@ def genera_pdf(ticket):
     )
 
     styles = getSampleStyleSheet()
+    
+    PRIMARY_COLOR = "#1e3a8a"
+    TEXT_COLOR = "#1e293b"
+    BG_LIGHT = "#f8fafc"
+
     title_style = ParagraphStyle(
         "TicketTitle",
         parent=styles["Title"],
         alignment=TA_CENTER,
         fontSize=18,
         leading=22,
-        spaceAfter=10,
+        spaceAfter=15,
+        textColor=PRIMARY_COLOR,
+        fontName="Helvetica-Bold",
     )
+    
     heading = ParagraphStyle(
-        "Heading",
+        "HeadingCustom",
         parent=styles["Heading2"],
-        spaceBefore=10,
+        spaceBefore=14,
         spaceAfter=6,
+        fontSize=12,
+        leading=16,
+        textColor=PRIMARY_COLOR,
+        fontName="Helvetica-Bold",
     )
-    body = styles["BodyText"]
+    
+    body = ParagraphStyle(
+        "BodyTextCustom",
+        parent=styles["BodyText"],
+        textColor=TEXT_COLOR,
+        fontSize=10,
+        leading=14,
+    )
+    
+    body_bold = ParagraphStyle(
+        "BodyTextBoldCustom",
+        parent=body,
+        fontName="Helvetica-Bold",
+    )
 
     story = [
         _p(f"GESTIONE TICKET — #{ticket.get('id', '')}", title_style),
-        Spacer(1, 4 * mm),
+        Spacer(1, 2 * mm),
     ]
 
     rows = [
@@ -97,29 +120,24 @@ def genera_pdf(ticket):
         ["Modificato il", db.format_data(ticket.get("modificato_il"))],
     ]
 
-    table_data = [[_p(k, body), _p(v, body)] for k, v in rows]
-    table = Table(table_data, colWidths=[38 * mm, 137 * mm], repeatRows=0)
+    table_data = [[_p(k, body_bold), _p(v, body)] for k, v in rows]
+    table = Table(table_data, colWidths=[40 * mm, 137 * mm], repeatRows=0)
     table.setStyle(
         TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.4, "#999999"),
+            ("GRID", (0, 0), (-1, -1), 0.5, "#cbd5e1"),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("BACKGROUND", (0, 0), (0, -1), "#eeeeee"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 5),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("BACKGROUND", (0, 0), (0, -1), BG_LIGHT),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ])
     )
-    story += [table, Spacer(1, 5 * mm)]
+    story += [table, Spacer(1, 6 * mm)]
 
     story.append(_p("Descrizione", heading))
     story.append(_p(ticket.get("descrizione", ""), body))
 
-    # ============================================================
-    # FOTO ALLEGATE
-    # Mostriamo solo la foto nel PDF, senza il nome del file.
-    # Le colonne corrette sono: percorso_file e tipo_file.
-    # ============================================================
     allegati = db.get_allegati(ticket.get("id"))
     immagini_inserite = 0
 
@@ -137,31 +155,39 @@ def genera_pdf(ticket):
                 flow = _image_flowable(data)
                 if flow:
                     if immagini_inserite == 0:
-                        story.append(_p("Allegato", heading))
+                        story.append(_p("Allegati / Foto", heading))
                     story += [
-                        Spacer(1, 2 * mm),
+                        Spacer(1, 3 * mm),
                         flow,
                         Spacer(1, 5 * mm),
                     ]
                     immagini_inserite += 1
             except Exception:
-                # Se un allegato non è leggibile, non blocchiamo la generazione
-                # del PDF e non mostriamo il nome del file.
                 continue
 
     intervento = db.get_intervento(ticket.get("id"))
     if intervento:
         story.append(_p("Intervento tecnico", heading))
-        story.append(_p(f"Tecnico: {intervento.get('tecnico', '')}", body))
-        story.append(_p(f"Stato: {intervento.get('stato', '')}", body))
-        story.append(_p(intervento.get("descrizione_intervento", ""), body))
+        story.append(_p(f"<b>Tecnico:</b> {intervento.get('tecnico', '')}", body))
+        story.append(_p(f"<b>Stato:</b> {intervento.get('stato', '')}", body))
+        
+        data_int = intervento.get('data_intervento')
+        if data_int:
+            story.append(_p(f"<b>Data Intervento:</b> {db.format_data(data_int)}", body))
+            
+        story.append(Spacer(1, 2 * mm))
+        
+        desc_intervento = intervento.get("descrizione", "")
+        if desc_intervento:
+            story.append(_p(desc_intervento, body))
 
         firma_path = intervento.get("firma_path")
         if firma_path:
             try:
+                story.append(Spacer(1, 4 * mm))
                 story.append(_p("Firma del tecnico", heading))
                 firma_data = db.scarica_firma_intervento(firma_path)
-                firma_flow = _image_flowable(firma_data, 80 * mm, 40 * mm)
+                firma_flow = _image_flowable(firma_data, 70 * mm, 35 * mm)
                 if firma_flow:
                     story += [firma_flow, Spacer(1, 4 * mm)]
             except Exception:
@@ -170,8 +196,9 @@ def genera_pdf(ticket):
     def footer(canvas, doc_obj):
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
-        canvas.drawString(15 * mm, 8 * mm, "Gestione Ticket")
-        canvas.drawRightString(195 * mm, 8 * mm, f"Pagina {doc_obj.page}")
+        canvas.setFillColorHex("#64748b")
+        canvas.drawString(15 * mm, 10 * mm, "Gestione Ticket — Report Ufficiale")
+        canvas.drawRightString(195 * mm, 10 * mm, f"Pagina {doc_obj.page}")
         canvas.restoreState()
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
