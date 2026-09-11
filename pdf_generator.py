@@ -74,8 +74,6 @@ def genera_pdf(ticket):
         ["Categoria", ticket.get("categoria", "")],
         ["Creato da", ticket.get("creato_da", "")],
         ["Assegnato a", ticket.get("assegnato_a", "")],
-        ["Creato il", db.format_data(ticket.get("creato_il"))],
-        ["Modificato il", db.format_data(ticket.get("modificato_il"))],
     ]
 
     table_data = [[_p(k, body), _p(v, body)] for k, v in rows]
