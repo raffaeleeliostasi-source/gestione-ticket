@@ -177,13 +177,13 @@ def genera_pdf(ticket):
         story.append(_p_label_value("Tecnico", intervento.get('tecnico', ''), body))
         story.append(_p_label_value("Stato", intervento.get('stato', ''), body))
         
-        # Descrizione intervento posizionata subito sotto lo stato
+        # Descrizione Intervento tecnico come titolo di sezione e testo sotto
         desc_intervento = intervento.get("descrizione", "")
         if desc_intervento:
-            story.append(Spacer(1, 2 * mm))
+            story.append(_p("Descrizione Intervento tecnico", heading))
             story.append(_p(desc_intervento, body))
         
-        # Data intervento posizionata prima della firma
+        # Data Intervento posizionata prima della firma
         data_int = intervento.get('data_intervento')
         if data_int:
             story.append(Spacer(1, 2 * mm))
