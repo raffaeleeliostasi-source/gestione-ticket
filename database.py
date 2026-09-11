@@ -198,6 +198,7 @@ def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da
         "assegnato_a": assegnato_a,
         "stato": "Aperto",
         "creato_da": creato_da,
+        "creato_il": _now(),
     }
     return supabase.table("tickets").insert(payload).execute().data[0]
 
@@ -205,20 +206,23 @@ def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da
 def aggiorna_stato_ticket(ticket_id, nuovo_stato):
     return (
         supabase.table("tickets")
-        .update({"stato": nuovo_stato})
+        .update({
+            "stato": nuovo_stato,
+            "modificato_il": _now(),
+        })
         .eq("id", ticket_id)
         .execute()
     )
 
 
 def chiudi_ticket(ticket_id, chiuso_da):
-    """Chiude definitivamente un ticket registrando data e utente."""
     return (
         supabase.table("tickets")
         .update({
             "stato": "Chiuso",
             "data_chiusura": _now(),
             "chiuso_da": chiuso_da,
+            "modificato_il": _now(),
         })
         .eq("id", ticket_id)
         .execute()
@@ -306,9 +310,6 @@ def salva_intervento_tecnico(
     if nuovo_stato not in {"Aperto", "In Lavorazione", "Risolto"}:
         raise ValueError("Stato non consentito al tecnico.")
 
-    # ticket_interventi ammette solo gli stati previsti dal vincolo Supabase.
-    # "Aperto" e "In Lavorazione" del ticket corrispondono a "In lavorazione"
-    # nell'intervento; "Risolto" resta "Risolto".
     stato_intervento = (
         "Risolto" if nuovo_stato == "Risolto" else "In lavorazione"
     )
