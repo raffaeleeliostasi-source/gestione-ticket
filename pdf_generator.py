@@ -681,12 +681,32 @@ def genera_pdf(ticket):
         story.append(_info_table(intervention_metadata))
         story.append(Spacer(1, 3 * mm))
 
-        story.append(
-            _box(
-                "DESCRIZIONE INTERVENTO EFFETTUATO",
-                descr_intervento or "Nessuna descrizione.",
+        # Descrizione intervento: riquadro a tutta larghezza,
+        # con titolo sopra e testo sotto, evitando l'etichetta
+        # stretta che andava a capo in modo poco elegante.
+        intervention_description = Table(
+            [
+                [Paragraph("DESCRIZIONE INTERVENTO EFFETTUATO", STYLES["box_title"])],
+                [Paragraph(_txt(descr_intervento or "Nessuna descrizione."), STYLES["box_text"])],
+            ],
+            colWidths=[174 * mm],
+        )
+        intervention_description.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), LIGHT_BLUE),
+                    ("BACKGROUND", (0, 1), (-1, 1), colors.white),
+                    ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
+                    ("LINEBELOW", (0, 0), (-1, 0), 0.4, BORDER),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
             )
         )
+        story.append(intervention_description)
         story.append(Spacer(1, 4 * mm))
 
         # Firma tecnico
@@ -706,12 +726,8 @@ def genera_pdf(ticket):
 
         if signature_flowable:
             signature_content = [
-                [
-                    Paragraph("FIRMA DEL TECNICO", STYLES["signature"]),
-                ],
-                [
-                    signature_flowable,
-                ],
+                [Paragraph("FIRMA DEL TECNICO", STYLES["signature"])],
+                [signature_flowable],
             ]
         else:
             signature_content = [
@@ -728,9 +744,9 @@ def genera_pdf(ticket):
                 [
                     ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
                     ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 5),
                     ("TOPPADDING", (0, 0), (-1, -1), 5),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -776,9 +792,9 @@ def genera_pdf(ticket):
             [
                 ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
                 ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 5),
                 ("TOPPADDING", (0, 0), (-1, -1), 5),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
