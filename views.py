@@ -928,7 +928,7 @@ def pagina_amministrazione():
 
     st.title("⚙️ Amministrazione")
 
-    tab1, tab2, tab3 = st.tabs(["👥 Utenti", "🔐 Password", "🗂️ Categorie"])
+    tab1, tab2, tab3, tab4 = st.tabs(["👥 Utenti", "🔐 Password", "🗂️ Categorie", "✍️ Firma amministratore"])
 
     with tab1:
         st.subheader("Utenti")
@@ -1095,3 +1095,65 @@ def pagina_amministrazione():
                         st.rerun()
                     else:
                         st.error(msg)
+
+    with tab4:
+        st.subheader("✍️ Firma amministratore")
+        st.caption(
+            "Carica la firma che verrà inserita automaticamente nel PDF "
+            "quando questo amministratore chiude un ticket."
+        )
+
+        firma_esistente = db.scarica_firma_amministratore(
+            st.session_state.username
+        )
+        if firma_esistente:
+            st.image(
+                firma_esistente,
+                caption="Firma attualmente configurata",
+                width=350,
+            )
+        else:
+            st.info("Nessuna firma configurata per il tuo account amministratore.")
+
+        firma_file = st.file_uploader(
+            "Carica firma",
+            type=["png", "jpg", "jpeg"],
+            key="firma_amministratore_upload",
+            help="Preferibilmente PNG con sfondo trasparente.",
+        )
+
+        if firma_file is not None:
+            try:
+                immagine = Image.open(firma_file)
+                st.image(
+                    immagine,
+                    caption="Anteprima nuova firma",
+                    width=350,
+                )
+            except Exception:
+                st.error("Il file selezionato non è un'immagine valida.")
+                firma_file = None
+
+        if st.button(
+            "💾 Salva firma amministratore",
+            key="salva_firma_amministratore",
+            use_container_width=True,
+        ):
+            if firma_file is None:
+                st.warning("Seleziona prima un'immagine della firma.")
+            else:
+                try:
+                    immagine = Image.open(firma_file)
+                    if immagine.mode not in ("RGB", "RGBA"):
+                        immagine = immagine.convert("RGBA")
+                    buffer = BytesIO()
+                    immagine.save(buffer, format="PNG")
+                    db.salva_firma_amministratore(
+                        st.session_state.username,
+                        buffer.getvalue(),
+                    )
+                    st.success("✅ Firma amministratore salvata correttamente.")
+                    st.rerun()
+                except Exception as e:
+                    st.error("Errore nel salvataggio della firma.")
+                    st.exception(e)
