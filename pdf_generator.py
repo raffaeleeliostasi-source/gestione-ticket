@@ -644,7 +644,7 @@ def genera_pdf(ticket):
                         ("RIGHTPADDING", (0, 0), (-1, -1), 5),
                         ("TOPPADDING", (0, 0), (-1, -1), 5),
                         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                        ("ALIGN", (0, 0), (-1, -1), alignment),
                     ]
                 )
             )
@@ -656,6 +656,9 @@ def genera_pdf(ticket):
     # --------------------------------------------------------
 
     intervento = _get_intervention(ticket_id)
+    # Manteniamo anche una lista per la sezione firme finali.
+    # Il database restituisce un singolo intervento nell'attuale schema.
+    interventi = [intervento] if intervento else []
 
     if intervento:
         tecnico = _first(intervento, "tecnico", "technician")
@@ -836,7 +839,8 @@ def genera_pdf(ticket):
                 max_height=18 * mm,
             )
 
-    def _signature_panel(label, signature_image, person_name, date_value):
+    def _signature_panel(label, signature_image, person_name, date_value, alignment="CENTER"):
+
         content = [
             [Paragraph(label, STYLES["signature"])],
             [signature_image if signature_image else Spacer(1, 15 * mm)],
@@ -850,7 +854,7 @@ def genera_pdf(ticket):
                 [
                     ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
                     ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("ALIGN", (0, 0), (-1, -1), alignment),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 5),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 5),
@@ -866,6 +870,7 @@ def genera_pdf(ticket):
         technician_signature_image,
         technician_name_final,
         technician_date_final,
+        alignment="LEFT",
     )
 
     responsible_panel = _signature_panel(
@@ -873,6 +878,7 @@ def genera_pdf(ticket):
         responsible_signature_image,
         chiuso_da,
         _format_date(data_chiusura),
+        alignment="RIGHT",
     )
 
     final_signatures = Table(
