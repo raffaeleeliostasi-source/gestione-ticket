@@ -222,7 +222,7 @@ def _priority_badge(priority):
     return badge
 
 
-def _image_from_bytes(raw, max_width=82 * mm, max_height=72 * mm):
+def _image_from_bytes(raw, max_width=78 * mm, max_height=58 * mm):
     """
     Converte l'allegato in un'immagine ReportLab.
     PIL permette di gestire anche formati che ReportLab potrebbe non
@@ -707,7 +707,7 @@ def genera_pdf(ticket):
             )
         )
         story.append(intervention_description)
-        story.append(Spacer(1, 4 * mm))
+        story.append(Spacer(1, 2 * mm))
 
         # Firma tecnico
         signature_flowable = None
@@ -724,20 +724,30 @@ def genera_pdf(ticket):
                 max_height=30 * mm,
             )
 
+        # Firma tecnica compatta: etichetta a sinistra e firma
+        # sulla stessa riga. In questo modo si riduce molto l'altezza
+        # occupata e la firma rimane normalmente sulla pagina
+        # dell'intervento.
         if signature_flowable:
             signature_content = [
-                [Paragraph("FIRMA DEL TECNICO", STYLES["signature"])],
-                [signature_flowable],
+                [
+                    Paragraph("FIRMA DEL TECNICO", STYLES["signature"]),
+                    signature_flowable,
+                ]
             ]
+            signature_widths = [42 * mm, 132 * mm]
         else:
             signature_content = [
-                [Paragraph("FIRMA DEL TECNICO", STYLES["signature"])],
-                [Spacer(1, 18 * mm)],
+                [
+                    Paragraph("FIRMA DEL TECNICO", STYLES["signature"]),
+                    Spacer(1, 10 * mm),
+                ]
             ]
+            signature_widths = [42 * mm, 132 * mm]
 
         signature_box = Table(
             signature_content,
-            colWidths=[174 * mm],
+            colWidths=signature_widths,
         )
         signature_box.setStyle(
             TableStyle(
@@ -748,14 +758,14 @@ def genera_pdf(ticket):
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 7),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                    ("TOPPADDING", (0, 0), (-1, -1), 5),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                 ]
             )
         )
 
         story.append(signature_box)
-        story.append(Spacer(1, 5 * mm))
+        story.append(Spacer(1, 3 * mm))
 
     # --------------------------------------------------------
     # CHIUSURA INTERVENTO
