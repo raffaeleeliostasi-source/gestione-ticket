@@ -25,6 +25,18 @@ def _safe(value):
     return "" if value is None else str(value)
 
 
+def _reset_dashboard_filters():
+    """Reset dei filtri Dashboard eseguito come callback del pulsante."""
+    for key in (
+        "dashboard_cerca",
+        "dashboard_stato",
+        "dashboard_priorita",
+        "dashboard_assegnato",
+    ):
+        st.session_state.pop(key, None)
+    st.session_state.pop("dashboard_ticket_aperto", None)
+
+
 def pagina_login():
     st.title("🎫 Gestione Ticket")
     st.subheader("Accesso")
@@ -66,154 +78,288 @@ def pagina_login():
 
 
 def pagina_dashboard():
-    """Dashboard principale con filtri e schede ticket in stile moderno."""
-    # --------------------------------------------------------
-    # STILE DASHBOARD
-    # --------------------------------------------------------
+    """Dashboard principale con interfaccia moderna e riepilogo ticket."""
     st.markdown(
         """
         <style>
-        .dashboard-subtitle {
-            color: #66727D;
-            font-size: 0.98rem;
-            margin-top: -12px;
-            margin-bottom: 22px;
+        .dash-hero {
+            background: linear-gradient(135deg, #17365D 0%, #245B91 100%);
+            border-radius: 18px;
+            padding: 24px 28px;
+            color: white;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(23,54,93,.12);
         }
-        .filter-title {
-            color: #17365D;
-            font-size: 1.08rem;
+        .dash-hero h1 {
+            margin: 0;
+            font-size: 2rem;
+            line-height: 1.15;
+            color: white;
+        }
+        .dash-hero p {
+            margin: 7px 0 0 0;
+            color: rgba(255,255,255,.82);
+            font-size: .95rem;
+        }
+        .dash-user {
+            text-align: right;
+            font-size: .82rem;
+            color: rgba(255,255,255,.82);
+            padding-top: 4px;
+        }
+        .stat-card {
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 15px;
+            padding: 16px 18px;
+            min-height: 92px;
+            box-shadow: 0 3px 12px rgba(15,23,42,.05);
+        }
+        .stat-label {
+            color: #64748B;
+            font-size: .78rem;
             font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .stat-value {
+            color: #17365D;
+            font-size: 1.65rem;
+            font-weight: 800;
+            margin-top: 5px;
+        }
+        .filter-panel {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 15px;
+            padding: 15px 18px 6px 18px;
+            margin: 18px 0 14px 0;
+        }
+        .filter-heading {
+            color: #17365D;
+            font-size: 1rem;
+            font-weight: 800;
             margin-bottom: 8px;
         }
-        .results-badge {
-            display: inline-block;
-            padding: 7px 13px;
-            border-radius: 999px;
-            background: #EAF3FB;
-            color: #17365D;
-            font-weight: 700;
-            font-size: 0.9rem;
-            margin: 5px 0 14px 0;
+        .result-line {
+            color: #64748B;
+            font-size: .88rem;
+            margin: 10px 0 12px 2px;
         }
-        .ticket-card-title {
+        .result-line strong {
             color: #17365D;
-            font-size: 1.05rem;
-            font-weight: 700;
-            margin-bottom: 7px;
         }
-        .ticket-card-description {
-            color: #66727D;
-            font-size: 0.88rem;
-            line-height: 1.45;
+        .ticket-card {
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 15px;
+            padding: 17px 19px 14px 19px;
+            margin: 0 0 11px 0;
+            box-shadow: 0 3px 12px rgba(15,23,42,.045);
+        }
+        .ticket-id {
+            color: #2F75B5;
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .ticket-title {
+            color: #17365D;
+            font-size: 1.08rem;
+            font-weight: 800;
+            margin-top: 2px;
+            line-height: 1.25;
+        }
+        .ticket-desc {
+            color: #64748B;
+            font-size: .84rem;
+            line-height: 1.4;
             margin-top: 8px;
         }
-        .ticket-meta-label {
-            color: #7A8792;
-            font-size: 0.73rem;
+        .meta-label {
+            color: #94A3B8;
+            font-size: .67rem;
+            font-weight: 800;
             text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: .03em;
+            letter-spacing: .05em;
+            margin-bottom: 2px;
         }
-        .ticket-meta-value {
-            color: #263238;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-top: 2px;
+        .meta-value {
+            color: #334155;
+            font-size: .82rem;
+            font-weight: 650;
         }
         .badge {
             display: inline-block;
             padding: 4px 9px;
             border-radius: 999px;
             color: white;
-            font-size: 0.75rem;
-            font-weight: 700;
+            font-size: .70rem;
+            font-weight: 800;
+            line-height: 1;
         }
-        .badge-open { background: #2563EB; }
-        .badge-work { background: #D97706; }
-        .badge-resolved { background: #15803D; }
-        .badge-closed { background: #64748B; }
-        .priority-low { background: #15803D; }
-        .priority-medium { background: #CA8A04; }
-        .priority-high { background: #EA580C; }
-        .priority-urgent { background: #B91C1C; }
+        .s-aperto { background: #2563EB; }
+        .s-lavorazione { background: #D97706; }
+        .s-risolto { background: #15803D; }
+        .s-chiuso { background: #64748B; }
+        .p-bassa { background: #15803D; }
+        .p-media { background: #CA8A04; }
+        .p-alta { background: #EA580C; }
+        .p-urgente { background: #B91C1C; }
+        .empty-card {
+            background: #F8FAFC;
+            border: 1px dashed #CBD5E1;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            color: #64748B;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    st.title("📊 Dashboard")
-    st.markdown(
-        '<div class="dashboard-subtitle">Gestisci e monitora i tuoi ticket di assistenza</div>',
-        unsafe_allow_html=True,
-    )
-
     admin = is_admin()
-    username = st.session_state.username
+    username = st.session_state.get("username", "")
 
     rows = db.get_tickets() if admin else db.get_tickets_tecnico(username)
 
+    # --------------------------------------------------------
+    # TESTATA
+    # --------------------------------------------------------
+    user_label = username.replace("_", " ").title() if username else ""
+    ruolo_label = st.session_state.get("ruolo", "")
+
+    st.markdown(
+        f"""
+        <div class="dash-hero">
+            <div style="display:flex;justify-content:space-between;gap:20px;align-items:center;">
+                <div>
+                    <h1>📊 Dashboard</h1>
+                    <p>Gestisci e monitora in modo semplice tutte le richieste di assistenza.</p>
+                </div>
+                <div class="dash-user">
+                    <b>{_safe(user_label)}</b><br/>
+                    {_safe(ruolo_label)}
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     if not rows:
-        st.info("Non ci sono ticket da visualizzare.")
+        st.markdown(
+            '<div class="empty-card">🎫<br/><br/><b>Nessun ticket da visualizzare</b><br/>Non sono presenti richieste disponibili per il tuo profilo.</div>',
+            unsafe_allow_html=True,
+        )
         return
 
     df = pd.DataFrame(rows)
 
     # --------------------------------------------------------
+    # RIEPILOGO
+    # --------------------------------------------------------
+    def count_status(name):
+        if "stato" not in df.columns:
+            return 0
+        return int((df["stato"].fillna("").astype(str).str.strip() == name).sum())
+
+    total = len(df)
+    aperti = count_status("Aperto")
+    lavorazione = count_status("In Lavorazione")
+    risolti = count_status("Risolto")
+    chiusi = count_status("Chiuso")
+
+    stat_cols = st.columns(5)
+    stats = [
+        ("TOTALE", total),
+        ("APERTI", aperti),
+        ("IN LAVORAZIONE", lavorazione),
+        ("RISOLTI", risolti),
+        ("CHIUSI", chiusi),
+    ]
+
+    for col, (label, value) in zip(stat_cols, stats):
+        with col:
+            st.markdown(
+                f"""
+                <div class="stat-card">
+                    <div class="stat-label">{label}</div>
+                    <div class="stat-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    # --------------------------------------------------------
     # FILTRI
     # --------------------------------------------------------
-    st.markdown('<div class="filter-title">🔎 Filtri</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="filter-panel">
+            <div class="filter-heading">🔎 FILTRA I TICKET</div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    with st.container(border=True):
-        c1, c2, c3, c4, c5 = st.columns([2.2, 1.15, 1.15, 1.45, 0.65])
+    c1, c2, c3, c4, c5 = st.columns([2.25, 1.2, 1.2, 1.45, .65])
 
-        with c1:
-            cerca = st.text_input(
-                "Cerca",
-                placeholder="Titolo, descrizione o categoria",
-                key="dashboard_cerca",
-                label_visibility="collapsed",
-            )
-        with c2:
-            stato = st.selectbox(
-                "Stato",
-                ["Tutti"] + STATI,
-                key="dashboard_stato",
-                label_visibility="collapsed",
-            )
-        with c3:
-            priorita = st.selectbox(
-                "Priorità",
-                ["Tutte"] + PRIORITA,
-                key="dashboard_priorita",
-                label_visibility="collapsed",
-            )
-        with c4:
-            if admin:
-                assegnati = sorted(
-                    [
-                        x
-                        for x in df.get("assegnato_a", pd.Series(dtype=str)).dropna().unique()
-                        if str(x).strip()
-                    ]
-                )
-                assegnato = st.selectbox(
-                    "Assegnato a",
-                    ["Tutti"] + assegnati,
-                    key="dashboard_assegnato",
-                    label_visibility="collapsed",
-                )
-            else:
-                assegnato = "Tutti"
-        with c5:
-            reset = st.button("↺", key="dashboard_reset", help="Azzera tutti i filtri", use_container_width=True)
+    with c1:
+        cerca = st.text_input(
+            "Cerca",
+            placeholder="Titolo, descrizione o categoria",
+            key="dashboard_cerca",
+            label_visibility="collapsed",
+        )
 
-    if reset:
-        st.session_state["dashboard_cerca"] = ""
-        st.session_state["dashboard_stato"] = "Tutti"
-        st.session_state["dashboard_priorita"] = "Tutte"
+    with c2:
+        stato = st.selectbox(
+            "Stato",
+            ["Tutti"] + STATI,
+            key="dashboard_stato",
+            label_visibility="collapsed",
+        )
+
+    with c3:
+        priorita = st.selectbox(
+            "Priorità",
+            ["Tutte"] + PRIORITA,
+            key="dashboard_priorita",
+            label_visibility="collapsed",
+        )
+
+    with c4:
         if admin:
-            st.session_state["dashboard_assegnato"] = "Tutti"
-        st.rerun()
+            assegnati = sorted(
+                [
+                    str(x)
+                    for x in df.get(
+                        "assegnato_a", pd.Series(dtype=str)
+                    ).dropna().unique()
+                    if str(x).strip()
+                ]
+            )
+            assegnato = st.selectbox(
+                "Assegnato a",
+                ["Tutti"] + assegnati,
+                key="dashboard_assegnato",
+                label_visibility="collapsed",
+            )
+        else:
+            assegnato = "Tutti"
+
+    with c5:
+        st.button(
+            "↺",
+            key="dashboard_reset",
+            help="Azzera tutti i filtri",
+            use_container_width=True,
+            on_click=_reset_dashboard_filters,
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # --------------------------------------------------------
     # APPLICAZIONE FILTRI
@@ -223,7 +369,11 @@ def pagina_dashboard():
     if cerca:
         mask = (
             filtrato.astype(str)
-            .apply(lambda col: col.str.contains(cerca, case=False, na=False, regex=False))
+            .apply(
+                lambda col: col.str.contains(
+                    cerca, case=False, na=False, regex=False
+                )
+            )
             .any(axis=1)
         )
         filtrato = filtrato[mask]
@@ -238,22 +388,27 @@ def pagina_dashboard():
         filtrato = filtrato[filtrato["assegnato_a"] == assegnato]
 
     st.markdown(
-        f'<div class="results-badge">🎫 {len(filtrato)} ticket visualizzati</div>',
+        f'<div class="result-line"><strong>{len(filtrato)}</strong> ticket visualizzati</div>',
         unsafe_allow_html=True,
     )
 
     if filtrato.empty:
-        st.info("Nessun ticket corrisponde ai filtri selezionati.")
+        st.markdown(
+            '<div class="empty-card">🔍<br/><br/><b>Nessun risultato</b><br/>Prova a modificare i filtri selezionati.</div>',
+            unsafe_allow_html=True,
+        )
         return
 
     # --------------------------------------------------------
-    # TICKET SELEZIONATO
+    # DETTAGLIO TICKET
     # --------------------------------------------------------
     selected = st.session_state.get("dashboard_ticket_aperto")
+
     if selected is not None:
         if st.button("← Torna alla Dashboard", key="dashboard_back"):
             st.session_state.pop("dashboard_ticket_aperto", None)
             st.rerun()
+
         mostra_dettaglio_ticket(int(selected))
         return
 
@@ -262,76 +417,83 @@ def pagina_dashboard():
     # --------------------------------------------------------
     for _, row in filtrato.iterrows():
         ticket_id = int(row["id"])
-        titolo = _safe(row.get("titolo")) or "Senza titolo"
+
+        titolo = _safe(row.get("titolo")) or "SENZA TITOLO"
         stato_val = _safe(row.get("stato")) or "—"
         priorita_val = _safe(row.get("priorita")) or "—"
         categoria_val = _safe(row.get("categoria")) or "—"
-        tecnico_val = _safe(row.get("assegnato_a")) or "Non assegnato"
+        tecnico_val = _safe(row.get("assegnato_a")) or "NON ASSEGNATO"
 
-        descrizione = _safe(row.get("descrizione"))
-        if len(descrizione) > 180:
-            descrizione = descrizione[:177].rstrip() + "..."
+        descrizione = _safe(row.get("descrizione")).strip()
+        if len(descrizione) > 150:
+            descrizione = descrizione[:147].rstrip() + "..."
+
+        # Data ticket: supportiamo i nomi già usati nell'app.
+        data_ticket = (
+            row.get("creato_il")
+            or row.get("created_at")
+            or row.get("data_creazione")
+            or ""
+        )
+        try:
+            data_ticket = db.format_data(data_ticket) if data_ticket else ""
+        except Exception:
+            data_ticket = _safe(data_ticket)
 
         stato_class = {
-            "Aperto": "badge-open",
-            "In Lavorazione": "badge-work",
-            "Risolto": "badge-resolved",
-            "Chiuso": "badge-closed",
-        }.get(stato_val, "badge-closed")
+            "Aperto": "s-aperto",
+            "In Lavorazione": "s-lavorazione",
+            "Risolto": "s-risolto",
+            "Chiuso": "s-chiuso",
+        }.get(stato_val, "s-chiuso")
 
         priority_class = {
-            "Bassa": "priority-low",
-            "Media": "priority-medium",
-            "Alta": "priority-high",
-            "Urgente": "priority-urgent",
-        }.get(priorita_val, "badge-closed")
+            "Bassa": "p-bassa",
+            "Media": "p-media",
+            "Alta": "p-alta",
+            "Urgente": "p-urgente",
+        }.get(priorita_val, "s-chiuso")
 
-        with st.container(border=True):
-            top_left, top_right = st.columns([5.8, 1.2])
-            with top_left:
-                st.markdown(
-                    f'<div class="ticket-card-title">#{ticket_id} &nbsp;—&nbsp; { _safe(titolo) }</div>',
-                    unsafe_allow_html=True,
-                )
-            with top_right:
-                if st.button("Apri  ›", key=f"dashboard_open_{ticket_id}", use_container_width=True):
-                    st.session_state["dashboard_ticket_aperto"] = ticket_id
-                    st.rerun()
+        # Scheda HTML superiore.
+        st.markdown(
+            f"""
+            <div class="ticket-card">
+                <div class="ticket-id">TICKET #{ticket_id}</div>
+                <div class="ticket-title">{_safe(titolo)}</div>
+                {f'<div class="ticket-desc">{_safe(descrizione)}</div>' if descrizione else ''}
+                <div style="height:12px"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+                    <div>
+                        <div class="meta-label">Stato</div>
+                        <span class="badge {stato_class}">{_safe(stato_val)}</span>
+                    </div>
+                    <div>
+                        <div class="meta-label">Priorità</div>
+                        <span class="badge {priority_class}">{_safe(priorita_val)}</span>
+                    </div>
+                    <div>
+                        <div class="meta-label">Categoria</div>
+                        <div class="meta-value">{_safe(categoria_val)}</div>
+                    </div>
+                    <div>
+                        <div class="meta-label">Assegnato a</div>
+                        <div class="meta-value">{_safe(tecnico_val)}</div>
+                    </div>
+                </div>
+                {f'<div style="margin-top:11px;color:#94A3B8;font-size:.72rem;">CREATO IL&nbsp;&nbsp; {_safe(data_ticket)}</div>' if data_ticket else ''}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-            m1, m2, m3, m4 = st.columns(4)
-            with m1:
-                st.markdown('<div class="ticket-meta-label">Stato</div>', unsafe_allow_html=True)
-                st.markdown(
-                    f'<span class="badge {stato_class}">{_safe(stato_val)}</span>',
-                    unsafe_allow_html=True,
-                )
-            with m2:
-                st.markdown('<div class="ticket-meta-label">Priorità</div>', unsafe_allow_html=True)
-                st.markdown(
-                    f'<span class="badge {priority_class}">{_safe(priorita_val)}</span>',
-                    unsafe_allow_html=True,
-                )
-            with m3:
-                st.markdown('<div class="ticket-meta-label">Categoria</div>', unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ticket-meta-value">{_safe(categoria_val)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with m4:
-                st.markdown('<div class="ticket-meta-label">Assegnato a</div>', unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ticket-meta-value">{_safe(tecnico_val)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            if descrizione:
-                st.markdown(
-                    f'<div class="ticket-card-description">{_safe(descrizione)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-
+        # Il pulsante resta Streamlit nativo, quindi è affidabile e accessibile.
+        if st.button(
+            "Apri ticket  ›",
+            key=f"dashboard_open_{ticket_id}",
+            use_container_width=True,
+        ):
+            st.session_state["dashboard_ticket_aperto"] = ticket_id
+            st.rerun()
 def pagina_nuovo_ticket():
     st.title("➕ Nuovo Ticket")
     st.markdown("Compila i campi sottostanti per aprire una nuova segnalazione nel sistema.")
