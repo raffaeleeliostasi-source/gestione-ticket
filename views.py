@@ -26,15 +26,14 @@ def _safe(value):
 
 
 def _reset_dashboard_filters():
-    """Reset dei filtri Dashboard eseguito come callback del pulsante."""
-    for key in (
-        "dashboard_cerca",
-        "dashboard_stato",
-        "dashboard_priorita",
-        "dashboard_assegnato",
-    ):
-        st.session_state.pop(key, None)
-    st.session_state.pop("dashboard_ticket_aperto", None)
+    """
+    Aumenta la versione dei widget filtro.
+    Al rerun Streamlit crea quindi nuovi widget con i valori iniziali,
+    svuotando realmente i campi e riportando le select a "Tutti".
+    """
+    st.session_state["dashboard_filter_version"] = (
+        int(st.session_state.get("dashboard_filter_version", 0)) + 1
+    )
 
 
 def pagina_login():
@@ -304,13 +303,18 @@ def pagina_dashboard():
         unsafe_allow_html=True,
     )
 
+    # La versione viene usata nelle chiavi dei widget.
+    # Dopo il click su "Azzera" la versione cambia e Streamlit crea
+    # una nuova istanza dei widget con i valori predefiniti.
+    filter_version = int(st.session_state.get("dashboard_filter_version", 0))
+
     c1, c2, c3, c4, c5 = st.columns([2.25, 1.2, 1.2, 1.45, .65])
 
     with c1:
         cerca = st.text_input(
             "Cerca",
             placeholder="Titolo, descrizione o categoria",
-            key="dashboard_cerca",
+            key=f"dashboard_cerca_{filter_version}",
             label_visibility="collapsed",
         )
 
@@ -318,7 +322,7 @@ def pagina_dashboard():
         stato = st.selectbox(
             "Stato",
             ["Tutti"] + STATI,
-            key="dashboard_stato",
+            key=f"dashboard_stato_{filter_version}",
             label_visibility="collapsed",
         )
 
@@ -326,7 +330,7 @@ def pagina_dashboard():
         priorita = st.selectbox(
             "Priorità",
             ["Tutte"] + PRIORITA,
-            key="dashboard_priorita",
+            key=f"dashboard_priorita_{filter_version}",
             label_visibility="collapsed",
         )
 
@@ -344,7 +348,7 @@ def pagina_dashboard():
             assegnato = st.selectbox(
                 "Assegnato a",
                 ["Tutti"] + assegnati,
-                key="dashboard_assegnato",
+                key=f"dashboard_assegnato_{filter_version}",
                 label_visibility="collapsed",
             )
         else:
