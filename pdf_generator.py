@@ -644,7 +644,7 @@ def genera_pdf(ticket):
                         ("RIGHTPADDING", (0, 0), (-1, -1), 5),
                         ("TOPPADDING", (0, 0), (-1, -1), 5),
                         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                        ("ALIGN", (0, 0), (-1, -1), alignment),
+                        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                     ]
                 )
             )
@@ -854,7 +854,7 @@ def genera_pdf(ticket):
                 [
                     ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
                     ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
-                    ("ALIGN", (0, 0), (-1, -1), alignment),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 5),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 5),
