@@ -793,14 +793,37 @@ def genera_pdf(ticket):
     story.append(_info_table(closure_rows))
     story.append(Spacer(1, 4 * mm))
 
-    responsible_signature = Table(
-        [
-            [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
-            [Spacer(1, 15 * mm)],
-            [Paragraph("____________________________________________", STYLES["small"])],
-        ],
-        colWidths=[174 * mm],
-    )
+    # Firma automatica dell'amministratore che ha chiuso il ticket.
+    responsible_signature_image = None
+    if chiuso_da:
+        try:
+            raw_responsible_signature = db.scarica_firma_amministratore(chiuso_da)
+        except Exception:
+            raw_responsible_signature = None
+
+        responsible_signature_image = _image_from_bytes(
+            raw_responsible_signature,
+            max_width=65 * mm,
+            max_height=28 * mm,
+        )
+
+    if responsible_signature_image:
+        responsible_signature = Table(
+            [
+                [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
+                [responsible_signature_image],
+            ],
+            colWidths=[174 * mm],
+        )
+    else:
+        responsible_signature = Table(
+            [
+                [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
+                [Spacer(1, 15 * mm)],
+                [Paragraph("____________________________________________", STYLES["small"])],
+            ],
+            colWidths=[174 * mm],
+        )
 
     responsible_signature.setStyle(
         TableStyle(
