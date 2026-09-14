@@ -66,7 +66,86 @@ def pagina_login():
 
 
 def pagina_dashboard():
+    """Dashboard principale con filtri e schede ticket in stile moderno."""
+    # --------------------------------------------------------
+    # STILE DASHBOARD
+    # --------------------------------------------------------
+    st.markdown(
+        """
+        <style>
+        .dashboard-subtitle {
+            color: #66727D;
+            font-size: 0.98rem;
+            margin-top: -12px;
+            margin-bottom: 22px;
+        }
+        .filter-title {
+            color: #17365D;
+            font-size: 1.08rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .results-badge {
+            display: inline-block;
+            padding: 7px 13px;
+            border-radius: 999px;
+            background: #EAF3FB;
+            color: #17365D;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin: 5px 0 14px 0;
+        }
+        .ticket-card-title {
+            color: #17365D;
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 7px;
+        }
+        .ticket-card-description {
+            color: #66727D;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            margin-top: 8px;
+        }
+        .ticket-meta-label {
+            color: #7A8792;
+            font-size: 0.73rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: .03em;
+        }
+        .ticket-meta-value {
+            color: #263238;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 999px;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .badge-open { background: #2563EB; }
+        .badge-work { background: #D97706; }
+        .badge-resolved { background: #15803D; }
+        .badge-closed { background: #64748B; }
+        .priority-low { background: #15803D; }
+        .priority-medium { background: #CA8A04; }
+        .priority-high { background: #EA580C; }
+        .priority-urgent { background: #B91C1C; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.title("📊 Dashboard")
+    st.markdown(
+        '<div class="dashboard-subtitle">Gestisci e monitora i tuoi ticket di assistenza</div>',
+        unsafe_allow_html=True,
+    )
 
     admin = is_admin()
     username = st.session_state.username
@@ -79,63 +158,179 @@ def pagina_dashboard():
 
     df = pd.DataFrame(rows)
 
-    st.subheader("Filtri")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        cerca = st.text_input("🔎 Cerca", placeholder="Titolo, descrizione o categoria")
-    with c2:
-        stato = st.selectbox("Stato", ["Tutti"] + STATI)
-    with c3:
-        priorita = st.selectbox("Priorità", ["Tutte"] + PRIORITA)
-    with c4:
-        if admin:
-            assegnati = sorted(
-                [x for x in df.get("assegnato_a", pd.Series(dtype=str)).dropna().unique() if str(x).strip()]
-            )
-            assegnato = st.selectbox("Assegnato a", ["Tutti"] + assegnati)
-        else:
-            assegnato = "Tutti"
+    # --------------------------------------------------------
+    # FILTRI
+    # --------------------------------------------------------
+    st.markdown('<div class="filter-title">🔎 Filtri</div>', unsafe_allow_html=True)
 
+    with st.container(border=True):
+        c1, c2, c3, c4, c5 = st.columns([2.2, 1.15, 1.15, 1.45, 0.65])
+
+        with c1:
+            cerca = st.text_input(
+                "Cerca",
+                placeholder="Titolo, descrizione o categoria",
+                key="dashboard_cerca",
+                label_visibility="collapsed",
+            )
+        with c2:
+            stato = st.selectbox(
+                "Stato",
+                ["Tutti"] + STATI,
+                key="dashboard_stato",
+                label_visibility="collapsed",
+            )
+        with c3:
+            priorita = st.selectbox(
+                "Priorità",
+                ["Tutte"] + PRIORITA,
+                key="dashboard_priorita",
+                label_visibility="collapsed",
+            )
+        with c4:
+            if admin:
+                assegnati = sorted(
+                    [
+                        x
+                        for x in df.get("assegnato_a", pd.Series(dtype=str)).dropna().unique()
+                        if str(x).strip()
+                    ]
+                )
+                assegnato = st.selectbox(
+                    "Assegnato a",
+                    ["Tutti"] + assegnati,
+                    key="dashboard_assegnato",
+                    label_visibility="collapsed",
+                )
+            else:
+                assegnato = "Tutti"
+        with c5:
+            reset = st.button("↺", key="dashboard_reset", help="Azzera tutti i filtri", use_container_width=True)
+
+    if reset:
+        st.session_state["dashboard_cerca"] = ""
+        st.session_state["dashboard_stato"] = "Tutti"
+        st.session_state["dashboard_priorita"] = "Tutte"
+        if admin:
+            st.session_state["dashboard_assegnato"] = "Tutti"
+        st.rerun()
+
+    # --------------------------------------------------------
+    # APPLICAZIONE FILTRI
+    # --------------------------------------------------------
     filtrato = df.copy()
 
     if cerca:
         mask = (
             filtrato.astype(str)
-            .apply(lambda col: col.str.contains(cerca, case=False, na=False))
+            .apply(lambda col: col.str.contains(cerca, case=False, na=False, regex=False))
             .any(axis=1)
         )
         filtrato = filtrato[mask]
 
-    if stato != "Tutti":
+    if stato != "Tutti" and "stato" in filtrato.columns:
         filtrato = filtrato[filtrato["stato"] == stato]
 
-    if priorita != "Tutte":
+    if priorita != "Tutte" and "priorita" in filtrato.columns:
         filtrato = filtrato[filtrato["priorita"] == priorita]
 
-    if admin and assegnato != "Tutti":
+    if admin and assegnato != "Tutti" and "assegnato_a" in filtrato.columns:
         filtrato = filtrato[filtrato["assegnato_a"] == assegnato]
 
-    st.write(f"**Ticket visualizzati: {len(filtrato)}**")
+    st.markdown(
+        f'<div class="results-badge">🎫 {len(filtrato)} ticket visualizzati</div>',
+        unsafe_allow_html=True,
+    )
 
+    if filtrato.empty:
+        st.info("Nessun ticket corrisponde ai filtri selezionati.")
+        return
+
+    # --------------------------------------------------------
+    # TICKET SELEZIONATO
+    # --------------------------------------------------------
+    selected = st.session_state.get("dashboard_ticket_aperto")
+    if selected is not None:
+        if st.button("← Torna alla Dashboard", key="dashboard_back"):
+            st.session_state.pop("dashboard_ticket_aperto", None)
+            st.rerun()
+        mostra_dettaglio_ticket(int(selected))
+        return
+
+    # --------------------------------------------------------
+    # SCHEDE TICKET
+    # --------------------------------------------------------
     for _, row in filtrato.iterrows():
         ticket_id = int(row["id"])
-        label = f"#{ticket_id} — {_safe(row.get('titolo'))} — {_safe(row.get('stato'))}"
+        titolo = _safe(row.get("titolo")) or "Senza titolo"
+        stato_val = _safe(row.get("stato")) or "—"
+        priorita_val = _safe(row.get("priorita")) or "—"
+        categoria_val = _safe(row.get("categoria")) or "—"
+        tecnico_val = _safe(row.get("assegnato_a")) or "Non assegnato"
 
-        with st.expander(label):
-            a, b, c, d = st.columns(4)
-            a.metric("Stato", _safe(row.get("stato")))
-            b.metric("Priorità", _safe(row.get("priorita")))
-            c.metric("Categoria", _safe(row.get("categoria")))
-            d.metric("Tecnico", _safe(row.get("assegnato_a")))
+        descrizione = _safe(row.get("descrizione"))
+        if len(descrizione) > 180:
+            descrizione = descrizione[:177].rstrip() + "..."
 
-            st.write(_safe(row.get("descrizione")))
+        stato_class = {
+            "Aperto": "badge-open",
+            "In Lavorazione": "badge-work",
+            "Risolto": "badge-resolved",
+            "Chiuso": "badge-closed",
+        }.get(stato_val, "badge-closed")
 
-            if st.button("Apri ticket", key=f"open_{ticket_id}"):
-                st.session_state[f"ticket_aperto_{ticket_id}"] = True
+        priority_class = {
+            "Bassa": "priority-low",
+            "Media": "priority-medium",
+            "Alta": "priority-high",
+            "Urgente": "priority-urgent",
+        }.get(priorita_val, "badge-closed")
 
-            if st.session_state.get(f"ticket_aperto_{ticket_id}"):
-                mostra_dettaglio_ticket(ticket_id)
+        with st.container(border=True):
+            top_left, top_right = st.columns([5.8, 1.2])
+            with top_left:
+                st.markdown(
+                    f'<div class="ticket-card-title">#{ticket_id} &nbsp;—&nbsp; { _safe(titolo) }</div>',
+                    unsafe_allow_html=True,
+                )
+            with top_right:
+                if st.button("Apri  ›", key=f"dashboard_open_{ticket_id}", use_container_width=True):
+                    st.session_state["dashboard_ticket_aperto"] = ticket_id
+                    st.rerun()
 
+            m1, m2, m3, m4 = st.columns(4)
+            with m1:
+                st.markdown('<div class="ticket-meta-label">Stato</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<span class="badge {stato_class}">{_safe(stato_val)}</span>',
+                    unsafe_allow_html=True,
+                )
+            with m2:
+                st.markdown('<div class="ticket-meta-label">Priorità</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<span class="badge {priority_class}">{_safe(priorita_val)}</span>',
+                    unsafe_allow_html=True,
+                )
+            with m3:
+                st.markdown('<div class="ticket-meta-label">Categoria</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ticket-meta-value">{_safe(categoria_val)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with m4:
+                st.markdown('<div class="ticket-meta-label">Assegnato a</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ticket-meta-value">{_safe(tecnico_val)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            if descrizione:
+                st.markdown(
+                    f'<div class="ticket-card-description">{_safe(descrizione)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
 def pagina_nuovo_ticket():
     st.title("➕ Nuovo Ticket")
