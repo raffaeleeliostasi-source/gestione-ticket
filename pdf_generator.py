@@ -61,10 +61,15 @@ PRIORITY_COLORS = {
 # ------------------------------------------------------------
 
 def _txt(value):
-    """Converte qualsiasi valore in testo sicuro per ReportLab."""
+    """
+    Converte qualsiasi valore in testo sicuro per ReportLab e lo
+    visualizza sempre in MAIUSCOLO nel PDF, indipendentemente da
+    come è stato scritto dall'operatore.
+    """
     if value is None:
         return ""
-    return escape(str(value)).replace("\n", "<br/>")
+    text = str(value).upper()
+    return escape(text).replace("\n", "<br/>")
 
 
 def _first(ticket, *keys):
