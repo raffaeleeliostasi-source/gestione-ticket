@@ -165,7 +165,7 @@ def _info_table(rows, widths=(43 * mm, 44 * mm, 43 * mm, 44 * mm)):
     table.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
+                ("BACKGROUND", (0, 0), (-1, -1), WHITE),
                 ("GRID", (0, 0), (-1, -1), 0.45, BORDER),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
@@ -812,7 +812,7 @@ def genera_pdf(ticket):
         technician_signature_image,
         technician_name_final,
         technician_date_final,
-        alignment="LEFT",
+        alignment="CENTER",
     )
 
     responsible_panel = _signature_panel(
@@ -820,7 +820,7 @@ def genera_pdf(ticket):
         responsible_signature_image,
         chiuso_da,
         _format_date(data_chiusura),
-        alignment="RIGHT",
+        alignment="CENTER",
     )
 
     final_signatures = Table(
