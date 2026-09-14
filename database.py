@@ -378,3 +378,38 @@ def elimina_allegato(allegato_id, path):
         supabase.storage.from_(BUCKET_ALLEGATI).remove([path])
     finally:
         supabase.table("ticket_allegati").delete().eq("id", allegato_id).execute()
+
+# ============================================================
+# FIRMA AMMINISTRATORE
+# ============================================================
+
+def _percorso_firma_amministratore(username):
+    username = sanitizza_nome_file(username or "amministratore")
+    return f"firme/amministratori/{username}.png"
+
+
+def salva_firma_amministratore(username, file_bytes):
+    """Salva/sostituisce la firma dell'amministratore nello Storage."""
+    if not username:
+        raise ValueError("Amministratore non specificato.")
+    if not file_bytes:
+        raise ValueError("File firma non valido.")
+
+    path = _percorso_firma_amministratore(username)
+    supabase.storage.from_(BUCKET_ALLEGATI).upload(
+        path,
+        file_bytes,
+        {"content-type": "image/png", "upsert": "true"},
+    )
+    return path
+
+
+def scarica_firma_amministratore(username):
+    """Recupera la firma associata all'amministratore indicato."""
+    if not username:
+        return None
+    try:
+        path = _percorso_firma_amministratore(username)
+        return supabase.storage.from_(BUCKET_ALLEGATI).download(path)
+    except Exception:
+        return None
