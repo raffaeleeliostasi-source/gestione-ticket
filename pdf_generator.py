@@ -813,7 +813,8 @@ def genera_pdf(ticket):
                 [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
                 [responsible_signature_image],
             ],
-            colWidths=[174 * mm],
+            colWidths=[78 * mm],
+            hAlign="RIGHT",
         )
     else:
         responsible_signature = Table(
@@ -822,7 +823,8 @@ def genera_pdf(ticket):
                 [Spacer(1, 15 * mm)],
                 [Paragraph("____________________________________________", STYLES["small"])],
             ],
-            colWidths=[174 * mm],
+            colWidths=[78 * mm],
+            hAlign="RIGHT",
         )
 
     responsible_signature.setStyle(
@@ -830,10 +832,10 @@ def genera_pdf(ticket):
             [
                 ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
                 ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 7),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
                 ("TOPPADDING", (0, 0), (-1, -1), 5),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ]
