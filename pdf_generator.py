@@ -793,7 +793,11 @@ def genera_pdf(ticket):
     story.append(_info_table(closure_rows))
     story.append(Spacer(1, 4 * mm))
 
-    # Firma automatica dell'amministratore che ha chiuso il ticket.
+    # --------------------------------------------------------
+    # FIRME FINALI: TECNICO A SINISTRA / RESPONSABILE A DESTRA
+    # --------------------------------------------------------
+
+    # Recupera la firma automatica dell'amministratore che ha chiuso il ticket.
     responsible_signature_image = None
     if chiuso_da:
         try:
@@ -803,46 +807,92 @@ def genera_pdf(ticket):
 
         responsible_signature_image = _image_from_bytes(
             raw_responsible_signature,
-            max_width=65 * mm,
-            max_height=28 * mm,
+            max_width=42 * mm,
+            max_height=18 * mm,
         )
 
-    if responsible_signature_image:
-        responsible_signature = Table(
-            [
-                [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
-                [responsible_signature_image],
-            ],
-            colWidths=[78 * mm],
-            hAlign="RIGHT",
-        )
-    else:
-        responsible_signature = Table(
-            [
-                [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
-                [Spacer(1, 15 * mm)],
-                [Paragraph("____________________________________________", STYLES["small"])],
-            ],
-            colWidths=[78 * mm],
-            hAlign="RIGHT",
-        )
+    # Recupera la firma del tecnico dall'ultimo intervento disponibile.
+    technician_signature_image = None
+    technician_name_final = tecnico or ""
+    technician_date_final = data_intervento or ""
 
-    responsible_signature.setStyle(
+    if interventi:
+        ultimo_intervento = interventi[-1]
+        technician_name_final = ultimo_intervento.get("tecnico") or technician_name_final
+        technician_date_final = _format_date(
+            ultimo_intervento.get("data_intervento")
+        ) or technician_date_final
+        firma_path_final = ultimo_intervento.get("firma_path")
+
+        if firma_path_final:
+            try:
+                raw_technician_signature = db.scarica_firma_intervento(firma_path_final)
+            except Exception:
+                raw_technician_signature = None
+
+            technician_signature_image = _image_from_bytes(
+                raw_technician_signature,
+                max_width=42 * mm,
+                max_height=18 * mm,
+            )
+
+    def _signature_panel(label, signature_image, person_name, date_value):
+        content = [
+            [Paragraph(label, STYLES["signature"])],
+            [signature_image if signature_image else Spacer(1, 15 * mm)],
+            [Paragraph("________________________________", STYLES["small"])],
+            [Paragraph(_txt(person_name), STYLES["small"])],
+            [Paragraph(_txt(date_value), STYLES["small"])],
+        ]
+        panel = Table(content, colWidths=[78 * mm])
+        panel.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
+                    ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ]
+            )
+        )
+        return panel
+
+    technician_panel = _signature_panel(
+        "FIRMA DEL TECNICO",
+        technician_signature_image,
+        technician_name_final,
+        technician_date_final,
+    )
+
+    responsible_panel = _signature_panel(
+        "FIRMA DEL RESPONSABILE",
+        responsible_signature_image,
+        chiuso_da,
+        _format_date(data_chiusura),
+    )
+
+    final_signatures = Table(
+        [[technician_panel, responsible_panel]],
+        colWidths=[85 * mm, 85 * mm],
+        hAlign="CENTER",
+    )
+    final_signatures.setStyle(
         TableStyle(
             [
-                ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
-                ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
-                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ]
         )
     )
 
-    story.append(responsible_signature)
+    story.append(final_signatures)
 
     # --------------------------------------------------------
     # COSTRUZIONE
