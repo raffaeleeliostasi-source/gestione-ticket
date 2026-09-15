@@ -945,6 +945,147 @@ def mostra_dettaglio_ticket(ticket_id):
                 st.exception(e)
 
 
+
+def pagina_gestione_interventi():
+    """Gestione dedicata degli interventi tecnici."""
+    admin = is_admin()
+    username = st.session_state.get("username", "")
+
+    st.title("🛠️ Gestisci gli interventi")
+    st.caption(
+        "Consulta lo storico degli interventi e, per i tecnici, registra nuovi interventi sui ticket assegnati."
+    )
+
+    tickets = db.get_tickets() if admin else db.get_tickets_tecnico(username)
+
+    if not tickets:
+        st.info("Non ci sono ticket disponibili per la gestione degli interventi.")
+        return
+
+    df = pd.DataFrame(tickets)
+
+    # --------------------------------------------------------
+    # RIEPILOGO
+    # --------------------------------------------------------
+    stati = df["stato"].fillna("") if "stato" in df.columns else pd.Series(dtype=str)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Ticket", len(df))
+    c2.metric("Aperti", int((stati == "Aperto").sum()))
+    c3.metric("In lavorazione", int((stati == "In Lavorazione").sum()))
+    c4.metric("Risolti", int((stati == "Risolto").sum()))
+
+    # --------------------------------------------------------
+    # FILTRI
+    # --------------------------------------------------------
+    with st.container(border=True):
+        st.markdown("### 🔎 Filtra ticket")
+        f1, f2, f3 = st.columns([2, 1.2, 1.2])
+
+        with f1:
+            ricerca = st.text_input(
+                "Cerca",
+                placeholder="Numero, titolo, descrizione...",
+                key="gestione_interventi_cerca",
+            ).strip()
+
+        with f2:
+            stati_disponibili = ["Tutti", "Aperto", "In Lavorazione", "Risolto", "Chiuso"]
+            filtro_stato = st.selectbox(
+                "Stato",
+                stati_disponibili,
+                key="gestione_interventi_stato",
+            )
+
+        with f3:
+             # Usa i valori reali presenti nei ticket, mantenendo l'ordine standard.
+            presenti = []
+            if "priorita" in df.columns:
+                presenti = [str(x) for x in df["priorita"].dropna().unique() if str(x)]
+            priorita_disponibili = ["Tutte"] + [x for x in PRIORITA if x in presenti]
+            for x in presenti:
+                if x not in priorita_disponibili:
+                    priorita_disponibili.append(x)
+            filtro_priorita = st.selectbox(
+                "Priorità",
+                priorita_disponibili,
+                key="gestione_interventi_priorita",
+            )
+
+    filtrato = df.copy()
+
+    if ricerca:
+        mask = filtrato.astype(str).apply(
+            lambda col: col.str.contains(ricerca, case=False, na=False, regex=False)
+        ).any(axis=1)
+        filtrato = filtrato[mask]
+
+    if filtro_stato != "Tutti" and "stato" in filtrato.columns:
+        filtrato = filtrato[filtrato["stato"] == filtro_stato]
+
+    if filtro_priorita != "Tutte" and "priorita" in filtrato.columns:
+        filtrato = filtrato[filtrato["priorita"] == filtro_priorita]
+
+    st.caption(f"{len(filtrato)} ticket visualizzati")
+
+    selected = st.session_state.get("gestione_interventi_ticket")
+
+    if selected is not None:
+        if st.button("← Torna alla lista interventi", key="gestione_interventi_back"):
+            st.session_state.pop("gestione_interventi_ticket", None)
+            st.rerun()
+
+        mostra_dettaglio_ticket(int(selected))
+        return
+
+    if filtrato.empty:
+        st.info("Nessun ticket corrisponde ai filtri selezionati.")
+        return
+
+    # --------------------------------------------------------
+    # ELENCO TICKET
+    # --------------------------------------------------------
+    for _, row in filtrato.iterrows():
+        ticket_id = int(row["id"])
+        titolo = _safe(row.get("titolo")) or "Senza titolo"
+        stato = _safe(row.get("stato")) or "—"
+        priorita = _safe(row.get("priorita")) or "—"
+        categoria = _safe(row.get("categoria")) or "—"
+        tecnico = _safe(row.get("assegnato_a")) or "Non assegnato"
+
+        interventi = db.get_interventi(ticket_id)
+        numero_interventi = len(interventi)
+        ultimo = interventi[-1] if interventi else None
+
+        with st.container(border=True):
+            c1, c2 = st.columns([4, 1.2])
+            with c1:
+                st.markdown(f"### 🎫 #{ticket_id} — {titolo}")
+                st.write(
+                    f"**Stato:** {stato}  •  **Priorità:** {priorita}  •  **Categoria:** {categoria}"
+                )
+                st.caption(
+                    f"👷 Tecnico: {tecnico}  •  🛠️ Interventi registrati: {numero_interventi}"
+                )
+                if ultimo:
+                    st.write(
+                        f"**Ultimo intervento:** {_safe(ultimo.get('descrizione'))}"
+                    )
+                    st.caption(
+                        f"{_safe(ultimo.get('tecnico'))} • {db.format_data(ultimo.get('data_intervento'))} • {_safe(ultimo.get('stato'))}"
+                    )
+                else:
+                    st.info("Nessun intervento ancora registrato.")
+
+            with c2:
+                if st.button(
+                    "🛠️ Gestisci",
+                    key=f"gestisci_interventi_{ticket_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state["gestione_interventi_ticket"] = ticket_id
+                    st.rerun()
+
+
 def pagina_statistiche():
     if not is_admin():
         st.error("Accesso non autorizzato.")
