@@ -349,7 +349,29 @@ def salva_intervento_tecnico(
     if not intervento:
         raise ValueError("Intervento non restituito da Supabase.")
 
-    aggiorna_stato_ticket(ticket_id, nuovo_stato)
+    # Aggiorna anche lo stato principale del ticket e verifica il risultato.
+    risultato = (
+        supabase.table("tickets")
+        .update({"stato": nuovo_stato})
+        .eq("id", ticket_id)
+        .eq("assegnato_a", tecnico)
+        .select("id, stato")
+        .execute()
+    )
+
+    if not risultato.data:
+        raise RuntimeError(
+            "L'intervento è stato registrato, ma lo stato del ticket non è stato aggiornato. "
+            "Verificare i permessi di aggiornamento della tabella tickets in Supabase."
+        )
+
+    stato_salvato = risultato.data[0].get("stato")
+    if stato_salvato != nuovo_stato:
+        raise RuntimeError(
+            f"Stato ticket non aggiornato correttamente: atteso '{nuovo_stato}', "
+            f"ottenuto '{stato_salvato}'."
+        )
+
     return intervento
 
 
