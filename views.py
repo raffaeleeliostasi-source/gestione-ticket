@@ -886,11 +886,13 @@ def mostra_dettaglio_ticket(ticket_id):
                         return
 
                 # 1. Crea SEMPRE una nuova riga e recupera il suo ID.
+                # Uso parametri posizionali per mantenere compatibilita
+                # anche con la versione precedente di database.py.
                 intervento = db.salva_intervento_tecnico(
-                    ticket_id=ticket_id,
-                    tecnico=username,
-                    descrizione=note,
-                    stato=stato,
+                    ticket_id,
+                    username,
+                    note,
+                    stato,
                 )
 
                 if not intervento:
