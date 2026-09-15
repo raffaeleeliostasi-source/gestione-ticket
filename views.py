@@ -785,20 +785,25 @@ def mostra_dettaglio_ticket(ticket_id):
                 key=f"tech_camera_{ticket_id}",
             )
 
+        # Il canvas firma viene creato solo quando serve, cioè per lo stato Risolto.
+        # È separato dagli altri controlli per rendere il rendering del modulo più robusto.
         canvas_result = None
         if stato == "Risolto":
+            st.markdown("#### ✍️ Firma del tecnico")
             st.info("Per risolvere il ticket è obbligatoria la firma grafica del tecnico.")
             canvas_result = st_canvas(
                 fill_color="rgba(255,255,255,0)",
                 stroke_width=2,
                 stroke_color="#000000",
                 background_color="#FFFFFF",
-                height=180, width=600,
+                height=180,
+                width=600,
                 drawing_mode="freedraw",
-                key=f"firma_{ticket_id}",
+                key=f"firma_intervento_{ticket_id}",
                 return_image_data=True,
             )
 
+        st.markdown("")
         if st.button("💾 Salva nuovo intervento", key=f"tech_save_{ticket_id}", use_container_width=True):
             try:
                 if not note.strip():
