@@ -1,12 +1,14 @@
 import streamlit as st
 import views
 
+
 st.set_page_config(
     page_title="Gestione Ticket",
     page_icon="🎫",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 
 for key, default in {
     "logged_in": False,
@@ -19,7 +21,8 @@ for key, default in {
 
 def is_admin():
     return str(st.session_state.get("ruolo", "")).strip().lower() in {
-        "amministratore", "admin"
+        "amministratore",
+        "admin",
     }
 
 
@@ -33,6 +36,7 @@ if not st.session_state.logged_in:
     views.pagina_login()
     st.stop()
 
+
 with st.sidebar:
     st.title("🎫 Gestione Ticket")
     st.write(f"**Utente:** {st.session_state.username}")
@@ -42,20 +46,33 @@ with st.sidebar:
     if is_admin():
         menu = st.radio(
             "Menu",
-            ["📊 Dashboard", "➕ Nuovo Ticket", "📈 Statistiche & Report", "⚙️ Amministrazione"],
+            [
+                "📊 Dashboard",
+                "🛠️ Gestisci interventi",
+                "➕ Nuovo Ticket",
+                "📈 Statistiche & Report",
+                "⚙️ Amministrazione",
+            ],
         )
     else:
         menu = st.radio(
             "Menu",
-            ["📊 Dashboard", "➕ Nuovo Ticket"],
+            [
+                "📊 Dashboard",
+                "🛠️ Gestisci interventi",
+                "➕ Nuovo Ticket",
+            ],
         )
 
     st.divider()
     if st.button("🚪 Logout", use_container_width=True):
         logout()
 
+
 if menu == "📊 Dashboard":
     views.pagina_dashboard()
+elif menu == "🛠️ Gestisci interventi":
+    views.pagina_gestione_interventi()
 elif menu == "➕ Nuovo Ticket":
     views.pagina_nuovo_ticket()
 elif menu == "📈 Statistiche & Report":
