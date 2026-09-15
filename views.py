@@ -690,11 +690,9 @@ def mostra_dettaglio_ticket(ticket_id):
         st.error("Accesso non autorizzato a questo ticket.")
         return
 
-    # Messaggio persistente dopo il rerun eseguito al salvataggio.
-    successo = st.session_state.get("intervento_successo")
-    if successo and successo.get("ticket_id") == ticket_id:
-        st.success(successo.get("messaggio", "✅ Nuovo intervento salvato correttamente."))
-        st.session_state.pop("intervento_successo", None)
+    # Carica sempre tutta la cronologia: ogni intervento è una riga distinta.
+    interventi = db.get_interventi(ticket_id)
+    ultimo_intervento = interventi[-1] if interventi else None
 
     st.divider()
     st.header(f"🎫 Ticket #{ticket_id}: {_safe(ticket.get('titolo'))}")
@@ -704,29 +702,82 @@ def mostra_dettaglio_ticket(ticket_id):
     c2.write(f"**Priorità:** {_safe(ticket.get('priorita'))}")
     c3.write(f"**Categoria:** {_safe(ticket.get('categoria'))}")
     c4.write(f"**Tecnico:** {assegnato}")
+
     st.write(f"**Creato da:** {_safe(ticket.get('creato_da'))}")
     st.markdown("### Descrizione")
     st.write(_safe(ticket.get("descrizione")))
 
     _mostra_allegati(ticket_id)
-    _mostra_cronologia_interventi(ticket_id)
 
+    # --------------------------------------------------------
+    # CRONOLOGIA INTERVENTI
+    # --------------------------------------------------------
+    if interventi:
+        st.markdown("### 🕘 Cronologia interventi")
+
+        for numero, intervento in enumerate(interventi, start=1):
+            stato_int = _safe(intervento.get("stato")) or "—"
+            tecnico_int = _safe(intervento.get("tecnico")) or "—"
+            data_int = db.format_data(intervento.get("data_intervento"))
+            descrizione_int = _safe(intervento.get("descrizione"))
+
+            with st.container(border=True):
+                st.markdown(f"**Intervento #{numero}** — {stato_int}")
+                st.caption(f"👷 {tecnico_int}  •  📅 {data_int}")
+                st.write(descrizione_int)
+
+                foto_path = intervento.get("foto_path")
+                if foto_path:
+                    try:
+                        foto_bytes = db.scarica_foto_intervento(foto_path)
+                        if foto_bytes:
+                            st.image(
+                                foto_bytes,
+                                caption=f"📷 Foto intervento #{numero}",
+                                width=500,
+                            )
+                    except Exception:
+                        st.warning("Foto dell'intervento presente ma non visualizzabile.")
+
+                firma_path = intervento.get("firma_path")
+                if firma_path:
+                    try:
+                        firma_bytes = db.scarica_firma_intervento(firma_path)
+                        if firma_bytes:
+                            st.image(
+                                firma_bytes,
+                                caption=f"✍️ Firma intervento #{numero}",
+                                width=350,
+                            )
+                    except Exception:
+                        st.warning("Firma dell'intervento presente ma non visualizzabile.")
+    else:
+        st.info("Nessun intervento tecnico registrato.")
+
+    # --------------------------------------------------------
+    # AMMINISTRATORE
+    # --------------------------------------------------------
     if admin:
         with st.container(border=True):
-            st.markdown("### 👨‍💼 Gestione amministrativa")
-            if stato_attuale == "Chiuso":
-                st.success("Questo ticket è chiuso.")
-            else:
-                st.info("L'amministratore può chiudere il ticket dopo aver verificato gli interventi del tecnico.")
+            st.markdown("### 🛠️ Gestione Amministrativa")
+            st.write(f"**Tecnico assegnato:** {assegnato or '—'}")
+            st.write(f"**Stato attuale:** {stato_attuale or '—'}")
+
+            if ultimo_intervento:
+                st.write("**Ultimo intervento:**")
+                st.write(_safe(ultimo_intervento.get("descrizione")))
 
             col_pdf, col_close = st.columns(2)
+
             with col_pdf:
                 try:
                     pdf_bytes = pdf_generator.genera_pdf(ticket)
                     st.download_button(
-                        "📄 Scarica PDF", data=pdf_bytes,
+                        "📄 Scarica PDF",
+                        data=pdf_bytes,
                         file_name=f"ticket_{ticket_id}.pdf",
-                        mime="application/pdf", key=f"pdf_{ticket_id}",
+                        mime="application/pdf",
+                        key=f"pdf_{ticket_id}",
                         use_container_width=True,
                     )
                 except Exception as e:
@@ -735,33 +786,46 @@ def mostra_dettaglio_ticket(ticket_id):
 
             with col_close:
                 if stato_attuale != "Chiuso":
-                    if st.button("🔒 Chiudi ticket", key=f"close_{ticket_id}", use_container_width=True):
+                    if st.button(
+                        "🔒 Chiudi ticket",
+                        key=f"close_{ticket_id}",
+                        use_container_width=True,
+                    ):
                         try:
-                            db.chiudi_ticket(ticket_id, username)
-                            st.success("Ticket chiuso.")
-                            st.rerun()
+                            if db.chiudi_ticket(ticket_id, username):
+                                st.success("Ticket chiuso.")
+                                st.rerun()
                         except Exception as e:
                             st.error("Errore nella chiusura del ticket.")
                             st.exception(e)
+
         return
 
     # --------------------------------------------------------
-    # AREA TECNICO
+    # TECNICO — NUOVO INTERVENTO
     # --------------------------------------------------------
     with st.container(border=True):
         st.markdown("### 🔧 Nuovo intervento tecnico")
 
         if stato_attuale in {"Risolto", "Chiuso"}:
-            st.success(f"Ticket {stato_attuale.lower()}: non sono consentiti nuovi interventi.")
+            st.success(
+                f"Ticket {stato_attuale.lower()}: non sono consentiti nuovi interventi."
+            )
             return
 
-        st.caption("Ogni salvataggio crea un nuovo intervento e conserva lo storico precedente.")
+        st.caption(
+            "Ogni salvataggio crea un nuovo intervento e conserva tutto lo storico precedente."
+        )
 
         stato_options = ["Aperto", "In Lavorazione", "Risolto"]
         stato = st.selectbox(
             "Stato dell'intervento",
             stato_options,
-            index=stato_options.index(stato_attuale) if stato_attuale in stato_options else 0,
+            index=(
+                stato_options.index(stato_attuale)
+                if stato_attuale in stato_options
+                else 0
+            ),
             key=f"tech_state_{ticket_id}",
         )
 
@@ -785,12 +849,12 @@ def mostra_dettaglio_ticket(ticket_id):
                 key=f"tech_camera_{ticket_id}",
             )
 
-        # Il canvas firma viene creato solo quando serve, cioè per lo stato Risolto.
-        # È separato dagli altri controlli per rendere il rendering del modulo più robusto.
         canvas_result = None
         if stato == "Risolto":
             st.markdown("#### ✍️ Firma del tecnico")
-            st.info("Per risolvere il ticket è obbligatoria la firma grafica del tecnico.")
+            st.info(
+                "Per risolvere il ticket è obbligatoria la firma grafica del tecnico."
+            )
             canvas_result = st_canvas(
                 fill_color="rgba(255,255,255,0)",
                 stroke_width=2,
@@ -804,7 +868,11 @@ def mostra_dettaglio_ticket(ticket_id):
             )
 
         st.markdown("")
-        if st.button("💾 Salva nuovo intervento", key=f"tech_save_{ticket_id}", use_container_width=True):
+        if st.button(
+            "💾 Salva nuovo intervento",
+            key=f"tech_save_{ticket_id}",
+            use_container_width=True,
+        ):
             try:
                 if not note.strip():
                     st.error("La descrizione dell'intervento è obbligatoria.")
@@ -817,32 +885,52 @@ def mostra_dettaglio_ticket(ticket_id):
                         st.error("Inserisci la firma prima di risolvere il ticket.")
                         return
 
+                # 1. Crea SEMPRE una nuova riga e recupera il suo ID.
                 intervento = db.salva_intervento_tecnico(
                     ticket_id=ticket_id,
                     tecnico=username,
-                    descrizione_intervento=note,
-                    nuovo_stato=stato,
+                    descrizione=note,
+                    stato=stato,
                 )
-                intervento_id = intervento["id"]
 
+                if not intervento:
+                    st.error("L'intervento non è stato creato.")
+                    return
+
+                intervento_id = intervento.get("id")
+                if not intervento_id:
+                    st.error("Supabase non ha restituito l'ID del nuovo intervento.")
+                    return
+
+                # 2. La foto viene associata ESATTAMENTE a questa riga.
                 foto_da_salvare = foto_file or foto_camera
                 if foto_da_salvare is not None:
-                    db.salva_foto_intervento(
-                        intervento_id, ticket_id, foto_da_salvare
+                    percorso_foto = db.salva_foto_intervento(
+                        intervento_id=intervento_id,
+                        ticket_id=ticket_id,
+                        file=foto_da_salvare,
                     )
+                    if not percorso_foto:
+                        st.warning(
+                            "L'intervento è stato salvato, ma la foto non è stata associata correttamente."
+                        )
 
+                # 3. La firma viene associata ESATTAMENTE a questa riga.
                 if firma_bytes is not None:
-                    db.salva_firma_intervento(
-                        intervento_id, ticket_id, firma_bytes,
-                        filename=f"firma_intervento_{intervento_id}.png",
+                    percorso_firma = db.salva_firma_intervento(
+                        intervento_id=intervento_id,
+                        ticket_id=ticket_id,
+                        firma_bytes=firma_bytes,
                     )
+                    if not percorso_firma:
+                        st.warning(
+                            "L'intervento è stato salvato, ma la firma non è stata associata correttamente."
+                        )
 
-                # Salviamo il messaggio nello stato di sessione perché st.rerun()
-                # ricrea la pagina e altrimenti il messaggio verrebbe perso.
                 st.session_state["intervento_successo"] = {
                     "ticket_id": ticket_id,
                     "messaggio": (
-                        f"✅ Nuovo intervento salvato correttamente. "
+                        f"✅ Intervento #{intervento_id} salvato correttamente. "
                         f"Ticket aggiornato a: {stato}."
                     ),
                 }
