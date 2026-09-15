@@ -26,11 +26,6 @@ def _safe(value):
 
 
 def _reset_dashboard_filters():
-    """
-    Aumenta la versione dei widget filtro.
-    Al rerun Streamlit crea quindi nuovi widget con i valori iniziali,
-    svuotando realmente i campi e riportando le select a "Tutti".
-    """
     st.session_state["dashboard_filter_version"] = (
         int(st.session_state.get("dashboard_filter_version", 0)) + 1
     )
@@ -66,7 +61,6 @@ def pagina_login():
             st.error("Credenziali non valide.")
             return
 
-        # Migrazione automatica di eventuali vecchie password in chiaro.
         if "$" not in str(user.get("password", "")):
             db.aggiorna_utente(username, password=auth.hash_password(password))
 
@@ -224,9 +218,6 @@ def pagina_dashboard():
 
     rows = db.get_tickets() if admin else db.get_tickets_tecnico(username)
 
-    # --------------------------------------------------------
-    # TESTATA
-    # --------------------------------------------------------
     user_label = username.replace("_", " ").title() if username else ""
     ruolo_label = st.session_state.get("ruolo", "")
 
@@ -257,9 +248,6 @@ def pagina_dashboard():
 
     df = pd.DataFrame(rows)
 
-    # --------------------------------------------------------
-    # RIEPILOGO
-    # --------------------------------------------------------
     def count_status(name):
         if "stato" not in df.columns:
             return 0
@@ -292,9 +280,6 @@ def pagina_dashboard():
                 unsafe_allow_html=True,
             )
 
-    # --------------------------------------------------------
-    # FILTRI
-    # --------------------------------------------------------
     st.markdown(
         """
         <div class="filter-panel">
@@ -303,9 +288,6 @@ def pagina_dashboard():
         unsafe_allow_html=True,
     )
 
-    # La versione viene usata nelle chiavi dei widget.
-    # Dopo il click su "Azzera" la versione cambia e Streamlit crea
-    # una nuova istanza dei widget con i valori predefiniti.
     filter_version = int(st.session_state.get("dashboard_filter_version", 0))
 
     c1, c2, c3, c4, c5 = st.columns([2.25, 1.2, 1.2, 1.45, .65])
@@ -365,9 +347,6 @@ def pagina_dashboard():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # --------------------------------------------------------
-    # APPLICAZIONE FILTRI
-    # --------------------------------------------------------
     filtrato = df.copy()
 
     if cerca:
@@ -403,9 +382,6 @@ def pagina_dashboard():
         )
         return
 
-    # --------------------------------------------------------
-    # DETTAGLIO TICKET
-    # --------------------------------------------------------
     selected = st.session_state.get("dashboard_ticket_aperto")
 
     if selected is not None:
@@ -419,6 +395,8 @@ def pagina_dashboard():
     # --------------------------------------------------------
     # SCHEDE TICKET
     # --------------------------------------------------------
+    # Il pulsante PDF è volutamente subito dopo il blocco
+    # "Assegnato a", come richiesto.
     for _, row in filtrato.iterrows():
         ticket_id = int(row["id"])
 
@@ -432,7 +410,6 @@ def pagina_dashboard():
         if len(descrizione) > 150:
             descrizione = descrizione[:147].rstrip() + "..."
 
-        # Data ticket: supportiamo i nomi già usati nell'app.
         data_ticket = (
             row.get("creato_il")
             or row.get("created_at")
@@ -458,7 +435,6 @@ def pagina_dashboard():
             "Urgente": "p-urgente",
         }.get(priorita_val, "s-chiuso")
 
-        # Scheda HTML superiore.
         st.markdown(
             f"""
             <div class="ticket-card">
@@ -490,14 +466,46 @@ def pagina_dashboard():
             unsafe_allow_html=True,
         )
 
-        # Il pulsante resta Streamlit nativo, quindi è affidabile e accessibile.
-        if st.button(
-            "Apri ticket  ›",
-            key=f"dashboard_open_{ticket_id}",
-            use_container_width=True,
-        ):
-            st.session_state["dashboard_ticket_aperto"] = ticket_id
-            st.rerun()
+        # PDF e apertura ticket sono azioni indipendenti.
+        # Il PDF viene generato sul ticket completo, così conserva
+        # interventi, foto e firme già gestiti da pdf_generator.
+        col_open, col_pdf = st.columns([5.8, 1.2])
+
+        with col_open:
+            if st.button(
+                "Apri ticket  ›",
+                key=f"dashboard_open_{ticket_id}",
+                use_container_width=True,
+            ):
+                st.session_state["dashboard_ticket_aperto"] = ticket_id
+                st.rerun()
+
+        with col_pdf:
+            try:
+                ticket_completo = db.get_ticket(ticket_id)
+                if not ticket_completo:
+                    st.button(
+                        "📄",
+                        key=f"dashboard_pdf_disabled_{ticket_id}",
+                        help="Ticket non disponibile",
+                        disabled=True,
+                        use_container_width=True,
+                    )
+                else:
+                    pdf_bytes = pdf_generator.genera_pdf(ticket_completo)
+                    st.download_button(
+                        "📄",
+                        data=pdf_bytes,
+                        file_name=f"ticket_{ticket_id}.pdf",
+                        mime="application/pdf",
+                        key=f"dashboard_pdf_{ticket_id}",
+                        help=f"Scarica PDF del ticket #{ticket_id}",
+                        use_container_width=True,
+                    )
+            except Exception as e:
+                st.error(f"PDF #{ticket_id}: {e}")
+
+
 def pagina_nuovo_ticket():
     st.title("➕ Nuovo Ticket")
     st.markdown("Compila i campi sottostanti per aprire una nuova segnalazione nel sistema.")
@@ -519,15 +527,19 @@ def pagina_nuovo_ticket():
     with st.form("nuovo_ticket_form", clear_on_submit=True):
         st.markdown("### 📝 Dettagli Principali")
         titolo = st.text_input("Titolo del ticket", placeholder="Es. Problema stampante piano terra")
-        descrizione = st.text_area("Descrizione dettagliata", height=130, placeholder="Fornisci quanti più dettagli possibili sul problema...")
-        
+        descrizione = st.text_area(
+            "Descrizione dettagliata",
+            height=130,
+            placeholder="Fornisci quanti più dettagli possibili sul problema..."
+        )
+
         st.markdown("---")
         st.markdown("### ⚙️ Classificazione e Assegnazione")
         c1, c2, c3 = st.columns(3)
         categoria = c1.selectbox("Categoria", categorie)
         priorita = c2.selectbox("Priorità", PRIORITA)
         assegnato_a = c3.selectbox("Assegna a tecnico", tecnici)
-        
+
         st.markdown("---")
         st.markdown("### 📎 Allegati e Contenuti Multimediali")
         c_file, c_foto = st.columns(2)
@@ -539,7 +551,7 @@ def pagina_nuovo_ticket():
             )
         with c_foto:
             foto = st.camera_input("Scatta foto del problema")
-            
+
         st.markdown("")
         submit = st.form_submit_button("💾 Crea Ticket", use_container_width=True)
 
@@ -666,7 +678,7 @@ def mostra_dettaglio_ticket(ticket_id):
             st.markdown("### 🛠️ Gestione Amministrativa Intervento")
             tecnico = st.text_input("Tecnico Assegnato", value=assegnato, disabled=True)
             stato_options = STATI
-            
+
             c_st, _ = st.columns(2)
             with c_st:
                 stato = st.selectbox(
@@ -675,7 +687,7 @@ def mostra_dettaglio_ticket(ticket_id):
                     index=stato_options.index(stato_attuale) if stato_attuale in stato_options else 0,
                     key=f"admin_state_{ticket_id}",
                 )
-                
+
             note = st.text_area(
                 "Note / Intervento registrato",
                 value=_safe(intervento.get("descrizione") if intervento else ""),
@@ -865,7 +877,7 @@ def pagina_statistiche():
             df[col] = ""
 
     st.subheader("📋 Dati")
-    
+
     st.dataframe(
         df,
         use_container_width=True,
@@ -928,7 +940,9 @@ def pagina_amministrazione():
 
     st.title("⚙️ Amministrazione")
 
-    tab1, tab2, tab3, tab4 = st.tabs(["👥 Utenti", "🔐 Password", "🗂️ Categorie", "✍️ Firma amministratore"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["👥 Utenti", "🔐 Password", "🗂️ Categorie", "✍️ Firma amministratore"]
+    )
 
     with tab1:
         st.subheader("Utenti")
@@ -940,9 +954,13 @@ def pagina_amministrazione():
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "username": st.column_config.TextColumn("Username", help="Nome utente per il login"),
+                    "username": st.column_config.TextColumn(
+                        "Username", help="Nome utente per il login"
+                    ),
                     "ruolo": st.column_config.TextColumn("Ruolo di Sistema"),
-                    "attivo": st.column_config.CheckboxColumn("Stato Attivo", help="Indica se l'utente può accedere"),
+                    "attivo": st.column_config.CheckboxColumn(
+                        "Stato Attivo", help="Indica se l'utente può accedere"
+                    ),
                 }
             )
 
@@ -969,7 +987,12 @@ def pagina_amministrazione():
                         st.error("Username già esistente.")
                     else:
                         try:
-                            db.crea_utente(username, auth.hash_password(password), ruolo, attivo)
+                            db.crea_utente(
+                                username,
+                                auth.hash_password(password),
+                                ruolo,
+                                attivo
+                            )
                             st.success("Utente creato.")
                             st.rerun()
                         except Exception as e:
@@ -992,12 +1015,20 @@ def pagina_amministrazione():
                     key=f"active_{username}",
                 )
                 col1, col2 = st.columns(2)
-                if col1.button("💾 Salva", key=f"user_save_{username}", use_container_width=True):
+                if col1.button(
+                    "💾 Salva",
+                    key=f"user_save_{username}",
+                    use_container_width=True
+                ):
                     try:
                         if username == st.session_state.username and not new_active:
                             st.error("Non puoi disattivare il tuo stesso account.")
                         else:
-                            db.aggiorna_utente(username, ruolo=new_role, attivo=new_active)
+                            db.aggiorna_utente(
+                                username,
+                                ruolo=new_role,
+                                attivo=new_active
+                            )
                             st.success("Utente aggiornato.")
                             st.rerun()
                     except Exception as e:
@@ -1009,12 +1040,19 @@ def pagina_amministrazione():
                     type="password",
                     key=f"newpw_{username}",
                 )
-                if st.button("🔑 Imposta password", key=f"setpw_{username}", use_container_width=True):
+                if st.button(
+                    "🔑 Imposta password",
+                    key=f"setpw_{username}",
+                    use_container_width=True
+                ):
                     ok, msg = auth.password_valida(new_password)
                     if not ok:
                         st.error(msg)
                     else:
-                        db.aggiorna_utente(username, password=auth.hash_password(new_password))
+                        db.aggiorna_utente(
+                            username,
+                            password=auth.hash_password(new_password)
+                        )
                         st.success("Password aggiornata.")
                         st.rerun()
 
@@ -1025,11 +1063,16 @@ def pagina_amministrazione():
             old = st.text_input("Password attuale", type="password")
             new = st.text_input("Nuova password", type="password")
             confirm = st.text_input("Conferma nuova password", type="password")
-            change = st.form_submit_button("🔄 Cambia password", use_container_width=True)
+            change = st.form_submit_button(
+                "🔄 Cambia password",
+                use_container_width=True
+            )
 
         if change:
             current_user = db.get_utente(st.session_state.username)
-            if not current_user or not auth.verifica_password(old, current_user.get("password", "")):
+            if not current_user or not auth.verifica_password(
+                old, current_user.get("password", "")
+            ):
                 st.error("La password attuale non è corretta.")
             elif new != confirm:
                 st.error("Le nuove password non coincidono.")
@@ -1064,7 +1107,10 @@ def pagina_amministrazione():
 
         with st.form("nuova_categoria"):
             nome = st.text_input("Nuova categoria")
-            add = st.form_submit_button("➕ Aggiungi categoria", use_container_width=True)
+            add = st.form_submit_button(
+                "➕ Aggiungi categoria",
+                use_container_width=True
+            )
 
         if add:
             ok, msg = db.aggiungi_categoria(nome)
@@ -1087,7 +1133,11 @@ def pagina_amministrazione():
                     value=cat.get("attivo", True) is not False,
                     key=f"cat_active_{cid}",
                 )
-                if st.button("💾 Salva categoria", key=f"cat_save_{cid}", use_container_width=True):
+                if st.button(
+                    "💾 Salva categoria",
+                    key=f"cat_save_{cid}",
+                    use_container_width=True
+                ):
                     ok, msg = db.modifica_categoria(cid, new_name)
                     if ok:
                         db.cambia_stato_categoria(cid, active)
