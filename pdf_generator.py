@@ -95,7 +95,6 @@ def _format_date(value):
     if not text:
         return ""
 
-    # Formato ISO comune: 2026-09-14T11:20:30...
     try:
         from datetime import datetime
 
@@ -131,11 +130,6 @@ def _section_header(title):
 
 
 def _info_table(rows, widths=(43 * mm, 44 * mm, 43 * mm, 44 * mm)):
-    """
-    rows: lista di tuple (etichetta, valore).
-    Crea una griglia 2x2 per riga:
-    etichetta | valore | etichetta | valore
-    """
     data = []
 
     for i in range(0, len(rows), 2):
@@ -228,11 +222,6 @@ def _priority_badge(priority):
 
 
 def _image_from_bytes(raw, max_width=78 * mm, max_height=58 * mm):
-    """
-    Converte l'allegato in un'immagine ReportLab.
-    PIL permette di gestire anche formati che ReportLab potrebbe non
-    leggere direttamente.
-    """
     if not raw:
         return None
 
@@ -241,7 +230,6 @@ def _image_from_bytes(raw, max_width=78 * mm, max_height=58 * mm):
             source = BytesIO(raw)
             pil = PILImage.open(source)
 
-            # Conversione a RGB/RGBA per evitare problemi con palette/transparency.
             if pil.mode not in ("RGB", "RGBA"):
                 pil = pil.convert("RGB")
 
@@ -424,16 +412,6 @@ def _draw_footer(canvas, doc):
 # ------------------------------------------------------------
 
 def genera_pdf(ticket):
-    """
-    Genera il PDF ufficiale del ticket.
-
-    API mantenuta compatibile con views.py:
-        pdf_generator.genera_pdf(ticket)
-
-    Restituisce:
-        bytes
-    """
-
     if not ticket:
         raise ValueError("Ticket non valido.")
 
@@ -632,7 +610,6 @@ def genera_pdf(ticket):
         story.append(_section_header("ALLEGATI / FOTO"))
         story.append(Spacer(1, 3 * mm))
 
-        # Una foto per riga: leggibilità massima e nessun nome file.
         for image in image_items:
             image_box = Table([[image]], colWidths=[174 * mm])
             image_box.setStyle(
@@ -656,9 +633,16 @@ def genera_pdf(ticket):
     # --------------------------------------------------------
 
     intervento = _get_intervention(ticket_id)
-    # Manteniamo anche una lista per la sezione firme finali.
-    # Il database restituisce un singolo intervento nell'attuale schema.
     interventi = [intervento] if intervento else []
+
+    # IMPORTANTE:
+    # Queste variabili devono esistere anche quando il ticket
+    # non ha ancora un intervento tecnico.
+    tecnico = ""
+    stato_intervento = ""
+    descr_intervento = ""
+    data_intervento = ""
+    firma_path = ""
 
     if intervento:
         tecnico = _first(intervento, "tecnico", "technician")
@@ -689,9 +673,6 @@ def genera_pdf(ticket):
         story.append(_info_table(intervention_metadata))
         story.append(Spacer(1, 3 * mm))
 
-        # Descrizione intervento: riquadro a tutta larghezza,
-        # con titolo sopra e testo sotto, evitando l'etichetta
-        # stretta che andava a capo in modo poco elegante.
         intervention_description = Table(
             [
                 [Paragraph("DESCRIZIONE INTERVENTO EFFETTUATO", STYLES["box_title"])],
@@ -742,7 +723,6 @@ def genera_pdf(ticket):
     # FIRME FINALI: TECNICO A SINISTRA / RESPONSABILE A DESTRA
     # --------------------------------------------------------
 
-    # Recupera la firma automatica dell'amministratore che ha chiuso il ticket.
     responsible_signature_image = None
     if chiuso_da:
         try:
@@ -756,7 +736,6 @@ def genera_pdf(ticket):
             max_height=18 * mm,
         )
 
-    # Recupera la firma del tecnico dall'ultimo intervento disponibile.
     technician_signature_image = None
     technician_name_final = tecnico or ""
     technician_date_final = data_intervento or ""
@@ -782,7 +761,6 @@ def genera_pdf(ticket):
             )
 
     def _signature_panel(label, signature_image, person_name, date_value, alignment="CENTER"):
-
         content = [
             [Paragraph(label, STYLES["signature"])],
             [signature_image if signature_image else Spacer(1, 15 * mm)],
