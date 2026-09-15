@@ -690,6 +690,12 @@ def mostra_dettaglio_ticket(ticket_id):
         st.error("Accesso non autorizzato a questo ticket.")
         return
 
+    # Messaggio persistente dopo il rerun eseguito al salvataggio.
+    successo = st.session_state.get("intervento_successo")
+    if successo and successo.get("ticket_id") == ticket_id:
+        st.success(successo.get("messaggio", "✅ Nuovo intervento salvato correttamente."))
+        st.session_state.pop("intervento_successo", None)
+
     st.divider()
     st.header(f"🎫 Ticket #{ticket_id}: {_safe(ticket.get('titolo'))}")
 
@@ -826,7 +832,15 @@ def mostra_dettaglio_ticket(ticket_id):
                         filename=f"firma_intervento_{intervento_id}.png",
                     )
 
-                st.success("✅ Nuovo intervento salvato correttamente.")
+                # Salviamo il messaggio nello stato di sessione perché st.rerun()
+                # ricrea la pagina e altrimenti il messaggio verrebbe perso.
+                st.session_state["intervento_successo"] = {
+                    "ticket_id": ticket_id,
+                    "messaggio": (
+                        f"✅ Nuovo intervento salvato correttamente. "
+                        f"Ticket aggiornato a: {stato}."
+                    ),
+                }
                 st.rerun()
 
             except PermissionError as e:
