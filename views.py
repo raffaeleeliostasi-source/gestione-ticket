@@ -579,6 +579,15 @@ def pagina_nuovo_ticket():
         if foto is not None:
             db.salva_allegato(ticket_id, foto)
 
+        numero_allegati = len(allegati or []) + (1 if foto is not None else 0)
+        if numero_allegati:
+            db.registra_evento(
+                ticket_id,
+                st.session_state.username,
+                "Allegati caricati",
+                f"Caricati {numero_allegati} allegat{'o' if numero_allegati == 1 else 'i'}.",
+            )
+
         st.session_state["ticket_creato_msg"] = (
             f"✅ Ticket #{ticket_id} creato correttamente!"
         )
@@ -673,6 +682,32 @@ def _mostra_cronologia_interventi(ticket_id):
                 firma = db.scarica_firma_intervento(firma_path)
                 if firma:
                     st.image(firma, caption="Firma del tecnico", width=300)
+
+
+def _mostra_storico_ticket(ticket_id):
+    """Mostra lo storico audit completo del ticket."""
+    eventi = db.get_audit_log(ticket_id)
+
+    st.markdown("### 🧾 Storico attività ticket")
+
+    if not eventi:
+        st.info(
+            "Nessun evento di audit disponibile. "
+            "Gli eventi futuri verranno registrati automaticamente."
+        )
+        return
+
+    for evento in eventi:
+        data = db.format_data(evento.get("data_evento"))
+        utente = _safe(evento.get("utente")) or "Sistema"
+        azione = _safe(evento.get("azione")) or "Evento"
+        dettagli = _safe(evento.get("dettagli"))
+
+        with st.container(border=True):
+            st.markdown(f"**{azione}**")
+            st.caption(f"👤 {utente}  •  📅 {data}")
+            if dettagli:
+                st.write(dettagli)
 
 
 def mostra_dettaglio_ticket(ticket_id):
@@ -770,6 +805,11 @@ def mostra_dettaglio_ticket(ticket_id):
                     )
     else:
         st.info("Nessun intervento tecnico registrato.")
+
+    # --------------------------------------------------------
+    # STORICO COMPLETO DEL TICKET
+    # --------------------------------------------------------
+    _mostra_storico_ticket(ticket_id)
 
     # --------------------------------------------------------
     # AMMINISTRATORE
