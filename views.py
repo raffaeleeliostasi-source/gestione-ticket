@@ -922,7 +922,7 @@ def mostra_dettaglio_ticket(ticket_id):
                     percorso_firma = db.salva_firma_intervento(
                         intervento_id=intervento_id,
                         ticket_id=ticket_id,
-                        firma_bytes=firma_bytes,
+                        file_bytes=firma_bytes,
                     )
                     if not percorso_firma:
                         st.warning(
