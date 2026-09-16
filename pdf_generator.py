@@ -1,11 +1,6 @@
 # ============================================================
 # PDF GENERATOR — GESTIONE TICKET
-# Versione grafica aggiornata
-#
-# Compatibile con views.py:
-#     pdf_generator.genera_pdf(ticket)
-#
-# Non modifica il database e non richiede nuove colonne Supabase.
+# Versione aggiornata con Cronologia Interventi e Firma Amministratore
 # ============================================================
 
 from io import BytesIO
@@ -90,7 +85,6 @@ def _format_date(value):
     if not text:
         return ""
 
-    # Formato ISO comune: 2026-09-14T11:20:30...
     try:
         from datetime import datetime
 
@@ -99,10 +93,6 @@ def _format_date(value):
         return dt.strftime("%d/%m/%Y %H:%M")
     except Exception:
         return text
-
-
-def _style_paragraph(text, style):
-    return Paragraph(_txt(text), style)
 
 
 def _section_header(title):
@@ -126,13 +116,7 @@ def _section_header(title):
 
 
 def _info_table(rows, widths=(43 * mm, 44 * mm, 43 * mm, 44 * mm)):
-    """
-    rows: lista di tuple (etichetta, valore).
-    Crea una griglia 2x2 per riga:
-    etichetta | valore | etichetta | valore
-    """
     data = []
-
     for i in range(0, len(rows), 2):
         row = []
         first = rows[i]
@@ -223,11 +207,6 @@ def _priority_badge(priority):
 
 
 def _image_from_bytes(raw, max_width=82 * mm, max_height=72 * mm):
-    """
-    Converte l'allegato in un'immagine ReportLab.
-    PIL permette di gestire anche formati che ReportLab potrebbe non
-    leggere direttamente.
-    """
     if not raw:
         return None
 
@@ -236,7 +215,6 @@ def _image_from_bytes(raw, max_width=82 * mm, max_height=72 * mm):
             source = BytesIO(raw)
             pil = PILImage.open(source)
 
-            # Conversione a RGB/RGBA per evitare problemi con palette/transparency.
             if pil.mode not in ("RGB", "RGBA"):
                 pil = pil.convert("RGB")
 
@@ -264,21 +242,6 @@ def _image_from_bytes(raw, max_width=82 * mm, max_height=72 * mm):
         return None
 
 
-def _get_attachments(ticket_id):
-    try:
-        result = db.get_allegati(ticket_id)
-        return result or []
-    except Exception:
-        return []
-
-
-def _get_intervention(ticket_id):
-    try:
-        return db.get_intervento(ticket_id)
-    except Exception:
-        return None
-
-
 # ------------------------------------------------------------
 # STILI
 # ------------------------------------------------------------
@@ -287,130 +250,56 @@ _styles = getSampleStyleSheet()
 
 STYLES = {
     "header": ParagraphStyle(
-        "Header",
-        parent=_styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=17,
-        leading=19,
-        textColor=WHITE,
-        alignment=TA_LEFT,
+        "Header", parent=_styles["Normal"], fontName="Helvetica-Bold", fontSize=17, leading=19, textColor=WHITE, alignment=TA_LEFT
     ),
     "header_right": ParagraphStyle(
-        "HeaderRight",
-        parent=_styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=12,
-        leading=14,
-        textColor=WHITE,
-        alignment=TA_CENTER,
+        "HeaderRight", parent=_styles["Normal"], fontName="Helvetica-Bold", fontSize=12, leading=14, textColor=WHITE, alignment=TA_CENTER
     ),
     "title": ParagraphStyle(
-        "Title",
-        parent=_styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=15,
-        leading=18,
-        textColor=NAVY,
-        alignment=TA_LEFT,
+        "Title", parent=_styles["Normal"], fontName="Helvetica-Bold", fontSize=15, leading=18, textColor=NAVY, alignment=TA_LEFT
     ),
     "section": ParagraphStyle(
-        "Section",
-        parent=_styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=10.5,
-        leading=12,
-        textColor=WHITE,
-        alignment=TA_LEFT,
+        "Section", parent=_styles["Normal"], fontName="Helvetica-Bold", fontSize=10.5, leading=12, textColor=WHITE, alignment=TA_LEFT
     ),
     "label": ParagraphStyle(
-        "Label",
-        parent=_styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=7.5,
-        leading=9,
-        textColor=MUTED,
+        "Label", parent=_styles["Normal"], fontName="Helvetica-Bold", fontSize=7.5, leading=9, textColor=MUTED
     ),
     "value": ParagraphStyle(
-        "Value",
-        parent=_styles["Normal"],
-        fontName="Helvetica",
-        fontSize=9,
-        leading=11,
-        textColor=TEXT,
+        "Value", parent=_styles["Normal"], fontName="Helvetica", fontSize=9, leading=11, textColor=TEXT
     ),
     "box_title": ParagraphStyle(
-        "BoxTitle",
-        parent=_styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=8.5,
-        leading=10,
-        textColor=NAVY,
+        "BoxTitle", parent=_styles["Normal"], fontName="Helvetica-Bold", fontSize=8.5, leading=10, textColor=NAVY
     ),
     "box_text": ParagraphStyle(
-        "BoxText",
-        parent=_styles["Normal"],
-        fontName="Helvetica",
-        fontSize=9,
-        leading=12,
-        textColor=TEXT,
+        "BoxText", parent=_styles["Normal"], fontName="Helvetica", fontSize=9, leading=12, textColor=TEXT
     ),
     "priority": ParagraphStyle(
-        "Priority",
-        parent=_styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=9,
-        leading=10,
-        textColor=WHITE,
-        alignment=TA_CENTER,
+        "Priority", parent=_styles["Normal"], fontName="Helvetica-Bold", fontSize=9, leading=10, textColor=WHITE, alignment=TA_CENTER
     ),
     "small": ParagraphStyle(
-        "Small",
-        parent=_styles["Normal"],
-        fontName="Helvetica",
-        fontSize=7.5,
-        leading=9,
-        textColor=MUTED,
+        "Small", parent=_styles["Normal"], fontName="Helvetica", fontSize=7.5, leading=9, textColor=MUTED
     ),
     "signature": ParagraphStyle(
-        "Signature",
-        parent=_styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=8,
-        leading=10,
-        textColor=MUTED,
-        alignment=TA_CENTER,
+        "Signature", parent=_styles["Normal"], fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=MUTED, alignment=TA_CENTER
     ),
 }
 
 
 # ------------------------------------------------------------
-# FOOTER / HEADER PAGINA
+# FOOTER PAGINA
 # ------------------------------------------------------------
 
 def _draw_footer(canvas, doc):
     canvas.saveState()
-
     width, height = A4
-
     canvas.setStrokeColor(BORDER)
     canvas.setLineWidth(0.5)
     canvas.line(18 * mm, 12 * mm, width - 18 * mm, 12 * mm)
 
     canvas.setFont("Helvetica", 7.5)
     canvas.setFillColor(MUTED)
-    canvas.drawString(
-        18 * mm,
-        7.5 * mm,
-        "Gestione Ticket — Report Ufficiale",
-    )
-
-    page_text = f"Pagina {doc.page}"
-    canvas.drawRightString(
-        width - 18 * mm,
-        7.5 * mm,
-        page_text,
-    )
-
+    canvas.drawString(18 * mm, 7.5 * mm, "Gestione Ticket — Report Ufficiale")
+    canvas.drawRightString(width - 18 * mm, 7.5 * mm, f"Pagina {doc.page}")
     canvas.restoreState()
 
 
@@ -419,16 +308,6 @@ def _draw_footer(canvas, doc):
 # ------------------------------------------------------------
 
 def genera_pdf(ticket):
-    """
-    Genera il PDF ufficiale del ticket.
-
-    API mantenuta compatibile con views.py:
-        pdf_generator.genera_pdf(ticket)
-
-    Restituisce:
-        bytes
-    """
-
     if not ticket:
         raise ValueError("Ticket non valido.")
 
@@ -440,32 +319,12 @@ def genera_pdf(ticket):
     creato_da = _first(ticket, "creato_da", "created_by")
     assegnato_a = _first(ticket, "assegnato_a", "assegnato", "assigned_to")
 
-    data_creazione = _first(
-        ticket,
-        "creato_il",
-        "created_at",
-        "data_creazione",
-        "created_on",
-    )
-
-    data_chiusura = _first(
-        ticket,
-        "data_chiusura",
-        "chiuso_il",
-        "closed_at",
-        "closed_on",
-    )
-
-    chiuso_da = _first(
-        ticket,
-        "chiuso_da",
-        "closed_by",
-    )
-
+    data_creazione = _first(ticket, "creato_il", "created_at", "data_creazione", "created_on")
+    data_chiusura = _first(ticket, "data_chiusura", "chiuso_il", "closed_at", "closed_on")
+    chiuso_da = _first(ticket, "chiuso_da", "closed_by")
     descrizione = _first(ticket, "descrizione", "description")
 
     output = BytesIO()
-
     doc = SimpleDocTemplate(
         output,
         pagesize=A4,
@@ -482,81 +341,53 @@ def genera_pdf(ticket):
     # --------------------------------------------------------
     # TESTATA
     # --------------------------------------------------------
-
     header = Table(
-        [
-            [
-                Paragraph("GESTIONE TICKET", STYLES["header"]),
-                Paragraph(
-                    f"TICKET #{_txt(ticket_id)}",
-                    STYLES["header_right"],
-                ),
-            ]
-        ],
+        [[
+            Paragraph("GESTIONE TICKET", STYLES["header"]),
+            Paragraph(f"TICKET #{_txt(ticket_id)}", STYLES["header_right"]),
+        ]],
         colWidths=[116 * mm, 58 * mm],
         rowHeights=[17 * mm],
     )
-
-    header.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), NAVY),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (0, 0), 9),
-                ("RIGHTPADDING", (0, 0), (0, 0), 5),
-                ("LEFTPADDING", (1, 0), (1, 0), 5),
-                ("RIGHTPADDING", (1, 0), (1, 0), 9),
-                ("BOX", (0, 0), (-1, -1), 0.7, NAVY),
-            ]
-        )
-    )
-
+    header.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (0, 0), 9),
+        ("RIGHTPADDING", (0, 0), (0, 0), 5),
+        ("LEFTPADDING", (1, 0), (1, 0), 5),
+        ("RIGHTPADDING", (1, 0), (1, 0), 9),
+        ("BOX", (0, 0), (-1, -1), 0.7, NAVY),
+    ]))
     story.append(header)
     story.append(Spacer(1, 5 * mm))
 
     # --------------------------------------------------------
     # TITOLO + STATO + PRIORITA
     # --------------------------------------------------------
-
     title_box = Table(
-        [
-            [
-                Paragraph(
-                    f"<b>Richiesta di intervento</b><br/>{_txt(titolo or 'Senza titolo')}",
-                    STYLES["title"],
-                ),
-                Paragraph(
-                    f"<b>STATO</b><br/>{_txt(stato or '—')}",
-                    STYLES["value"],
-                ),
-                _priority_badge(priorita),
-            ]
-        ],
+        [[
+            Paragraph(f"<b>Richiesta di intervento</b><br/>{_txt(titolo or 'Senza titolo')}", STYLES["title"]),
+            Paragraph(f"<b>STATO</b><br/>{_txt(stato or '—')}", STYLES["value"]),
+            _priority_badge(priorita),
+        ]],
         colWidths=[94 * mm, 40 * mm, 40 * mm],
     )
-
-    title_box.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BLUE),
-                ("BOX", (0, 0), (-1, -1), 0.7, BLUE),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-                ("ALIGN", (2, 0), (2, 0), "CENTER"),
-            ]
-        )
-    )
-
+    title_box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BLUE),
+        ("BOX", (0, 0), (-1, -1), 0.7, BLUE),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("ALIGN", (2, 0), (2, 0), "CENTER"),
+    ]))
     story.append(title_box)
     story.append(Spacer(1, 5 * mm))
 
     # --------------------------------------------------------
-    # RICHIESTA DI INTERVENTO
+    # DETTAGLI INIZIALI
     # --------------------------------------------------------
-
     story.append(_section_header("RICHIESTA DI INTERVENTO"))
     story.append(Spacer(1, 2 * mm))
 
@@ -568,176 +399,163 @@ def genera_pdf(ticket):
         ("Creato da", creato_da),
         ("Stato attuale", stato),
     ]
-
     story.append(_info_table(metadata))
     story.append(Spacer(1, 3 * mm))
-
     story.append(_box("DESCRIZIONE", descrizione or "Nessuna descrizione."))
     story.append(Spacer(1, 5 * mm))
 
     # --------------------------------------------------------
-    # ALLEGATI / FOTO
+    # ALLEGATI / FOTO PRINCIPALI DEL TICKET
     # --------------------------------------------------------
-
-    attachments = _get_attachments(ticket_id)
+    try:
+        attachments = db.get_allegati(ticket_id) or []
+    except Exception:
+        attachments = []
 
     image_items = []
-
     for attachment in attachments:
-        if not isinstance(attachment, dict):
-            continue
-
-        tipo = str(
-            attachment.get("tipo_file")
-            or attachment.get("mime_type")
-            or attachment.get("content_type")
-            or ""
-        ).lower()
-
+        tipo = str(attachment.get("tipo_file") or "").lower()
         nome = str(attachment.get("nome_file") or "").lower()
-
-        is_image = (
-            tipo.startswith("image/")
-            or nome.endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"))
-        )
-
-        if not is_image:
-            continue
-
-        path = (
-            attachment.get("percorso_file")
-            or attachment.get("path")
-            or attachment.get("file_path")
-        )
-
-        if not path:
-            continue
-
-        try:
-            raw = db.scarica_allegato(path)
-        except Exception:
-            raw = None
-
-        image = _image_from_bytes(raw)
-
-        if image is not None:
-            image_items.append(image)
+        if tipo.startswith("image/") or nome.endswith((".jpg", ".jpeg", ".png", ".webp")):
+            path = attachment.get("percorso_file")
+            if path:
+                try:
+                    raw = db.scarica_allegato(path)
+                    img = _image_from_bytes(raw)
+                    if img:
+                        image_items.append(img)
+                except Exception:
+                    pass
 
     if image_items:
         story.append(_section_header("ALLEGATI / FOTO"))
         story.append(Spacer(1, 3 * mm))
-
-        # Una foto per riga: leggibilità massima e nessun nome file.
-        for image in image_items:
-            image_box = Table([[image]], colWidths=[174 * mm])
-            image_box.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-                        ("BOX", (0, 0), (-1, -1), 0.5, BORDER),
-                        ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                        ("TOPPADDING", (0, 0), (-1, -1), 5),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ]
-                )
-            )
-            story.append(image_box)
+        for img in image_items:
+            img_box = Table([[img]], colWidths=[174 * mm])
+            img_box.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                ("BOX", (0, 0), (-1, -1), 0.5, BORDER),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            story.append(img_box)
             story.append(Spacer(1, 3 * mm))
 
     # --------------------------------------------------------
-    # INTERVENTO TECNICO
+    # CRONOLOGIA INTERVENTI TECNICI
     # --------------------------------------------------------
+    try:
+        interventi = db.get_interventi(ticket_id) or []
+    except Exception:
+        interventi = []
 
-    intervento = _get_intervention(ticket_id)
-
-    if intervento:
-        tecnico = _first(intervento, "tecnico", "technician")
-        stato_intervento = _first(intervento, "stato", "status")
-        descr_intervento = _first(
-            intervento,
-            "descrizione",
-            "descrizione_intervento",
-            "description",
-        )
-        data_intervento = _first(
-            intervento,
-            "data_intervento",
-            "created_at",
-            "data",
-        )
-        story.append(_section_header("INTERVENTO TECNICO"))
-        story.append(Spacer(1, 2 * mm))
-
-        intervention_metadata = [
-            ("Nome del tecnico", tecnico),
-            ("Stato intervento", stato_intervento),
-            ("Data e ora intervento", _format_date(data_intervento)),
-        ]
-
-        story.append(_info_table(intervention_metadata))
+    if interventi:
+        story.append(_section_header(f"CRONOLOGIA INTERVENTI TECNICI ({len(interventi)})"))
         story.append(Spacer(1, 3 * mm))
 
-        story.append(
-            _box(
-                "DESCRIZIONE INTERVENTO EFFETTUATO",
-                descr_intervento or "Nessuna descrizione.",
-            )
-        )
-        story.append(Spacer(1, 4 * mm))
+        for idx, intervento in enumerate(interventi, start=1):
+            t_tecnico = _first(intervento, "tecnico")
+            t_stato = _first(intervento, "stato")
+            t_data = _format_date(_first(intervento, "data_intervento"))
+            t_descr = _first(intervento, "descrizione")
+
+            int_meta = [
+                ("N. Intervento", f"#{idx}"),
+                ("Tecnico", t_tecnico),
+                ("Stato", t_stato),
+                ("Data e ora", t_data),
+            ]
+            story.append(_info_table(int_meta))
+            story.append(Spacer(1, 2 * mm))
+            story.append(_box(f"INTERVENTO #{idx}", t_descr or "Nessuna descrizione."))
+            story.append(Spacer(1, 2 * mm))
+
+            # Foto dell'intervento se presente
+            foto_path = intervento.get("foto_path")
+            if foto_path:
+                try:
+                    foto_bytes = db.scarica_foto_intervento(foto_path)
+                    f_img = _image_from_bytes(foto_bytes)
+                    if f_img:
+                        f_box = Table([[f_img]], colWidths=[174 * mm])
+                        f_box.setStyle(TableStyle([
+                            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                            ("BOX", (0, 0), (-1, -1), 0.5, BORDER),
+                            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                            ("TOPPADDING", (0, 0), (-1, -1), 4),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                        ]))
+                        story.append(f_box)
+                        story.append(Spacer(1, 2 * mm))
+                except Exception:
+                    pass
+
+            # Firma del tecnico associata all'intervento se presente
+            firma_path = intervento.get("firma_path")
+            if not firma_path and intervento.get("id"):
+                firma_path = f"firme/{ticket_id}/intervento_{intervento.get('id')}/firma.png"
+
+            if firma_path:
+                try:
+                    sig_bytes = db.scarica_firma_intervento(firma_path)
+                    if sig_bytes:
+                        sig_img = _image_from_bytes(sig_bytes, max_width=50 * mm, max_height=20 * mm)
+                        if sig_img:
+                            sig_table = Table([[Paragraph(f"<b>Firma Tecnico ({t_tecnico})</b>", STYLES["small"]), sig_img]], colWidths=[80 * mm, 94 * mm])
+                            sig_table.setStyle(TableStyle([
+                                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                                ("BOX", (0, 0), (-1, -1), 0.4, BORDER),
+                                ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
+                                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                            ]))
+                            story.append(sig_table)
+                            story.append(Spacer(1, 3 * mm))
+                except Exception:
+                    pass
+
+            story.append(Spacer(1, 2 * mm))
 
     # --------------------------------------------------------
     # CHIUSURA TICKET
     # --------------------------------------------------------
-
     story.append(_section_header("CHIUSURA TICKET"))
     story.append(Spacer(1, 2 * mm))
 
     closure_rows = [
-        ("Data chiusura", _format_date(data_chiusura)),
-        ("Chiuso da", chiuso_da),
+        ("Data chiusura", _format_date(data_chiusura) if data_chiusura else "Non ancora chiuso"),
+        ("Chiuso da", chiuso_da or "—"),
     ]
-
-    if not data_chiusura and not chiuso_da:
-        closure_rows = [
-            ("Data chiusura", "Non ancora chiuso"),
-            ("Chiuso da", "—"),
-        ]
-
     story.append(_info_table(closure_rows))
     story.append(Spacer(1, 5 * mm))
 
-    # La firma del tecnico viene mostrata una sola volta, alla chiusura.
-    technician_signature = None
-    if intervento:
-        # Prima usiamo il percorso salvato nel record.
-        firma_path = _first(intervento, "firma_path", "signature_path")
-        raw_signature = None
-
-        if firma_path:
+    # --------------------------------------------------------
+    # FIRME FINALI (TECNICO DELL'ULTIMO INTERVENTO + AMMINISTRATORE)
+    # --------------------------------------------------------
+    tech_signature = None
+    if interventi:
+        ultimo_intervento = interventi[-1]
+        last_firma_path = ultimo_intervento.get("firma_path")
+        if not last_firma_path and ultimo_intervento.get("id"):
+            last_firma_path = f"firme/{ticket_id}/intervento_{ultimo_intervento.get('id')}/firma.png"
+        if last_firma_path:
             try:
-                raw_signature = db.scarica_firma_intervento(firma_path)
+                raw_sig = db.scarica_firma_intervento(last_firma_path)
+                tech_signature = _image_from_bytes(raw_sig, max_width=62 * mm, max_height=22 * mm)
             except Exception:
-                raw_signature = None
+                tech_signature = None
 
-        # Compatibilità con gli interventi già presenti: se firma_path non è
-        # valorizzato, proviamo il percorso standard usato dall'app.
-        if not raw_signature and intervento.get("id"):
-            fallback_path = (
-                f"firme/{ticket_id}/intervento_{intervento.get('id')}/firma.png"
-            )
-            try:
-                raw_signature = db.scarica_firma_intervento(fallback_path)
-            except Exception:
-                raw_signature = None
-
-        if raw_signature:
-            technician_signature = _image_from_bytes(
-                raw_signature,
-                max_width=62 * mm,
-                max_height=24 * mm,
-            )
+    # Recupero firma amministratore (cerca in base a chi ha chiuso il ticket o fallback)
+    admin_signature = None
+    admin_name_to_check = chiuso_da if chiuso_da else None
+    if admin_name_to_check:
+        try:
+            raw_admin_sig = db.scarica_firma_amministratore(admin_name_to_check)
+            if raw_admin_sig:
+                admin_signature = _image_from_bytes(raw_admin_sig, max_width=62 * mm, max_height=22 * mm)
+        except Exception:
+            admin_signature = None
 
     def _signature_box(title, signature=None):
         cell = [
@@ -754,7 +572,7 @@ def genera_pdf(ticket):
             TableStyle(
                 [
                     ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
-                    ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.white),
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("LEFTPADDING", (0, 0), (-1, -1), 5),
@@ -768,8 +586,8 @@ def genera_pdf(ticket):
 
     signatures = Table(
         [[
-            _signature_box("FIRMA DEL TECNICO", technician_signature),
-            _signature_box("FIRMA DEL RESPONSABILE"),
+            _signature_box("FIRMA DEL TECNICO", tech_signature),
+            _signature_box(f"FIRMA AMMINISTRATORE{f' ({chiuso_da})' if chiuso_da else ''}", admin_signature),
         ]],
         colWidths=[87 * mm, 87 * mm],
     )
@@ -790,7 +608,6 @@ def genera_pdf(ticket):
     # --------------------------------------------------------
     # COSTRUZIONE
     # --------------------------------------------------------
-
     doc.build(
         story,
         onFirstPage=_draw_footer,
