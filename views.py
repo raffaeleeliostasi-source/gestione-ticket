@@ -668,32 +668,11 @@ def _mostra_cronologia_interventi(ticket_id):
                 if foto:
                     st.image(foto, caption="Foto intervento", width=500)
 
-            # Firma del tecnico: recupero dal percorso salvato e, se necessario,
-            # ricostruzione del percorso standard dell'intervento.
             firma_path = intervento.get("firma_path")
-            firma = None
-
             if firma_path:
                 firma = db.scarica_firma_intervento(firma_path)
-
-            # Fallback per i record in cui il percorso non è stato valorizzato
-            # correttamente, ma la firma è stata salvata nello Storage.
-            if not firma and intervento.get("id"):
-                fallback_path = (
-                    f"firme/{ticket_id}/intervento_{intervento.get('id')}/firma.png"
-                )
-                firma = db.scarica_firma_intervento(fallback_path)
                 if firma:
-                    try:
-                        db.supabase.table("ticket_interventi").update(
-                            {"firma_path": fallback_path}
-                        ).eq("id", intervento.get("id")).execute()
-                        firma_path = fallback_path
-                    except Exception:
-                        pass
-
-            if firma:
-                st.image(firma, caption="Firma del tecnico", width=300)
+                    st.image(firma, caption="Firma del tecnico", width=300)
 
 
 def mostra_dettaglio_ticket(ticket_id):
@@ -711,6 +690,10 @@ def mostra_dettaglio_ticket(ticket_id):
         st.error("Accesso non autorizzato a questo ticket.")
         return
 
+    # Carica sempre tutta la cronologia: ogni intervento è una riga distinta.
+    interventi = db.get_interventi(ticket_id)
+    ultimo_intervento = interventi[-1] if interventi else None
+
     st.divider()
     st.header(f"🎫 Ticket #{ticket_id}: {_safe(ticket.get('titolo'))}")
 
@@ -719,29 +702,99 @@ def mostra_dettaglio_ticket(ticket_id):
     c2.write(f"**Priorità:** {_safe(ticket.get('priorita'))}")
     c3.write(f"**Categoria:** {_safe(ticket.get('categoria'))}")
     c4.write(f"**Tecnico:** {assegnato}")
+
     st.write(f"**Creato da:** {_safe(ticket.get('creato_da'))}")
     st.markdown("### Descrizione")
     st.write(_safe(ticket.get("descrizione")))
 
     _mostra_allegati(ticket_id)
-    _mostra_cronologia_interventi(ticket_id)
 
+    # --------------------------------------------------------
+    # CRONOLOGIA INTERVENTI
+    # --------------------------------------------------------
+    if interventi:
+        st.markdown("### 🕘 Cronologia interventi")
+
+        for numero, intervento in enumerate(interventi, start=1):
+            stato_int = _safe(intervento.get("stato")) or "—"
+            tecnico_int = _safe(intervento.get("tecnico")) or "—"
+            data_int = db.format_data(intervento.get("data_intervento"))
+            descrizione_int = _safe(intervento.get("descrizione"))
+
+            with st.container(border=True):
+                st.markdown(f"**Intervento #{numero}** — {stato_int}")
+                st.caption(f"👷 {tecnico_int}  •  📅 {data_int}")
+                st.write(descrizione_int)
+
+                foto_path = intervento.get("foto_path")
+                if foto_path:
+                    try:
+                        foto_bytes = db.scarica_foto_intervento(foto_path)
+                        if foto_bytes:
+                            st.image(
+                                foto_bytes,
+                                caption=f"📷 Foto intervento #{numero}",
+                                width=500,
+                            )
+                    except Exception:
+                        st.warning("Foto dell'intervento presente ma non visualizzabile.")
+
+                firma_path = intervento.get("firma_path")
+                firma_bytes = None
+                if firma_path:
+                    try:
+                        firma_bytes = db.scarica_firma_intervento(firma_path)
+                    except Exception:
+                        firma_bytes = None
+
+                # Fallback sul percorso standard, utile per eventuali record
+                # precedenti in cui firma_path non era valorizzato correttamente.
+                if not firma_bytes and intervento.get("id"):
+                    fallback_path = (
+                        f"firme/{ticket_id}/intervento_{intervento.get('id')}/firma.png"
+                    )
+                    try:
+                        firma_bytes = db.scarica_firma_intervento(fallback_path)
+                        if firma_bytes:
+                            db.supabase.table("ticket_interventi").update(
+                                {"firma_path": fallback_path}
+                            ).eq("id", intervento.get("id")).execute()
+                    except Exception:
+                        firma_bytes = None
+
+                if firma_bytes:
+                    st.image(
+                        firma_bytes,
+                        caption=f"✍️ Firma intervento #{numero}",
+                        width=350,
+                    )
+    else:
+        st.info("Nessun intervento tecnico registrato.")
+
+    # --------------------------------------------------------
+    # AMMINISTRATORE
+    # --------------------------------------------------------
     if admin:
         with st.container(border=True):
-            st.markdown("### 👨‍💼 Gestione amministrativa")
-            if stato_attuale == "Chiuso":
-                st.success("Questo ticket è chiuso.")
-            else:
-                st.info("L'amministratore può chiudere il ticket dopo aver verificato gli interventi del tecnico.")
+            st.markdown("### 🛠️ Gestione Amministrativa")
+            st.write(f"**Tecnico assegnato:** {assegnato or '—'}")
+            st.write(f"**Stato attuale:** {stato_attuale or '—'}")
+
+            if ultimo_intervento:
+                st.write("**Ultimo intervento:**")
+                st.write(_safe(ultimo_intervento.get("descrizione")))
 
             col_pdf, col_close = st.columns(2)
+
             with col_pdf:
                 try:
                     pdf_bytes = pdf_generator.genera_pdf(ticket)
                     st.download_button(
-                        "📄 Scarica PDF", data=pdf_bytes,
+                        "📄 Scarica PDF",
+                        data=pdf_bytes,
                         file_name=f"ticket_{ticket_id}.pdf",
-                        mime="application/pdf", key=f"pdf_{ticket_id}",
+                        mime="application/pdf",
+                        key=f"pdf_{ticket_id}",
                         use_container_width=True,
                     )
                 except Exception as e:
@@ -750,33 +803,46 @@ def mostra_dettaglio_ticket(ticket_id):
 
             with col_close:
                 if stato_attuale != "Chiuso":
-                    if st.button("🔒 Chiudi ticket", key=f"close_{ticket_id}", use_container_width=True):
+                    if st.button(
+                        "🔒 Chiudi ticket",
+                        key=f"close_{ticket_id}",
+                        use_container_width=True,
+                    ):
                         try:
-                            db.chiudi_ticket(ticket_id, username)
-                            st.success("Ticket chiuso.")
-                            st.rerun()
+                            if db.chiudi_ticket(ticket_id, username):
+                                st.success("Ticket chiuso.")
+                                st.rerun()
                         except Exception as e:
                             st.error("Errore nella chiusura del ticket.")
                             st.exception(e)
+
         return
 
     # --------------------------------------------------------
-    # AREA TECNICO
+    # TECNICO — NUOVO INTERVENTO
     # --------------------------------------------------------
     with st.container(border=True):
         st.markdown("### 🔧 Nuovo intervento tecnico")
 
         if stato_attuale in {"Risolto", "Chiuso"}:
-            st.success(f"Ticket {stato_attuale.lower()}: non sono consentiti nuovi interventi.")
+            st.success(
+                f"Ticket {stato_attuale.lower()}: non sono consentiti nuovi interventi."
+            )
             return
 
-        st.caption("Ogni salvataggio crea un nuovo intervento e conserva lo storico precedente.")
+        st.caption(
+            "Ogni salvataggio crea un nuovo intervento e conserva tutto lo storico precedente."
+        )
 
         stato_options = ["Aperto", "In Lavorazione", "Risolto"]
         stato = st.selectbox(
             "Stato dell'intervento",
             stato_options,
-            index=stato_options.index(stato_attuale) if stato_attuale in stato_options else 0,
+            index=(
+                stato_options.index(stato_attuale)
+                if stato_attuale in stato_options
+                else 0
+            ),
             key=f"tech_state_{ticket_id}",
         )
 
@@ -802,19 +868,28 @@ def mostra_dettaglio_ticket(ticket_id):
 
         canvas_result = None
         if stato == "Risolto":
-            st.info("Per risolvere il ticket è obbligatoria la firma grafica del tecnico.")
+            st.markdown("#### ✍️ Firma del tecnico")
+            st.info(
+                "Per risolvere il ticket è obbligatoria la firma grafica del tecnico."
+            )
             canvas_result = st_canvas(
                 fill_color="rgba(255,255,255,0)",
                 stroke_width=2,
                 stroke_color="#000000",
                 background_color="#FFFFFF",
-                height=180, width=600,
+                height=180,
+                width=600,
                 drawing_mode="freedraw",
-                key=f"firma_{ticket_id}",
+                key=f"firma_intervento_{ticket_id}",
                 return_image_data=True,
             )
 
-        if st.button("💾 Salva nuovo intervento", key=f"tech_save_{ticket_id}", use_container_width=True):
+        st.markdown("")
+        if st.button(
+            "💾 Salva nuovo intervento",
+            key=f"tech_save_{ticket_id}",
+            use_container_width=True,
+        ):
             try:
                 if not note.strip():
                     st.error("La descrizione dell'intervento è obbligatoria.")
@@ -827,20 +902,39 @@ def mostra_dettaglio_ticket(ticket_id):
                         st.error("Inserisci la firma prima di risolvere il ticket.")
                         return
 
+                # 1. Crea SEMPRE una nuova riga e recupera il suo ID.
+                # Uso parametri posizionali per mantenere compatibilita
+                # anche con la versione precedente di database.py.
                 intervento = db.salva_intervento_tecnico(
-                    ticket_id=ticket_id,
-                    tecnico=username,
-                    descrizione_intervento=note,
-                    nuovo_stato=stato,
+                    ticket_id,
+                    username,
+                    note,
+                    stato,
                 )
-                intervento_id = intervento["id"]
 
+                if not intervento:
+                    st.error("L'intervento non è stato creato.")
+                    return
+
+                intervento_id = intervento.get("id")
+                if not intervento_id:
+                    st.error("Supabase non ha restituito l'ID del nuovo intervento.")
+                    return
+
+                # 2. La foto viene associata ESATTAMENTE a questa riga.
                 foto_da_salvare = foto_file or foto_camera
                 if foto_da_salvare is not None:
-                    db.salva_foto_intervento(
-                        intervento_id, ticket_id, foto_da_salvare
+                    percorso_foto = db.salva_foto_intervento(
+                        intervento_id=intervento_id,
+                        ticket_id=ticket_id,
+                        file=foto_da_salvare,
                     )
+                    if not percorso_foto:
+                        st.warning(
+                            "L'intervento è stato salvato, ma la foto non è stata associata correttamente."
+                        )
 
+                # 3. La firma viene associata ESATTAMENTE a questa riga.
                 if firma_bytes is not None:
                     percorso_firma = db.salva_firma_intervento(
                         intervento_id=intervento_id,
@@ -848,9 +942,10 @@ def mostra_dettaglio_ticket(ticket_id):
                         file_bytes=firma_bytes,
                         filename="firma.png",
                     )
+                    if not percorso_firma:
+                        raise RuntimeError("La firma non è stata associata correttamente.")
 
-                    # Verifica immediata: non mostriamo un falso successo se
-                    # Storage o aggiornamento della riga non hanno funzionato.
+                    # Verifica immediata della firma nello Storage.
                     firma_verifica = db.scarica_firma_intervento(percorso_firma)
                     if not firma_verifica:
                         raise RuntimeError(
@@ -858,7 +953,13 @@ def mostra_dettaglio_ticket(ticket_id):
                             "recuperarla da Supabase Storage."
                         )
 
-                st.success("✅ Nuovo intervento salvato correttamente.")
+                st.session_state["intervento_successo"] = {
+                    "ticket_id": ticket_id,
+                    "messaggio": (
+                        f"✅ Intervento #{intervento_id} salvato correttamente. "
+                        f"Ticket aggiornato a: {stato}."
+                    ),
+                }
                 st.rerun()
 
             except PermissionError as e:
@@ -866,6 +967,147 @@ def mostra_dettaglio_ticket(ticket_id):
             except Exception as e:
                 st.error("Errore nel salvataggio dell'intervento.")
                 st.exception(e)
+
+
+
+def pagina_gestione_interventi():
+    """Gestione dedicata degli interventi tecnici."""
+    admin = is_admin()
+    username = st.session_state.get("username", "")
+
+    st.title("🛠️ Gestisci gli interventi")
+    st.caption(
+        "Consulta lo storico degli interventi e, per i tecnici, registra nuovi interventi sui ticket assegnati."
+    )
+
+    tickets = db.get_tickets() if admin else db.get_tickets_tecnico(username)
+
+    if not tickets:
+        st.info("Non ci sono ticket disponibili per la gestione degli interventi.")
+        return
+
+    df = pd.DataFrame(tickets)
+
+    # --------------------------------------------------------
+    # RIEPILOGO
+    # --------------------------------------------------------
+    stati = df["stato"].fillna("") if "stato" in df.columns else pd.Series(dtype=str)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Ticket", len(df))
+    c2.metric("Aperti", int((stati == "Aperto").sum()))
+    c3.metric("In lavorazione", int((stati == "In Lavorazione").sum()))
+    c4.metric("Risolti", int((stati == "Risolto").sum()))
+
+    # --------------------------------------------------------
+    # FILTRI
+    # --------------------------------------------------------
+    with st.container(border=True):
+        st.markdown("### 🔎 Filtra ticket")
+        f1, f2, f3 = st.columns([2, 1.2, 1.2])
+
+        with f1:
+            ricerca = st.text_input(
+                "Cerca",
+                placeholder="Numero, titolo, descrizione...",
+                key="gestione_interventi_cerca",
+            ).strip()
+
+        with f2:
+            stati_disponibili = ["Tutti", "Aperto", "In Lavorazione", "Risolto", "Chiuso"]
+            filtro_stato = st.selectbox(
+                "Stato",
+                stati_disponibili,
+                key="gestione_interventi_stato",
+            )
+
+        with f3:
+             # Usa i valori reali presenti nei ticket, mantenendo l'ordine standard.
+            presenti = []
+            if "priorita" in df.columns:
+                presenti = [str(x) for x in df["priorita"].dropna().unique() if str(x)]
+            priorita_disponibili = ["Tutte"] + [x for x in PRIORITA if x in presenti]
+            for x in presenti:
+                if x not in priorita_disponibili:
+                    priorita_disponibili.append(x)
+            filtro_priorita = st.selectbox(
+                "Priorità",
+                priorita_disponibili,
+                key="gestione_interventi_priorita",
+            )
+
+    filtrato = df.copy()
+
+    if ricerca:
+        mask = filtrato.astype(str).apply(
+            lambda col: col.str.contains(ricerca, case=False, na=False, regex=False)
+        ).any(axis=1)
+        filtrato = filtrato[mask]
+
+    if filtro_stato != "Tutti" and "stato" in filtrato.columns:
+        filtrato = filtrato[filtrato["stato"] == filtro_stato]
+
+    if filtro_priorita != "Tutte" and "priorita" in filtrato.columns:
+        filtrato = filtrato[filtrato["priorita"] == filtro_priorita]
+
+    st.caption(f"{len(filtrato)} ticket visualizzati")
+
+    selected = st.session_state.get("gestione_interventi_ticket")
+
+    if selected is not None:
+        if st.button("← Torna alla lista interventi", key="gestione_interventi_back"):
+            st.session_state.pop("gestione_interventi_ticket", None)
+            st.rerun()
+
+        mostra_dettaglio_ticket(int(selected))
+        return
+
+    if filtrato.empty:
+        st.info("Nessun ticket corrisponde ai filtri selezionati.")
+        return
+
+    # --------------------------------------------------------
+    # ELENCO TICKET
+    # --------------------------------------------------------
+    for _, row in filtrato.iterrows():
+        ticket_id = int(row["id"])
+        titolo = _safe(row.get("titolo")) or "Senza titolo"
+        stato = _safe(row.get("stato")) or "—"
+        priorita = _safe(row.get("priorita")) or "—"
+        categoria = _safe(row.get("categoria")) or "—"
+        tecnico = _safe(row.get("assegnato_a")) or "Non assegnato"
+
+        interventi = db.get_interventi(ticket_id)
+        numero_interventi = len(interventi)
+        ultimo = interventi[-1] if interventi else None
+
+        with st.container(border=True):
+            c1, c2 = st.columns([4, 1.2])
+            with c1:
+                st.markdown(f"### 🎫 #{ticket_id} — {titolo}")
+                st.write(
+                    f"**Stato:** {stato}  •  **Priorità:** {priorita}  •  **Categoria:** {categoria}"
+                )
+                st.caption(
+                    f"👷 Tecnico: {tecnico}  •  🛠️ Interventi registrati: {numero_interventi}"
+                )
+                if ultimo:
+                    st.write(
+                        f"**Ultimo intervento:** {_safe(ultimo.get('descrizione'))}"
+                    )
+                    st.caption(
+                        f"{_safe(ultimo.get('tecnico'))} • {db.format_data(ultimo.get('data_intervento'))} • {_safe(ultimo.get('stato'))}"
+                    )
+                else:
+                    st.info("Nessun intervento ancora registrato.")
+
+            with c2:
+                if st.button(
+                    "🛠️ Gestisci",
+                    key=f"gestisci_interventi_{ticket_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state["gestione_interventi_ticket"] = ticket_id
+                    st.rerun()
 
 
 def pagina_statistiche():
