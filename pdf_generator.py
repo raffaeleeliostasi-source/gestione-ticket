@@ -214,16 +214,41 @@ def _draw_footer(canvas, doc):
 
 
 
-def _scarica_firma(path, amministratore=False):
-    """Recupera la firma tramite gli helper del database."""
+def _scarica_firma(path, amministratore=False, ticket_id=None, intervento_id=None):
+    """Recupera la firma in modo robusto dal bucket Storage."""
     if not path:
         return None
-    try:
-        if amministratore:
-            return db.scarica_firma_amministratore(path)
-        return db.scarica_firma_intervento(path)
-    except Exception:
-        return None
+    if isinstance(path, (bytes, bytearray)):
+        return bytes(path)
+    candidates = [str(path).strip()]
+    if not amministratore and ticket_id and intervento_id:
+        fallback = f"firme/{ticket_id}/intervento_{intervento_id}/firma.png"
+        if fallback not in candidates:
+            candidates.append(fallback)
+    for candidate in candidates:
+        try:
+            if candidate.startswith(("http://", "https://")):
+                import requests
+                response = requests.get(candidate, timeout=8)
+                if response.status_code == 200 and response.content:
+                    return response.content
+                continue
+            try:
+                data = (db.scarica_firma_intervento(candidate) if not amministratore
+                        else db.scarica_firma_amministratore(candidate))
+                if data:
+                    return data
+            except Exception:
+                pass
+            try:
+                data = db.supabase.storage.from_("allegati").download(candidate)
+                if data:
+                    return data
+            except Exception:
+                pass
+        except Exception:
+            continue
+    return None
 
 
 def _signature_box(title, raw_signature, width=174 * mm):
@@ -388,7 +413,7 @@ def genera_pdf(ticket):
 
             if firma_path:
                 try:
-                    firma_raw = _scarica_firma(firma_path)
+                    firma_raw = _scarica_firma(firma_path, ticket_id=ticket_id, intervento_id=intervention.get("id"))
                 except Exception:
                     firma_raw = None
             else:
