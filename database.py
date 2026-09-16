@@ -189,6 +189,40 @@ def cambia_stato_categoria(categoria_id, attiva):
         return False, str(e)
 
 
+def registra_evento(ticket_id, utente, azione, dettagli=None):
+    """Registra un evento nello storico/audit del ticket.
+    Se la tabella audit_log non è ancora disponibile, l'operazione non
+    blocca il normale funzionamento dell'app.
+    """
+    try:
+        supabase.table("audit_log").insert({
+            "ticket_id": ticket_id,
+            "utente": utente,
+            "azione": azione,
+            "dettagli": dettagli,
+        }).execute()
+        return True
+    except Exception:
+        return False
+
+
+def get_audit_log(ticket_id):
+    """Restituisce lo storico audit del ticket in ordine cronologico."""
+    try:
+        risposta = (
+            supabase.table("audit_log")
+            .select("*")
+            .eq("ticket_id", ticket_id)
+            .order("data_evento", desc=False)
+            .order("id", desc=False)
+            .execute()
+        )
+        return risposta.data or []
+    except Exception as e:
+        st.error(f"Errore caricamento storico ticket: {e}")
+        return []
+
+
 def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da):
     payload = {
         "titolo": titolo,
@@ -199,7 +233,14 @@ def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da
         "stato": "Aperto",
         "creato_da": creato_da,
     }
-    return supabase.table("tickets").insert(payload).execute().data[0]
+    ticket = supabase.table("tickets").insert(payload).execute().data[0]
+    registra_evento(
+        ticket["id"],
+        creato_da,
+        "Ticket creato",
+        f"Ticket creato e assegnato a {assegnato_a}.",
+    )
+    return ticket
 
 
 def aggiorna_stato_ticket(ticket_id, nuovo_stato):
@@ -214,7 +255,7 @@ def aggiorna_stato_ticket(ticket_id, nuovo_stato):
 
 
 def chiudi_ticket(ticket_id, chiuso_da):
-    return (
+    risultato = (
         supabase.table("tickets")
         .update({
             "stato": "Chiuso",
@@ -224,6 +265,13 @@ def chiudi_ticket(ticket_id, chiuso_da):
         .eq("id", ticket_id)
         .execute()
     )
+    registra_evento(
+        ticket_id,
+        chiuso_da,
+        "Ticket chiuso",
+        "Il ticket è stato chiuso dall'amministratore.",
+    )
+    return risultato
 
 
 def salva_allegato(ticket_id, uploaded_file):
@@ -372,6 +420,13 @@ def salva_intervento_tecnico(
             f"ottenuto '{stato_salvato}'."
         )
 
+    registra_evento(
+        ticket_id,
+        tecnico,
+        "Intervento registrato",
+        f"Intervento #{intervento.get('id')} registrato. Stato ticket: {nuovo_stato}.",
+    )
+
     return intervento
 
 
@@ -443,6 +498,10 @@ def elimina_ticket_completo(ticket_id):
         supabase.table("ticket_allegati").delete().eq("ticket_id", ticket_id).execute()
         supabase.table("ticket_messaggi").delete().eq("ticket_id", ticket_id).execute()
         supabase.table("ticket_interventi").delete().eq("ticket_id", ticket_id).execute()
+        try:
+            supabase.table("audit_log").delete().eq("ticket_id", ticket_id).execute()
+        except Exception:
+            pass
         supabase.table("tickets").delete().eq("id", ticket_id).execute()
         return True
     except Exception as e:
