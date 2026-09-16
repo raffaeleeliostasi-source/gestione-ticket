@@ -1,6 +1,7 @@
 # ============================================================
 # PDF GENERATOR — GESTIONE TICKET
-# Versione aggiornata con Cronologia Interventi e Firma Amministratore
+# Versione con Cronologia Interventi e Firma Amministratore
+# (Firme dei tecnici solo nel blocco finale)
 # ============================================================
 
 from io import BytesIO
@@ -443,7 +444,7 @@ def genera_pdf(ticket):
             story.append(Spacer(1, 3 * mm))
 
     # --------------------------------------------------------
-    # CRONOLOGIA INTERVENTI TECNICI
+    # CRONOLOGIA INTERVENTI TECNICI (Senza firme nei singoli blocchi)
     # --------------------------------------------------------
     try:
         interventi = db.get_interventi(ticket_id) or []
@@ -491,31 +492,7 @@ def genera_pdf(ticket):
                 except Exception:
                     pass
 
-            # Firma del tecnico associata all'intervento se presente
-            firma_path = intervento.get("firma_path")
-            if not firma_path and intervento.get("id"):
-                firma_path = f"firme/{ticket_id}/intervento_{intervento.get('id')}/firma.png"
-
-            if firma_path:
-                try:
-                    sig_bytes = db.scarica_firma_intervento(firma_path)
-                    if sig_bytes:
-                        sig_img = _image_from_bytes(sig_bytes, max_width=50 * mm, max_height=20 * mm)
-                        if sig_img:
-                            sig_table = Table([[Paragraph(f"<b>Firma Tecnico ({t_tecnico})</b>", STYLES["small"]), sig_img]], colWidths=[80 * mm, 94 * mm])
-                            sig_table.setStyle(TableStyle([
-                                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                                ("BOX", (0, 0), (-1, -1), 0.4, BORDER),
-                                ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
-                                ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                            ]))
-                            story.append(sig_table)
-                            story.append(Spacer(1, 3 * mm))
-                except Exception:
-                    pass
-
-            story.append(Spacer(1, 2 * mm))
+            story.append(Spacer(1, 3 * mm))
 
     # --------------------------------------------------------
     # CHIUSURA TICKET
@@ -546,7 +523,6 @@ def genera_pdf(ticket):
             except Exception:
                 tech_signature = None
 
-    # Recupero firma amministratore (cerca in base a chi ha chiuso il ticket o fallback)
     admin_signature = None
     admin_name_to_check = chiuso_da if chiuso_da else None
     if admin_name_to_check:
