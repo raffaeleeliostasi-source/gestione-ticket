@@ -667,8 +667,6 @@ def genera_pdf(ticket):
             "created_at",
             "data",
         )
-        firma_path = _first(intervento, "firma_path", "signature_path")
-
         story.append(_section_header("INTERVENTO TECNICO"))
         story.append(Spacer(1, 2 * mm))
 
@@ -689,12 +687,11 @@ def genera_pdf(ticket):
         )
         story.append(Spacer(1, 4 * mm))
 
-
     # --------------------------------------------------------
-    # CHIUSURA INTERVENTO
+    # CHIUSURA TICKET
     # --------------------------------------------------------
 
-    story.append(_section_header("CHIUSURA INTERVENTO"))
+    story.append(_section_header("CHIUSURA TICKET"))
     story.append(Spacer(1, 2 * mm))
 
     closure_rows = [
@@ -711,31 +708,63 @@ def genera_pdf(ticket):
     story.append(_info_table(closure_rows))
     story.append(Spacer(1, 4 * mm))
 
-    responsible_signature = Table(
-        [
-            [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
-            [Spacer(1, 15 * mm)],
-            [Paragraph("____________________________________________", STYLES["small"])],
-        ],
-        colWidths=[174 * mm],
+    # La firma del tecnico viene mostrata una sola volta, alla chiusura,
+    # utilizzando la firma salvata nell'intervento che ha portato il ticket a Risolto.
+    technician_signature = None
+    if intervento:
+        firma_path = _first(intervento, "firma_path", "signature_path")
+        if firma_path:
+            try:
+                raw_signature = db.scarica_firma_intervento(firma_path)
+            except Exception:
+                raw_signature = None
+
+            technician_signature = _image_from_bytes(
+                raw_signature,
+                max_width=65 * mm,
+                max_height=28 * mm,
+            )
+
+    technician_signature_content = [
+        [Paragraph("FIRMA DEL TECNICO", STYLES["signature"])],
+    ]
+    if technician_signature:
+        technician_signature_content.append([technician_signature])
+    else:
+        technician_signature_content.append([Spacer(1, 18 * mm)])
+    technician_signature_content.append(
+        [Paragraph("________________________________", STYLES["small"])]
     )
 
-    responsible_signature.setStyle(
+    responsible_signature_content = [
+        [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
+        [Spacer(1, 18 * mm)],
+        [Paragraph("________________________________", STYLES["small"])],
+    ]
+
+    signatures = Table(
+        [
+            [technician_signature_content, responsible_signature_content]
+        ],
+        colWidths=[85 * mm, 85 * mm],
+    )
+    signatures.setStyle(
         TableStyle(
             [
-                ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
-                ("BACKGROUND", (0, 0), (-1, -1), VERY_LIGHT),
+                ("BOX", (0, 0), (0, 0), 0.6, BORDER),
+                ("BOX", (1, 0), (1, 0), 0.6, BORDER),
+                ("BACKGROUND", (0, 0), (-1, -1), WHITE),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ]
         )
     )
 
-    story.append(responsible_signature)
+    story.append(signatures)
 
     # --------------------------------------------------------
     # COSTRUZIONE
