@@ -971,190 +971,451 @@ def mostra_dettaglio_ticket(ticket_id):
 
 
 def pagina_gestione_interventi():
-    """Gestione dedicata degli interventi tecnici."""
+    """Area operativa dedicata al lavoro del tecnico."""
     admin = is_admin()
     username = st.session_state.get("username", "")
-
-    st.title("🛠️ Gestisci gli interventi")
-    st.caption(
-        "Consulta lo storico degli interventi e, per i tecnici, registra nuovi interventi sui ticket assegnati."
-    )
 
     tickets = db.get_tickets() if admin else db.get_tickets_tecnico(username)
 
     if not tickets:
+        st.title("🛠️ Gestisci gli interventi")
         st.info("Non ci sono ticket disponibili per la gestione degli interventi.")
         return
 
     df = pd.DataFrame(tickets)
 
-    # --------------------------------------------------------
-    # RIEPILOGO
-    # --------------------------------------------------------
-    stati = df["stato"].fillna("") if "stato" in df.columns else pd.Series(dtype=str)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Ticket", len(df))
-    c2.metric("Aperti", int((stati == "Aperto").sum()))
-    c3.metric("In lavorazione", int((stati == "In Lavorazione").sum()))
-    c4.metric("Risolti", int((stati == "Risolto").sum()))
-
-    # --------------------------------------------------------
-    # FILTRI
-    # --------------------------------------------------------
-    with st.container(border=True):
-        st.markdown("### 🔎 Filtra ticket")
-        f1, f2, f3 = st.columns([2, 1.2, 1.2])
-
-        with f1:
-            ricerca = st.text_input(
-                "Cerca",
-                placeholder="Numero, titolo, descrizione...",
-                key="gestione_interventi_cerca",
-            ).strip()
-
-        with f2:
-            stati_disponibili = ["Tutti", "Aperto", "In Lavorazione", "Risolto", "Chiuso"]
-            filtro_stato = st.selectbox(
-                "Stato",
-                stati_disponibili,
-                key="gestione_interventi_stato",
-            )
-
-        with f3:
-             # Usa i valori reali presenti nei ticket, mantenendo l'ordine standard.
-            presenti = []
-            if "priorita" in df.columns:
-                presenti = [str(x) for x in df["priorita"].dropna().unique() if str(x)]
-            priorita_disponibili = ["Tutte"] + [x for x in PRIORITA if x in presenti]
-            for x in presenti:
-                if x not in priorita_disponibili:
-                    priorita_disponibili.append(x)
-            filtro_priorita = st.selectbox(
-                "Priorità",
-                priorita_disponibili,
-                key="gestione_interventi_priorita",
-            )
-
-    filtrato = df.copy()
-
-    if ricerca:
-        mask = filtrato.astype(str).apply(
-            lambda col: col.str.contains(ricerca, case=False, na=False, regex=False)
-        ).any(axis=1)
-        filtrato = filtrato[mask]
-
-    if filtro_stato != "Tutti" and "stato" in filtrato.columns:
-        filtrato = filtrato[filtrato["stato"] == filtro_stato]
-
-    if filtro_priorita != "Tutte" and "priorita" in filtrato.columns:
-        filtrato = filtrato[filtrato["priorita"] == filtro_priorita]
-
-    st.caption(f"{len(filtrato)} ticket visualizzati")
-
+    # ========================================================
+    # DETTAGLIO TICKET
+    # ========================================================
     selected = st.session_state.get("gestione_interventi_ticket")
 
     if selected is not None:
-        if st.button("← Torna alla lista interventi", key="gestione_interventi_back"):
+        if st.button(
+            "← Torna alla mia area di lavoro",
+            key="gestione_interventi_back",
+        ):
             st.session_state.pop("gestione_interventi_ticket", None)
             st.rerun()
 
         mostra_dettaglio_ticket(int(selected))
         return
 
-    if filtrato.empty:
-        st.info("Nessun ticket corrisponde ai filtri selezionati.")
-        return
-
-    # --------------------------------------------------------
-    # ORDINE TICKET
-    # --------------------------------------------------------
-    # Per il tecnico mostriamo prima i ticket che richiedono ancora
-    # attenzione, lasciando i ticket già chiusi in fondo.
-    #
-    # Ordine operativo:
-    #   1. In Lavorazione
-    #   2. Aperto
-    #   3. Risolto (in attesa della chiusura amministrativa)
-    #   4. Chiuso
-    #
-    # A parità di stato, il ticket più recente viene mostrato prima.
-    if not admin and "stato" in filtrato.columns:
-        ordine_stati = {
-            "In Lavorazione": 0,
-            "Aperto": 1,
-            "Risolto": 2,
-            "Chiuso": 3,
-        }
-
-        filtrato = filtrato.copy()
-        filtrato["_ordine_stato"] = (
-            filtrato["stato"]
-            .fillna("")
-            .map(ordine_stati)
-            .fillna(99)
+    # ========================================================
+    # AMMINISTRATORE
+    # ========================================================
+    # Per l'amministratore manteniamo la gestione generale degli
+    # interventi, mentre la nuova area operativa è dedicata al tecnico.
+    if admin:
+        st.title("🛠️ Gestisci gli interventi")
+        st.caption(
+            "Consulta lo storico degli interventi e gestisci i ticket."
         )
 
-        # L'ID è crescente nel tempo: ordinandolo in modo decrescente
-        # abbiamo il ticket più recente per primo nello stesso stato.
-        if "id" in filtrato.columns:
-            filtrato = filtrato.sort_values(
-                by=["_ordine_stato", "id"],
+        stati = (
+            df["stato"].fillna("")
+            if "stato" in df.columns
+            else pd.Series(dtype=str)
+        )
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Ticket", len(df))
+        c2.metric("Aperti", int((stati == "Aperto").sum()))
+        c3.metric("In lavorazione", int((stati == "In Lavorazione").sum()))
+        c4.metric("Risolti", int((stati == "Risolto").sum()))
+
+        with st.container(border=True):
+            st.markdown("### 🔎 Filtra ticket")
+            f1, f2, f3 = st.columns([2, 1.2, 1.2])
+
+            with f1:
+                ricerca = st.text_input(
+                    "Cerca",
+                    placeholder="Numero, titolo, descrizione...",
+                    key="gestione_interventi_cerca",
+                ).strip()
+
+            with f2:
+                filtro_stato = st.selectbox(
+                    "Stato",
+                    ["Tutti", "Aperto", "In Lavorazione", "Risolto", "Chiuso"],
+                    key="gestione_interventi_stato",
+                )
+
+            with f3:
+                presenti = []
+                if "priorita" in df.columns:
+                    presenti = [
+                        str(x)
+                        for x in df["priorita"].dropna().unique()
+                        if str(x)
+                    ]
+                priorita_disponibili = ["Tutte"] + [
+                    x for x in PRIORITA if x in presenti
+                ]
+                for x in presenti:
+                    if x not in priorita_disponibili:
+                        priorita_disponibili.append(x)
+
+                filtro_priorita = st.selectbox(
+                    "Priorità",
+                    priorita_disponibili,
+                    key="gestione_interventi_priorita",
+                )
+
+        filtrato = df.copy()
+
+        if ricerca:
+            mask = filtrato.astype(str).apply(
+                lambda col: col.str.contains(
+                    ricerca,
+                    case=False,
+                    na=False,
+                    regex=False,
+                )
+            ).any(axis=1)
+            filtrato = filtrato[mask]
+
+        if filtro_stato != "Tutti" and "stato" in filtrato.columns:
+            filtrato = filtrato[filtrato["stato"] == filtro_stato]
+
+        if filtro_priorita != "Tutte" and "priorita" in filtrato.columns:
+            filtrato = filtrato[filtrato["priorita"] == filtro_priorita]
+
+        st.caption(f"{len(filtrato)} ticket visualizzati")
+
+        if filtrato.empty:
+            st.info("Nessun ticket corrisponde ai filtri selezionati.")
+            return
+
+        for _, row in filtrato.iterrows():
+            ticket_id = int(row["id"])
+            titolo = _safe(row.get("titolo")) or "Senza titolo"
+            stato = _safe(row.get("stato")) or "—"
+            priorita = _safe(row.get("priorita")) or "—"
+            categoria = _safe(row.get("categoria")) or "—"
+            tecnico = _safe(row.get("assegnato_a")) or "Non assegnato"
+
+            interventi = db.get_interventi(ticket_id)
+            ultimo = interventi[-1] if interventi else None
+
+            with st.container(border=True):
+                c1, c2 = st.columns([4, 1.2])
+                with c1:
+                    st.markdown(f"### 🎫 #{ticket_id} — {titolo}")
+                    st.write(
+                        f"**Stato:** {stato}  •  **Priorità:** {priorita}  •  "
+                        f"**Categoria:** {categoria}"
+                    )
+                    st.caption(
+                        f"👷 Tecnico: {tecnico}  •  "
+                        f"🛠️ Interventi registrati: {len(interventi)}"
+                    )
+                    if ultimo:
+                        st.write(
+                            f"**Ultimo intervento:** "
+                            f"{_safe(ultimo.get('descrizione'))}"
+                        )
+                        st.caption(
+                            f"{_safe(ultimo.get('tecnico'))} • "
+                            f"{db.format_data(ultimo.get('data_intervento'))} • "
+                            f"{_safe(ultimo.get('stato'))}"
+                        )
+                with c2:
+                    if st.button(
+                        "🛠️ Gestisci",
+                        key=f"gestisci_interventi_{ticket_id}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["gestione_interventi_ticket"] = ticket_id
+                        st.rerun()
+
+        return
+
+    # ========================================================
+    # TECNICO — VERA AREA DI LAVORO
+    # ========================================================
+    user_label = username.replace("_", " ").title() if username else "Tecnico"
+
+    stati = (
+        df["stato"].fillna("").astype(str).str.strip()
+        if "stato" in df.columns
+        else pd.Series(dtype=str)
+    )
+
+    aperti = df[stati == "Aperto"].copy()
+    lavorazione = df[stati == "In Lavorazione"].copy()
+    risolti = df[stati == "Risolto"].copy()
+    chiusi = df[stati == "Chiuso"].copy()
+
+    # Priorità operative: Urgente → Alta → Media → Bassa.
+    ordine_priorita = {
+        "Urgente": 0,
+        "Alta": 1,
+        "Media": 2,
+        "Bassa": 3,
+    }
+
+    def ordina_operativi(frame):
+        frame = frame.copy()
+        if frame.empty:
+            return frame
+
+        if "priorita" in frame.columns:
+            frame["_ordine_priorita"] = (
+                frame["priorita"]
+                .fillna("")
+                .map(ordine_priorita)
+                .fillna(99)
+            )
+        else:
+            frame["_ordine_priorita"] = 99
+
+        if "id" in frame.columns:
+            frame = frame.sort_values(
+                by=["_ordine_priorita", "id"],
                 ascending=[True, False],
                 kind="stable",
             )
         else:
-            filtrato = filtrato.sort_values(
-                by=["_ordine_stato"],
+            frame = frame.sort_values(
+                by=["_ordine_priorita"],
                 ascending=[True],
                 kind="stable",
             )
 
-        filtrato = filtrato.drop(columns=["_ordine_stato"])
+        return frame.drop(columns=["_ordine_priorita"])
+
+    aperti = ordina_operativi(aperti)
+    lavorazione = ordina_operativi(lavorazione)
+    risolti = ordina_operativi(risolti)
+    chiusi = ordina_operativi(chiusi)
 
     # --------------------------------------------------------
-    # ELENCO TICKET
+    # INTESTAZIONE
     # --------------------------------------------------------
-    for _, row in filtrato.iterrows():
+    st.markdown(
+        f"""
+        <div style="
+            background: linear-gradient(135deg, #17365D, #245B8F);
+            border-radius: 18px;
+            padding: 24px 28px;
+            margin-bottom: 18px;
+            color: white;
+        ">
+            <div style="font-size: 2rem; font-weight: 800;">
+                🛠️ La mia area di lavoro
+            </div>
+            <div style="font-size: 1rem; opacity: .92; margin-top: 6px;">
+                Ciao <b>{_safe(user_label)}</b> — qui trovi i ticket assegnati
+                e le attività che richiedono il tuo intervento.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # RIEPILOGO OPERATIVO
+    # --------------------------------------------------------
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("🎫 Totali", len(df))
+    c2.metric("🟡 Da lavorare", len(aperti))
+    c3.metric("🟠 In lavorazione", len(lavorazione))
+    c4.metric("🟢 Risolti", len(risolti))
+
+    st.markdown("")
+
+    # --------------------------------------------------------
+    # FILTRI
+    # --------------------------------------------------------
+    with st.container(border=True):
+        st.markdown("### 🔎 Cerca nella mia area")
+
+        f1, f2 = st.columns([2.5, 1])
+
+        with f1:
+            ricerca = st.text_input(
+                "Cerca ticket",
+                placeholder="Numero, titolo, descrizione, categoria...",
+                key="gestione_interventi_cerca",
+            ).strip()
+
+        with f2:
+            priorita_filtro = st.selectbox(
+                "Priorità",
+                ["Tutte"] + list(PRIORITA),
+                key="gestione_interventi_priorita",
+            )
+
+    def applica_filtri(frame):
+        if frame.empty:
+            return frame
+
+        risultato = frame.copy()
+
+        if ricerca:
+            mask = risultato.astype(str).apply(
+                lambda col: col.str.contains(
+                    ricerca,
+                    case=False,
+                    na=False,
+                    regex=False,
+                )
+            ).any(axis=1)
+            risultato = risultato[mask]
+
+        if (
+            priorita_filtro != "Tutte"
+            and "priorita" in risultato.columns
+        ):
+            risultato = risultato[
+                risultato["priorita"] == priorita_filtro
+            ]
+
+        return risultato
+
+    aperti = applica_filtri(aperti)
+    lavorazione = applica_filtri(lavorazione)
+    risolti = applica_filtri(risolti)
+    chiusi = applica_filtri(chiusi)
+
+    # --------------------------------------------------------
+    # CARD TICKET
+    # --------------------------------------------------------
+    def mostra_card_ticket(row, tipo):
         ticket_id = int(row["id"])
         titolo = _safe(row.get("titolo")) or "Senza titolo"
         stato = _safe(row.get("stato")) or "—"
         priorita = _safe(row.get("priorita")) or "—"
         categoria = _safe(row.get("categoria")) or "—"
-        tecnico = _safe(row.get("assegnato_a")) or "Non assegnato"
 
         interventi = db.get_interventi(ticket_id)
-        numero_interventi = len(interventi)
         ultimo = interventi[-1] if interventi else None
 
-        with st.container(border=True):
-            c1, c2 = st.columns([4, 1.2])
-            with c1:
-                st.markdown(f"### 🎫 #{ticket_id} — {titolo}")
-                st.write(
-                    f"**Stato:** {stato}  •  **Priorità:** {priorita}  •  **Categoria:** {categoria}"
+        icone_stato = {
+            "Aperto": "🟡",
+            "In Lavorazione": "🟠",
+            "Risolto": "🟢",
+            "Chiuso": "⚪",
+        }
+        icona = icone_stato.get(stato, "🎫")
+
+        st.markdown(
+            f"""
+            <div style="
+                border: 1px solid #E2E8F0;
+                border-radius: 14px;
+                padding: 16px 18px 12px 18px;
+                margin-bottom: 8px;
+                background: #FFFFFF;
+            ">
+                <div style="font-size: 1.12rem; font-weight: 800; color: #17365D;">
+                    {icona} #{ticket_id} — {_safe(titolo)}
+                </div>
+                <div style="margin-top: 7px; color: #475569; font-size: .88rem;">
+                    <b>Stato:</b> {_safe(stato)}
+                    &nbsp; • &nbsp;
+                    <b>Priorità:</b> {_safe(priorita)}
+                    &nbsp; • &nbsp;
+                    <b>Categoria:</b> {_safe(categoria)}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        c1, c2 = st.columns([4, 1])
+
+        with c1:
+            if ultimo:
+                st.caption(
+                    f"🛠️ Ultimo intervento: "
+                    f"{_safe(ultimo.get('descrizione'))}"
                 )
                 st.caption(
-                    f"👷 Tecnico: {tecnico}  •  🛠️ Interventi registrati: {numero_interventi}"
+                    f"{_safe(ultimo.get('tecnico'))} • "
+                    f"{db.format_data(ultimo.get('data_intervento'))} • "
+                    f"{_safe(ultimo.get('stato'))} • "
+                    f"Interventi totali: {len(interventi)}"
                 )
-                if ultimo:
-                    st.write(
-                        f"**Ultimo intervento:** {_safe(ultimo.get('descrizione'))}"
-                    )
-                    st.caption(
-                        f"{_safe(ultimo.get('tecnico'))} • {db.format_data(ultimo.get('data_intervento'))} • {_safe(ultimo.get('stato'))}"
-                    )
-                else:
-                    st.info("Nessun intervento ancora registrato.")
+            else:
+                st.caption(
+                    "🆕 Nessun intervento ancora registrato."
+                )
 
-            with c2:
-                if st.button(
-                    "🛠️ Gestisci",
-                    key=f"gestisci_interventi_{ticket_id}",
-                    use_container_width=True,
-                ):
-                    st.session_state["gestione_interventi_ticket"] = ticket_id
-                    st.rerun()
+        with c2:
+            if st.button(
+                "🛠️ Apri ticket",
+                key=f"area_tecnico_ticket_{tipo}_{ticket_id}",
+                use_container_width=True,
+            ):
+                st.session_state["gestione_interventi_ticket"] = ticket_id
+                st.rerun()
 
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+    # --------------------------------------------------------
+    # SEZIONE OPERATIVA
+    # --------------------------------------------------------
+    def mostra_sezione(frame, titolo, descrizione, emoji, empty_text):
+        st.markdown(f"### {emoji} {titolo}")
+        st.caption(descrizione)
+
+        if frame.empty:
+            st.info(empty_text)
+            return
+
+        st.caption(f"{len(frame)} ticket")
+        for _, row in frame.iterrows():
+            mostra_card_ticket(row, titolo)
+
+    mostra_sezione(
+        lavorazione,
+        "In lavorazione",
+        "Ticket sui quali stai già intervenendo.",
+        "🟠",
+        "Nessun ticket attualmente in lavorazione.",
+    )
+
+    st.divider()
+
+    mostra_sezione(
+        aperti,
+        "Da prendere in carico",
+        "Ticket assegnati a te che non sono ancora in lavorazione.",
+        "🟡",
+        "Non hai ticket aperti da prendere in carico.",
+    )
+
+    st.divider()
+
+    mostra_sezione(
+        risolti,
+        "Risolti — in attesa di chiusura",
+        "Hai completato l'intervento. Il ticket resta disponibile fino alla chiusura amministrativa.",
+        "🟢",
+        "Non ci sono ticket risolti in attesa di chiusura.",
+    )
+
+    # --------------------------------------------------------
+    # STORICO CHIUSI
+    # --------------------------------------------------------
+    st.divider()
+
+    with st.expander(
+        f"📁 Storico ticket chiusi ({len(chiusi)})",
+        expanded=False,
+    ):
+        st.caption(
+            "I ticket chiusi sono consultabili come storico e non "
+            "compaiono più nella parte operativa principale."
+        )
+
+        if chiusi.empty:
+            st.info("Nessun ticket chiuso nello storico.")
+        else:
+            for _, row in chiusi.iterrows():
+                mostra_card_ticket(row, "chiuso")
 
 def pagina_statistiche():
     if not is_admin():
