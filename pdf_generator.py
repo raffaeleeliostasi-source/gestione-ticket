@@ -706,60 +706,81 @@ def genera_pdf(ticket):
         ]
 
     story.append(_info_table(closure_rows))
-    story.append(Spacer(1, 4 * mm))
+    story.append(Spacer(1, 5 * mm))
 
-    # La firma del tecnico viene mostrata una sola volta, alla chiusura,
-    # utilizzando la firma salvata nell'intervento che ha portato il ticket a Risolto.
+    # La firma del tecnico viene mostrata una sola volta, alla chiusura.
     technician_signature = None
     if intervento:
+        # Prima usiamo il percorso salvato nel record.
         firma_path = _first(intervento, "firma_path", "signature_path")
+        raw_signature = None
+
         if firma_path:
             try:
                 raw_signature = db.scarica_firma_intervento(firma_path)
             except Exception:
                 raw_signature = None
 
+        # Compatibilità con gli interventi già presenti: se firma_path non è
+        # valorizzato, proviamo il percorso standard usato dall'app.
+        if not raw_signature and intervento.get("id"):
+            fallback_path = (
+                f"firme/{ticket_id}/intervento_{intervento.get('id')}/firma.png"
+            )
+            try:
+                raw_signature = db.scarica_firma_intervento(fallback_path)
+            except Exception:
+                raw_signature = None
+
+        if raw_signature:
             technician_signature = _image_from_bytes(
                 raw_signature,
-                max_width=65 * mm,
-                max_height=28 * mm,
+                max_width=62 * mm,
+                max_height=24 * mm,
             )
 
-    technician_signature_content = [
-        [Paragraph("FIRMA DEL TECNICO", STYLES["signature"])],
-    ]
-    if technician_signature:
-        technician_signature_content.append([technician_signature])
-    else:
-        technician_signature_content.append([Spacer(1, 18 * mm)])
-    technician_signature_content.append(
-        [Paragraph("________________________________", STYLES["small"])]
-    )
-
-    responsible_signature_content = [
-        [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
-        [Spacer(1, 18 * mm)],
-        [Paragraph("________________________________", STYLES["small"])],
-    ]
+    def _signature_box(title, signature=None):
+        cell = [
+            [Paragraph(title, STYLES["signature"])],
+            [signature if signature is not None else Spacer(1, 20 * mm)],
+            [Paragraph("________________________________", STYLES["small"])],
+        ]
+        box = Table(
+            cell,
+            colWidths=[82 * mm],
+            rowHeights=[8 * mm, 24 * mm, 7 * mm],
+        )
+        box.setStyle(
+            TableStyle(
+                [
+                    ("BOX", (0, 0), (-1, -1), 0.6, BORDER),
+                    ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        return box
 
     signatures = Table(
-        [
-            [technician_signature_content, responsible_signature_content]
-        ],
-        colWidths=[85 * mm, 85 * mm],
+        [[
+            _signature_box("FIRMA DEL TECNICO", technician_signature),
+            _signature_box("FIRMA DEL RESPONSABILE"),
+        ]],
+        colWidths=[87 * mm, 87 * mm],
     )
     signatures.setStyle(
         TableStyle(
             [
-                ("BOX", (0, 0), (0, 0), 0.6, BORDER),
-                ("BOX", (1, 0), (1, 0), 0.6, BORDER),
-                ("BACKGROUND", (0, 0), (-1, -1), WHITE),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ]
         )
     )
