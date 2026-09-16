@@ -213,6 +213,19 @@ def _draw_footer(canvas, doc):
     canvas.restoreState()
 
 
+
+def _scarica_firma(path, amministratore=False):
+    """Recupera la firma tramite gli helper del database."""
+    if not path:
+        return None
+    try:
+        if amministratore:
+            return db.scarica_firma_amministratore(path)
+        return db.scarica_firma_intervento(path)
+    except Exception:
+        return None
+
+
 def _signature_box(title, raw_signature, width=174 * mm):
     image = _image_from_bytes(raw_signature, max_width=58 * mm, max_height=25 * mm)
     content = [[Paragraph(_txt(title), STYLES["signature"])]]
@@ -375,7 +388,7 @@ def genera_pdf(ticket):
 
             if firma_path:
                 try:
-                    firma_raw = db.scarica_firma_intervento(firma_path)
+                    firma_raw = _scarica_firma(firma_path)
                 except Exception:
                     firma_raw = None
             else:
@@ -401,7 +414,7 @@ def genera_pdf(ticket):
 
     if chiuso_da:
         try:
-            admin_signature = db.scarica_firma_amministratore(chiuso_da)
+            admin_signature = _scarica_firma(chiuso_da, amministratore=True)
         except Exception:
             admin_signature = None
         story.append(_signature_box("FIRMA DEL RESPONSABILE", admin_signature))
