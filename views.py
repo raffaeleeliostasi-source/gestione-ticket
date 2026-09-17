@@ -466,10 +466,13 @@ def pagina_dashboard():
             unsafe_allow_html=True,
         )
 
-        # PDF e apertura ticket sono azioni indipendenti.
-        # Il PDF viene generato sul ticket completo, così conserva
-        # interventi, foto e firme già gestiti da pdf_generator.
-        col_open, col_pdf = st.columns([5.8, 1.2])
+        # L'apertura del ticket è disponibile a tutti.
+        # Il download PDF resta riservato all'amministratore.
+        if admin:
+            col_open, col_pdf = st.columns([5.8, 1.2])
+        else:
+            col_open = st.container()
+            col_pdf = None
 
         with col_open:
             if st.button(
@@ -480,30 +483,31 @@ def pagina_dashboard():
                 st.session_state["dashboard_ticket_aperto"] = ticket_id
                 st.rerun()
 
-        with col_pdf:
-            try:
-                ticket_completo = db.get_ticket(ticket_id)
-                if not ticket_completo:
-                    st.button(
-                        "📄",
-                        key=f"dashboard_pdf_disabled_{ticket_id}",
-                        help="Ticket non disponibile",
-                        disabled=True,
-                        use_container_width=True,
-                    )
-                else:
-                    pdf_bytes = pdf_generator.genera_pdf(ticket_completo)
-                    st.download_button(
-                        "📄",
-                        data=pdf_bytes,
-                        file_name=f"ticket_{ticket_id}.pdf",
-                        mime="application/pdf",
-                        key=f"dashboard_pdf_{ticket_id}",
-                        help=f"Scarica PDF del ticket #{ticket_id}",
-                        use_container_width=True,
-                    )
-            except Exception as e:
-                st.error(f"PDF #{ticket_id}: {e}")
+        if admin and col_pdf is not None:
+            with col_pdf:
+                try:
+                    ticket_completo = db.get_ticket(ticket_id)
+                    if not ticket_completo:
+                        st.button(
+                            "📄",
+                            key=f"dashboard_pdf_disabled_{ticket_id}",
+                            help="Ticket non disponibile",
+                            disabled=True,
+                            use_container_width=True,
+                        )
+                    else:
+                        pdf_bytes = pdf_generator.genera_pdf(ticket_completo)
+                        st.download_button(
+                            "📄",
+                            data=pdf_bytes,
+                            file_name=f"ticket_{ticket_id}.pdf",
+                            mime="application/pdf",
+                            key=f"dashboard_pdf_{ticket_id}",
+                            help=f"Scarica PDF del ticket #{ticket_id}",
+                            use_container_width=True,
+                        )
+                except Exception as e:
+                    st.error(f"PDF #{ticket_id}: {e}")
 
 
 def pagina_nuovo_ticket():
