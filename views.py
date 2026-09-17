@@ -69,13 +69,13 @@ def pagina_login():
             border-radius: 18px 18px 0 0;
             padding: 24px 28px 20px 28px;
             box-shadow: 0 12px 35px rgba(38, 91, 145, .10);
-            text-align: center;
+            text-align: left;
         }
 
         .login-brand-row {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 18px;
         }
 
@@ -163,7 +163,7 @@ def pagina_login():
             box-shadow: 0 0 0 2px rgba(181,31,43,.10) !important;
         }
 
-        /* Pulsante Accedi colorato come la farfalla (rosso bordeaux coordinato) */
+        /* Pulsante Accedi colorato come la farfalla e con scritta in grassetto marcato */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
             min-height: 48px !important;
@@ -171,8 +171,8 @@ def pagina_login():
             background: linear-gradient(90deg, #B51F2B, #C92A38) !important;
             border: none !important;
             color: white !important;
-            font-weight: 800 !important;
-            font-size: 1.0rem !important;
+            font-weight: 900 !important;
+            font-size: 1.05rem !important;
         }
 
         [data-testid="stForm"] button[type="submit"]:hover {
@@ -1661,7 +1661,7 @@ def pagina_gestione_interventi():
     mostra_sezione(
         lavorazione,
         "In lavorazione",
-        "Ticket sui quali stai già intervenendo.",
+        "Ticket sui quais stai già intervenendo.",
         "🟠",
         "Nessun ticket attualmente in lavorazione.",
     )
