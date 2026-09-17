@@ -1967,16 +1967,47 @@ def pagina_statistiche():
 
     with g4:
         st.markdown("### 👷 Ticket per tecnico")
-        tecnico_counts = (
-            filtrato["tecnici_assegnati"]
-            .replace("", "Non assegnato")
-            .value_counts()
-            .rename_axis("tecnico")
-            .reset_index(name="ticket")
-        )
+
+        # Un ticket assegnato a più tecnici deve comparire nel conteggio
+        # di ciascun tecnico, senza però duplicare il totale dei ticket.
+        righe_tecnici = []
+
+        for _, riga in filtrato.iterrows():
+            elenco = riga.get("tecnici_assegnati", "")
+            tecnici_riga = [
+                x.strip()
+                for x in str(elenco).split(",")
+                if x.strip()
+            ]
+
+            if not tecnici_riga:
+                tecnici_riga = ["Non assegnato"]
+
+            for tecnico in tecnici_riga:
+                righe_tecnici.append({
+                    "tecnico": tecnico,
+                    "ticket": 1,
+                })
+
+        if righe_tecnici:
+            tecnico_counts = (
+                pd.DataFrame(righe_tecnici)
+                .groupby("tecnico", as_index=False)["ticket"]
+                .sum()
+                .sort_values(["ticket", "tecnico"], ascending=[False, True])
+            )
+        else:
+            tecnico_counts = pd.DataFrame(
+                [{"tecnico": "Non assegnato", "ticket": 0}]
+            )
+
         st.altair_chart(
-            _grafico_barre(tecnico_counts, "tecnico", "ticket",
-                           tecnico_counts["tecnico"].tolist()),
+            _grafico_barre(
+                tecnico_counts,
+                "tecnico",
+                "ticket",
+                tecnico_counts["tecnico"].tolist(),
+            ),
             use_container_width=True,
             theme=None,
         )
