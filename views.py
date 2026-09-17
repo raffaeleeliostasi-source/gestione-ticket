@@ -2098,11 +2098,22 @@ def pagina_amministrazione():
         utenti = db.get_utenti()
         if utenti:
             df_utenti = pd.DataFrame(utenti)
+            colonne_utenti = [
+                col for col in ["nome", "cognome", "username", "ruolo", "attivo"]
+                if col in df_utenti.columns
+            ]
+
             st.dataframe(
-                df_utenti,
+                df_utenti[colonne_utenti],
                 use_container_width=True,
                 hide_index=True,
                 column_config={
+                    "nome": st.column_config.TextColumn(
+                        "Nome", help="Nome dell'utente"
+                    ),
+                    "cognome": st.column_config.TextColumn(
+                        "Cognome", help="Cognome dell'utente"
+                    ),
                     "username": st.column_config.TextColumn(
                         "Username", help="Nome utente per il login"
                     ),
@@ -2115,16 +2126,37 @@ def pagina_amministrazione():
 
         with st.expander("➕ Crea nuovo utente"):
             with st.form("crea_utente"):
-                username = st.text_input("Username")
-                ruolo = st.selectbox("Ruolo", ["Tecnico", "Amministratore"])
-                password = st.text_input("Password iniziale", type="password")
-                conferma = st.text_input("Conferma password", type="password")
+                col_nome, col_cognome = st.columns(2)
+                with col_nome:
+                    nome = st.text_input("Nome")
+                with col_cognome:
+                    cognome = st.text_input("Cognome")
+
+                col_username, col_ruolo = st.columns(2)
+                with col_username:
+                    username = st.text_input("Username")
+                with col_ruolo:
+                    ruolo = st.selectbox("Ruolo", ["Tecnico", "Amministratore"])
+
+                col_password, col_conferma = st.columns(2)
+                with col_password:
+                    password = st.text_input("Password iniziale", type="password")
+                with col_conferma:
+                    conferma = st.text_input("Conferma password", type="password")
+
                 attivo = st.checkbox("Utente attivo", value=True)
                 crea = st.form_submit_button("Crea utente", use_container_width=True)
 
             if crea:
+                nome = nome.strip()
+                cognome = cognome.strip()
                 username = username.strip().lower()
-                if not username:
+
+                if not nome:
+                    st.error("Nome obbligatorio.")
+                elif not cognome:
+                    st.error("Cognome obbligatorio.")
+                elif not username:
                     st.error("Username obbligatorio.")
                 elif password != conferma:
                     st.error("Le password non coincidono.")
@@ -2140,7 +2172,9 @@ def pagina_amministrazione():
                                 username,
                                 auth.hash_password(password),
                                 ruolo,
-                                attivo
+                                attivo,
+                                nome=nome,
+                                cognome=cognome,
                             )
                             st.success("Utente creato.")
                             st.rerun()
@@ -2151,7 +2185,15 @@ def pagina_amministrazione():
         st.subheader("Gestione utenti")
         for user in utenti:
             username = user["username"]
-            with st.expander(f"{username} — {user.get('ruolo', '')}"):
+            nome = str(user.get("nome") or "").strip()
+            cognome = str(user.get("cognome") or "").strip()
+            nominativo = " ".join(x for x in [nome, cognome] if x).strip()
+
+            titolo_utente = nominativo or username
+            if nominativo and username:
+                titolo_utente = f"{nominativo} — {username}"
+
+            with st.expander(f"{titolo_utente} — {user.get('ruolo', '')}"):
                 new_role = st.selectbox(
                     "Ruolo",
                     ["Tecnico", "Amministratore"],
