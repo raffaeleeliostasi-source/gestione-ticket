@@ -36,13 +36,36 @@ def _tecnici_assegnati(ticket_id, row=None):
 
     Compatibile sia con dict sia con pandas.Series.
     """
-    try:
-        tecnici = db.get_ticket_tecnici(int(ticket_id))
-    except Exception:
-        tecnici = []
+    tecnici = []
+
+    # Compatibilità con entrambe le versioni di database.py.
+    for nome_funzione in ("get_ticket_tecnici", "get_tecnici_ticket"):
+        try:
+            funzione = getattr(db, nome_funzione, None)
+            if funzione is not None:
+                tecnici = funzione(int(ticket_id)) or []
+                if tecnici:
+                    break
+        except Exception:
+            continue
 
     if tecnici:
         return [str(x).strip() for x in tecnici if str(x).strip()]
+
+    # Usa anche l'eventuale lista già presente nella riga.
+    if row is not None:
+        try:
+            elenco = row.get("tecnici_assegnati")
+            if isinstance(elenco, (list, tuple, set)):
+                valori = [str(x).strip() for x in elenco if str(x).strip()]
+                if valori:
+                    return valori
+            elif elenco is not None and str(elenco).strip():
+                valori = [x.strip() for x in str(elenco).split(",") if x.strip()]
+                if valori:
+                    return valori
+        except AttributeError:
+            pass
 
     legacy = ""
     if row is not None:
@@ -2007,7 +2030,7 @@ def _excel_bytes(df):
 
     preferred = [
         "id", "titolo", "descrizione", "categoria", "priorita",
-        "stato", "assegnato_a", "creato_da", "data_chiusura", "chiuso_da"
+        "stato", "tecnici_assegnati", "creato_da", "data_chiusura", "chiuso_da"
     ]
     ordered = [c for c in preferred if c in export_df.columns]
     ordered += [c for c in export_df.columns if c not in ordered]
