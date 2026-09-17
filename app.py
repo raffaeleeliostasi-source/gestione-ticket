@@ -22,25 +22,32 @@ st.markdown(
     /* Stile personalizzato per il logo e la testata nella sidebar */
     .sidebar-brand-container {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 0.5rem;
+        text-align: center;
+        margin-bottom: 1rem;
     }
 
     .sidebar-logo {
-        width: 48px;
-        height: 58px;
+        width: 58px;
+        height: 72px;
         object-fit: contain;
         mix-blend-mode: multiply;
+        margin-bottom: 6px;
     }
 
     .sidebar-title {
-        font-size: 1.25rem !important;
+        font-size: 1.15rem !important;
         font-weight: 800 !important;
         color: #17365D !important;
         white-space: nowrap !important;
         margin: 0 !important;
         padding: 0 !important;
+    }
+
+    /* Spazio extra per staccare i dati dell'utente verso il basso */
+    .sidebar-user-info {
+        margin-top: 1.2rem;
     }
 
     @media (max-width: 640px) {
@@ -148,7 +155,7 @@ if not st.session_state.logged_in:
 
 
 with st.sidebar:
-    # Caricamento del logo e generazione HTML per allineare logo e scritta senza andare a capo
+    # Caricamento del logo e generazione HTML per posizionare la scritta centrata sotto la farfalla
     logo_path = Path(__file__).resolve().parent / "assets" / "farfalla.jpg"
     logo_sidebar_html = ""
     if logo_path.exists():
@@ -166,8 +173,16 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    st.write(f"**Utente:** {st.session_state.username}")
-    st.write(f"**Ruolo:** {st.session_state.ruolo}")
+    # Blocco con margine superiore aumentato per distanziare l'utente
+    st.markdown(
+        f"""
+        <div class="sidebar-user-info">
+            <b>Utente:</b> {st.session_state.username}<br>
+            <b>Ruolo:</b> {st.session_state.ruolo}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.divider()
 
     if is_admin():
