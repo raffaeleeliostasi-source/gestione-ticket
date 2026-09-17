@@ -1,4 +1,3 @@
-```python
 import base64
 from io import BytesIO
 from datetime import date
@@ -164,32 +163,14 @@ def pagina_login():
             box-shadow: 0 0 0 2px rgba(181,31,43,.10) !important;
         }
 
-        /* ==========================================================
-           CENTRAMENTO COMPLETO DEL PULSANTE ACCEDI
-           ========================================================== */
-
+        /* Centramento del wrapper nativo di Streamlit del pulsante di invio */
         [data-testid="stFormSubmitButton"] {
             display: flex !important;
             justify-content: center !important;
-            align-items: center !important;
             width: 100% !important;
-            margin: 0 auto !important;
         }
 
-        [data-testid="stFormSubmitButton"] > div {
-            width: 100% !important;
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
-            margin: 0 auto !important;
-        }
-
-        [data-testid="stFormSubmitButton"] button {
-            display: block !important;
-            margin: 12px auto 0 auto !important;
-        }
-
-        /* Pulsante ACCEDI */
+        /* Pulsante ACCEDI ridotto e centrato perfettamente */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
             display: block !important;
@@ -258,26 +239,9 @@ def pagina_login():
                 margin-bottom: 16px;
             }
 
-            /* Anche su smartphone il pulsante rimane centrato */
-            [data-testid="stFormSubmitButton"] {
-                width: 100% !important;
-                display: flex !important;
-                justify-content: center !important;
-                align-items: center !important;
-            }
-
-            [data-testid="stFormSubmitButton"] > div {
-                width: 100% !important;
-                display: flex !important;
-                justify-content: center !important;
-            }
-
-            [data-testid="stFormSubmitButton"] button,
             [data-testid="stForm"] button[type="submit"] {
-                width: 220px !important;
-                max-width: 220px !important;
-                margin-left: auto !important;
-                margin-right: auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
             }
         }
         </style>
@@ -325,11 +289,7 @@ def pagina_login():
                 placeholder="Inserisci la tua password",
                 key="login_password",
             )
-            submit = st.form_submit_button(
-                "ACCEDI",
-                use_container_width=False,
-                type="primary"
-            )
+            submit = st.form_submit_button("ACCEDI", use_container_width=False, type="primary")
 
         if submit:
             username = username.strip().lower()
@@ -353,10 +313,7 @@ def pagina_login():
                 return
 
             if "$" not in str(user.get("password", "")):
-                db.aggiorna_utente(
-                    username,
-                    password=auth.hash_password(password)
-                )
+                db.aggiorna_utente(username, password=auth.hash_password(password))
 
             st.session_state.logged_in = True
             st.session_state.username = username
@@ -622,7 +579,7 @@ def pagina_dashboard():
                 "Assegnato a",
                 ["Tutti"] + assegnati,
                 key=f"dashboard_assegnato_{filter_version}",
-            )
+                )
         else:
             assegnato = "Tutti"
 
@@ -1920,12 +1877,8 @@ def pagina_statistiche():
             .reset_index(name="ticket")
         )
         st.altair_chart(
-            _grafico_barre(
-                categoria_counts,
-                "categoria",
-                "ticket",
-                categoria_counts["categoria"].tolist()
-            ),
+            _grafico_barre(categoria_counts, "categoria", "ticket",
+                           categoria_counts["categoria"].tolist()),
             use_container_width=True,
             theme=None,
         )
@@ -1940,12 +1893,8 @@ def pagina_statistiche():
             .reset_index(name="ticket")
         )
         st.altair_chart(
-            _grafico_barre(
-                tecnico_counts,
-                "tecnico",
-                "ticket",
-                tecnico_counts["tecnico"].tolist()
-            ),
+            _grafico_barre(tecnico_counts, "tecnico", "ticket",
+                           tecnico_counts["tecnico"].tolist()),
             use_container_width=True,
             theme=None,
         )
@@ -2028,13 +1977,7 @@ def pagina_amministrazione():
     st.title("⚙️ Amministrazione")
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        [
-            "👥 Utenti",
-            "🔐 Password",
-            "🗂️ Categorie",
-            "🗑️ Elimina ticket",
-            "✍️ Firma amministratore"
-        ]
+        ["👥 Utenti", "🔐 Password", "🗂️ Categorie", "🗑️ Elimina ticket", "✍️ Firma amministratore"]
     )
 
     with tab1:
@@ -2064,10 +2007,7 @@ def pagina_amministrazione():
                 password = st.text_input("Password iniziale", type="password")
                 conferma = st.text_input("Conferma password", type="password")
                 attivo = st.checkbox("Utente attivo", value=True)
-                crea = st.form_submit_button(
-                    "Crea utente",
-                    use_container_width=True
-                )
+                crea = st.form_submit_button("Crea utente", use_container_width=True)
 
             if crea:
                 username = username.strip().lower()
@@ -2111,7 +2051,6 @@ def pagina_amministrazione():
                     key=f"active_{username}",
                 )
                 col1, col2 = st.columns(2)
-
                 if col1.button(
                     "💾 Salva",
                     key=f"user_save_{username}",
@@ -2137,7 +2076,6 @@ def pagina_amministrazione():
                     type="password",
                     key=f"newpw_{username}",
                 )
-
                 if st.button(
                     "🔑 Imposta password",
                     key=f"setpw_{username}",
@@ -2157,12 +2095,10 @@ def pagina_amministrazione():
     with tab2:
         st.subheader("🔐 Cambia la tua password")
         auth.mostra_regole_password()
-
         with st.form("change_my_password"):
             old = st.text_input("Password attuale", type="password")
             new = st.text_input("Nuova password", type="password")
             confirm = st.text_input("Conferma nuova password", type="password")
-
             change = st.form_submit_button(
                 "🔄 Cambia password",
                 use_container_width=True
@@ -2170,27 +2106,18 @@ def pagina_amministrazione():
 
         if change:
             current_user = db.get_utente(st.session_state.username)
-
             if not current_user or not auth.verifica_password(
-                old,
-                current_user.get("password", "")
+                old, current_user.get("password", "")
             ):
                 st.error("La password attuale non è corretta.")
-
             elif new != confirm:
                 st.error("Le nuove password non coincidono.")
-
             elif old == new:
-                st.error(
-                    "La nuova password deve essere diversa da quella attuale."
-                )
-
+                st.error("La nuova password deve essere diversa da quella attuale.")
             else:
                 ok, msg = auth.password_valida(new)
-
                 if not ok:
                     st.error(msg)
-
                 else:
                     db.aggiorna_utente(
                         st.session_state.username,
@@ -2201,31 +2128,21 @@ def pagina_amministrazione():
     with tab3:
         st.subheader("🗂️ Categorie")
         categorie = db.get_categorie()
-
         if categorie:
             df_cat = pd.DataFrame(categorie)
-
             st.dataframe(
                 df_cat,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "id": st.column_config.NumberColumn(
-                        "ID",
-                        width="small"
-                    ),
-                    "nome": st.column_config.TextColumn(
-                        "Nome Categoria"
-                    ),
-                    "attivo": st.column_config.CheckboxColumn(
-                        "Attiva"
-                    ),
+                    "id": st.column_config.NumberColumn("ID", width="small"),
+                    "nome": st.column_config.TextColumn("Nome Categoria"),
+                    "attivo": st.column_config.CheckboxColumn("Attiva"),
                 }
             )
 
         with st.form("nuova_categoria"):
             nome = st.text_input("Nuova categoria")
-
             add = st.form_submit_button(
                 "➕ Aggiungi categoria",
                 use_container_width=True
@@ -2233,7 +2150,6 @@ def pagina_amministrazione():
 
         if add:
             ok, msg = db.aggiungi_categoria(nome)
-
             if ok:
                 st.success(msg)
                 st.rerun()
@@ -2242,36 +2158,25 @@ def pagina_amministrazione():
 
         for cat in categorie:
             cid = cat["id"]
-
             with st.expander(f"{cat.get('nome', '')}"):
-
                 new_name = st.text_input(
                     "Nome",
                     value=cat.get("nome", ""),
                     key=f"cat_name_{cid}",
                 )
-
                 active = st.checkbox(
                     "Attiva",
                     value=cat.get("attivo", True) is not False,
                     key=f"cat_active_{cid}",
                 )
-
                 if st.button(
                     "💾 Salva categoria",
                     key=f"cat_save_{cid}",
                     use_container_width=True
                 ):
-                    ok, msg = db.modifica_categoria(
-                        cid,
-                        new_name
-                    )
-
+                    ok, msg = db.modifica_categoria(cid, new_name)
                     if ok:
-                        db.cambia_stato_categoria(
-                            cid,
-                            active
-                        )
+                        db.cambia_stato_categoria(cid, active)
                         st.success("Categoria aggiornata.")
                         st.rerun()
                     else:
@@ -2279,37 +2184,26 @@ def pagina_amministrazione():
 
     with tab4:
         st.subheader("🗑️ Elimina ticket")
-
         st.warning(
             "L'eliminazione di un ticket è definitiva e rimuove anche interventi, "
             "messaggi, allegati, foto e firme collegati al ticket."
         )
 
         tickets = db.get_tickets()
-
         if not tickets:
             st.info("Non ci sono ticket da eliminare.")
-
         else:
             opzioni = []
             mappa = {}
-
             for t in tickets:
                 tid = t.get("id")
-                titolo = str(
-                    t.get("titolo") or "Senza titolo"
-                )
-                stato = str(
-                    t.get("stato") or ""
-                )
-
+                titolo = str(t.get("titolo") or "Senza titolo")
+                stato = str(t.get("stato") or "")
                 label = f"#{tid} — {titolo} — {stato}"
-
                 opzioni.append(label)
                 mappa[label] = tid
 
             placeholder = "— Seleziona un ticket —"
-
             scelta = st.selectbox(
                 "Seleziona il ticket da eliminare",
                 [placeholder] + opzioni,
@@ -2318,21 +2212,10 @@ def pagina_amministrazione():
             )
 
             if scelta == placeholder:
-                st.info(
-                    "Seleziona un ticket dall'elenco per procedere con l'eliminazione."
-                )
-
+                st.info("Seleziona un ticket dall'elenco per procedere con l'eliminazione.")
             else:
                 ticket_id = mappa[scelta]
-
-                ticket = next(
-                    (
-                        t for t in tickets
-                        if t.get("id") == ticket_id
-                    ),
-                    None
-                )
-
+                ticket = next((t for t in tickets if t.get("id") == ticket_id), None)
                 if ticket:
                     st.markdown(
                         f"**Ticket #{ticket_id}**  \n"
@@ -2353,18 +2236,13 @@ def pagina_amministrazione():
                     key="admin_delete_ticket_button",
                 ):
                     if db.elimina_ticket_completo(ticket_id):
-                        st.success(
-                            f"Ticket #{ticket_id} eliminato definitivamente."
-                        )
+                        st.success(f"Ticket #{ticket_id} eliminato definitivamente.")
                         st.rerun()
                     else:
-                        st.error(
-                            "Il ticket non è stato eliminato."
-                        )
+                        st.error("Il ticket non è stato eliminato.")
 
     with tab5:
         st.subheader("✍️ Firma amministratore")
-
         st.caption(
             "Carica la firma che verrà inserita automaticamente nel PDF "
             "quando questo amministratore chiude un ticket."
@@ -2373,7 +2251,6 @@ def pagina_amministrazione():
         firma_esistente = db.scarica_firma_amministratore(
             st.session_state.username
         )
-
         if firma_esistente:
             st.image(
                 firma_esistente,
@@ -2381,9 +2258,7 @@ def pagina_amministrazione():
                 width=350,
             )
         else:
-            st.info(
-                "Nessuna firma configurata per il tuo account amministratore."
-            )
+            st.info("Nessuna firma configurata per il tuo account amministratore.")
 
         firma_file = st.file_uploader(
             "Carica firma",
@@ -2395,17 +2270,13 @@ def pagina_amministrazione():
         if firma_file is not None:
             try:
                 immagine = Image.open(firma_file)
-
                 st.image(
                     immagine,
                     caption="Anteprima nuova firma",
                     width=350,
                 )
-
             except Exception:
-                st.error(
-                    "Il file selezionato non è un'immagine valida."
-                )
+                st.error("Il file selezionato non è un'immagine valida.")
                 firma_file = None
 
         if st.button(
@@ -2414,37 +2285,20 @@ def pagina_amministrazione():
             use_container_width=True,
         ):
             if firma_file is None:
-                st.warning(
-                    "Seleziona prima un'immagine della firma."
-                )
-
+                st.warning("Seleziona prima un'immagine della firma.")
             else:
                 try:
                     immagine = Image.open(firma_file)
-
                     if immagine.mode not in ("RGB", "RGBA"):
                         immagine = immagine.convert("RGBA")
-
                     buffer = BytesIO()
-                    immagine.save(
-                        buffer,
-                        format="PNG"
-                    )
-
+                    immagine.save(buffer, format="PNG")
                     db.salva_firma_amministratore(
                         st.session_state.username,
                         buffer.getvalue(),
                     )
-
-                    st.success(
-                        "✅ Firma amministratore salvata correttamente."
-                    )
-
+                    st.success("✅ Firma amministratore salvata correttamente.")
                     st.rerun()
-
                 except Exception as e:
-                    st.error(
-                        "Errore nel salvataggio della firma."
-                    )
+                    st.error("Errore nel salvataggio della firma.")
                     st.exception(e)
-```
