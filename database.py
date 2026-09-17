@@ -56,20 +56,105 @@ def get_ticket(ticket_id):
         .maybe_single()
         .execute()
     )
-    return res.data
+    ticket = getattr(res, "data", None)
+    if not ticket:
+        return ticket
+
+    tecnici = get_ticket_tecnici(ticket_id)
+    if not tecnici and ticket.get("assegnato_a"):
+        tecnici = [str(ticket.get("assegnato_a")).strip()]
+    ticket["tecnici_assegnati"] = tecnici
+    if tecnici:
+        ticket["assegnato_a"] = tecnici[0]
+    return ticket
+
+
+def get_ticket_tecnici(ticket_id):
+    try:
+        risposta = (
+            supabase.table("ticket_tecnici")
+            .select("tecnico")
+            .eq("ticket_id", ticket_id)
+            .order("id")
+            .execute()
+        )
+        return [
+            str(r.get("tecnico", "")).strip()
+            for r in (risposta.data or [])
+            if str(r.get("tecnico", "")).strip()
+        ]
+    except Exception as e:
+        st.error(f"Errore caricamento tecnici del ticket: {e}")
+        return []
+
+
+def assegna_tecnici_ticket(ticket_id, tecnici):
+    tecnici_puliti = []
+    for tecnico in tecnici or []:
+        valore = str(tecnico or "").strip()
+        if valore and valore not in tecnici_puliti:
+            tecnici_puliti.append(valore)
+
+    if not tecnici_puliti:
+        raise ValueError("È necessario assegnare almeno un tecnico al ticket.")
+
+    supabase.table("ticket_tecnici").delete().eq("ticket_id", ticket_id).execute()
+    supabase.table("ticket_tecnici").insert([
+        {"ticket_id": ticket_id, "tecnico": tecnico}
+        for tecnico in tecnici_puliti
+    ]).execute()
+    return tecnici_puliti
 
 
 def get_tickets_tecnico(username, limit=500):
-    res = (
-        supabase.table("tickets")
-        .select("*")
-        .eq("assegnato_a", username)
-        .order("id", desc=True)
-        .limit(limit)
-        .execute()
-    )
-    return res.data or []
+    username = str(username or "").strip()
+    if not username:
+        return []
 
+    try:
+        assegnazioni = (
+            supabase.table("ticket_tecnici")
+            .select("ticket_id")
+            .eq("tecnico", username)
+            .execute()
+        )
+        ticket_ids = [r.get("ticket_id") for r in (assegnazioni.data or []) if r.get("ticket_id") is not None]
+
+        if ticket_ids:
+            res = (
+                supabase.table("tickets")
+                .select("*")
+                .in_("id", ticket_ids)
+                .order("id", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            tickets = res.data or []
+        else:
+            # Compatibilità con eventuali ticket creati prima dell'introduzione
+            # della tabella ticket_tecnici.
+            res = (
+                supabase.table("tickets")
+                .select("*")
+                .eq("assegnato_a", username)
+                .order("id", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            tickets = res.data or []
+
+        for ticket in tickets:
+            tecnici = get_ticket_tecnici(ticket.get("id"))
+            if not tecnici and ticket.get("assegnato_a"):
+                tecnici = [str(ticket.get("assegnato_a")).strip()]
+            ticket["tecnici_assegnati"] = tecnici
+            if tecnici:
+                ticket["assegnato_a"] = tecnici[0]
+
+        return tickets
+    except Exception as e:
+        st.error(f"Errore caricamento ticket del tecnico: {e}")
+        return []
 
 def get_tecnici_attivi():
     res = (
@@ -107,12 +192,9 @@ def get_utente(username):
             .maybe_single()
             .execute()
         )
-
         if risposta is None:
             return None
-
         return getattr(risposta, "data", None)
-
     except Exception as e:
         st.error(f"Errore caricamento utente: {e}")
         return None
@@ -232,25 +314,67 @@ def get_audit_log(ticket_id):
         return []
 
 
-def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da):
+def crea_ticket(
+    titolo,
+    descrizione,
+    categoria,
+    priorita,
+    tecnici=None,
+    creato_da=None,
+    assegnato_a=None,
+):
+    """Crea un ticket e assegna uno o più tecnici.
+
+    `tecnici` è il nuovo parametro principale. `assegnato_a` rimane
+    temporaneamente supportato per compatibilità con il vecchio codice.
+    Il primo tecnico viene mantenuto anche in tickets.assegnato_a per
+    garantire compatibilità con le parti dell'app ancora non migrate.
+    """
+    if tecnici is None:
+        tecnici = []
+    elif isinstance(tecnici, str):
+        tecnici = [tecnici]
+
+    tecnici_puliti = []
+    for tecnico in tecnici:
+        valore = str(tecnico or "").strip()
+        if valore and valore not in tecnici_puliti:
+            tecnici_puliti.append(valore)
+
+    if not tecnici_puliti and assegnato_a:
+        tecnici_puliti = [str(assegnato_a).strip()]
+
+    if not tecnici_puliti:
+        raise ValueError("È necessario assegnare almeno un tecnico al ticket.")
+
     payload = {
         "titolo": titolo,
         "descrizione": descrizione,
         "categoria": categoria,
         "priorita": priorita,
-        "assegnato_a": assegnato_a,
+        "assegnato_a": tecnici_puliti[0],
         "stato": "Aperto",
         "creato_da": creato_da,
     }
-    ticket = supabase.table("tickets").insert(payload).execute().data[0]
+
+    risposta = supabase.table("tickets").insert(payload).execute()
+    if not risposta.data:
+        raise ValueError("Ticket non restituito da Supabase.")
+
+    ticket = risposta.data[0]
+    ticket_id = ticket["id"]
+
+    assegna_tecnici_ticket(ticket_id, tecnici_puliti)
+    ticket["tecnici_assegnati"] = tecnici_puliti
+
+    elenco = ", ".join(tecnici_puliti)
     registra_evento(
-        ticket["id"],
+        ticket_id,
         creato_da,
         "Ticket creato",
-        f"Ticket creato e assegnato a {assegnato_a}.",
+        f"Ticket creato e assegnato ai tecnici: {elenco}.",
     )
     return ticket
-
 
 def aggiorna_stato_ticket(ticket_id, nuovo_stato):
     return (
@@ -371,17 +495,20 @@ def salva_intervento_tecnico(
     nuovo_stato,
     firma_path=None,
 ):
-    """Crea SEMPRE un nuovo record di intervento."""
     ticket = get_ticket(ticket_id)
     if not ticket:
         raise ValueError("Ticket non trovato.")
 
-    if str(ticket.get("assegnato_a", "")).strip() != str(tecnico).strip():
+    tecnico = str(tecnico or "").strip()
+    tecnici_assegnati = get_ticket_tecnici(ticket_id)
+    if not tecnici_assegnati and ticket.get("assegnato_a"):
+        tecnici_assegnati = [str(ticket.get("assegnato_a")).strip()]
+
+    if tecnico not in tecnici_assegnati:
         raise PermissionError("Il tecnico può intervenire solo sui ticket a lui assegnati.")
 
     if ticket.get("stato") in {"Risolto", "Chiuso"}:
         raise PermissionError("Un ticket risolto o chiuso non può essere modificato dal tecnico.")
-
     if nuovo_stato not in {"Aperto", "In Lavorazione", "Risolto"}:
         raise ValueError("Stato non consentito al tecnico.")
 
@@ -389,13 +516,11 @@ def salva_intervento_tecnico(
     if not descrizione:
         raise ValueError("La descrizione dell'intervento è obbligatoria.")
 
-    stato_intervento = "Risolto" if nuovo_stato == "Risolto" else nuovo_stato
-
     dati = {
         "ticket_id": ticket_id,
         "tecnico": tecnico,
         "descrizione": descrizione,
-        "stato": stato_intervento,
+        "stato": nuovo_stato,
         "data_intervento": datetime.now().isoformat(),
     }
     if firma_path:
@@ -406,12 +531,10 @@ def salva_intervento_tecnico(
     if not intervento:
         raise ValueError("Intervento non restituito da Supabase.")
 
-    # Aggiorna anche lo stato principale del ticket e verifica il risultato.
     risultato = (
         supabase.table("tickets")
         .update({"stato": nuovo_stato})
         .eq("id", ticket_id)
-        .eq("assegnato_a", tecnico)
         .select("id, stato")
         .execute()
     )
@@ -435,9 +558,7 @@ def salva_intervento_tecnico(
         "Intervento registrato",
         f"Intervento #{intervento.get('id')} registrato. Stato ticket: {nuovo_stato}.",
     )
-
     return intervento
-
 
 def salva_foto_intervento(intervento_id, ticket_id, file, filename=None):
     if file is None:
