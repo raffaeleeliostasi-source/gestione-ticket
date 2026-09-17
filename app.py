@@ -19,6 +19,30 @@ st.markdown(
         overflow-x: hidden;
     }
 
+    /* Stile personalizzato per il logo e la testata nella sidebar */
+    .sidebar-brand-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 0.5rem;
+    }
+
+    .sidebar-logo {
+        width: 48px;
+        height: 58px;
+        object-fit: contain;
+        mix-blend-mode: multiply;
+    }
+
+    .sidebar-title {
+        font-size: 1.25rem !important;
+        font-weight: 800 !important;
+        color: #17365D !important;
+        white-space: nowrap !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
     @media (max-width: 640px) {
         .block-container {
             padding-left: 0.75rem;
@@ -124,12 +148,24 @@ if not st.session_state.logged_in:
 
 
 with st.sidebar:
-    # Caricamento e visualizzazione del logo della farfalla nella sidebar
+    # Caricamento del logo e generazione HTML per allineare logo e scritta senza andare a capo
     logo_path = Path(__file__).resolve().parent / "assets" / "farfalla.jpg"
+    logo_sidebar_html = ""
     if logo_path.exists():
-        st.image(str(logo_path), width=54)
+        import base64
+        logo_b64 = base64.b64encode(logo_path.read_bytes()).decode("utf-8")
+        logo_sidebar_html = f'<img class="sidebar-logo" src="data:image/jpeg;base64,{logo_b64}" alt="Logo" />'
 
-    st.title("🎫 Gestione Ticket")
+    st.markdown(
+        f"""
+        <div class="sidebar-brand-container">
+            {logo_sidebar_html}
+            <div class="sidebar-title">Gestione Ticket</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.write(f"**Utente:** {st.session_state.username}")
     st.write(f"**Ruolo:** {st.session_state.ruolo}")
     st.divider()
