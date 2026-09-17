@@ -729,18 +729,92 @@ def mostra_dettaglio_ticket(ticket_id):
     interventi = db.get_interventi(ticket_id)
     ultimo_intervento = interventi[-1] if interventi else None
 
-    st.divider()
-    st.header(f"🎫 Ticket #{ticket_id}: {_safe(ticket.get('titolo'))}")
+    # --------------------------------------------------------
+    # INTESTAZIONE E DATI DEL TICKET
+    # --------------------------------------------------------
+    st.markdown(
+        """
+        <style>
+        .detail-head {
+            background: linear-gradient(135deg, #17365D 0%, #245B91 100%);
+            border-radius: 16px;
+            padding: 20px 24px;
+            color: white;
+            margin: 12px 0 16px 0;
+            box-shadow: 0 6px 18px rgba(15,23,42,.10);
+        }
+        .detail-id {
+            font-size: .76rem;
+            font-weight: 800;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            opacity: .82;
+        }
+        .detail-title {
+            font-size: 1.55rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-top: 4px;
+        }
+        .detail-info {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            padding: 14px 16px 4px 16px;
+            margin-bottom: 16px;
+        }
+        .detail-section-title {
+            color: #17365D;
+            font-size: 1.05rem;
+            font-weight: 800;
+            margin: 18px 0 9px 0;
+        }
+        .detail-description {
+            background: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: #334155;
+            line-height: 1.55;
+            margin-bottom: 16px;
+        }
+        .intervention-head {
+            color: #17365D;
+            font-weight: 800;
+            font-size: .98rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
+    st.markdown(
+        f"""
+        <div class="detail-head">
+            <div class="detail-id">🎫 TICKET #{ticket_id}</div>
+            <div class="detail-title">{_safe(ticket.get('titolo'))}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="detail-info">', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    c1.write(f"**Stato:** {_safe(ticket.get('stato'))}")
-    c2.write(f"**Priorità:** {_safe(ticket.get('priorita'))}")
-    c3.write(f"**Categoria:** {_safe(ticket.get('categoria'))}")
-    c4.write(f"**Tecnico:** {assegnato}")
+    c1.markdown(f"**STATO**<br>{_safe(ticket.get('stato'))}", unsafe_allow_html=True)
+    c2.markdown(f"**PRIORITÀ**<br>{_safe(ticket.get('priorita'))}", unsafe_allow_html=True)
+    c3.markdown(f"**CATEGORIA**<br>{_safe(ticket.get('categoria'))}", unsafe_allow_html=True)
+    c4.markdown(f"**TECNICO**<br>{assegnato or 'NON ASSEGNATO'}", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
+    st.markdown('<div class="detail-section-title">👤 Informazioni</div>', unsafe_allow_html=True)
     st.write(f"**Creato da:** {_safe(ticket.get('creato_da'))}")
-    st.markdown("### Descrizione")
-    st.write(_safe(ticket.get("descrizione")))
+
+    st.markdown('<div class="detail-section-title">📝 Descrizione</div>', unsafe_allow_html=True)
+    descrizione_ticket = _safe(ticket.get("descrizione"))
+    st.markdown(
+        f'<div class="detail-description">{descrizione_ticket.replace(chr(10), "<br>")}</div>',
+        unsafe_allow_html=True,
+    )
 
     _mostra_allegati(ticket_id)
 
@@ -757,7 +831,10 @@ def mostra_dettaglio_ticket(ticket_id):
             descrizione_int = _safe(intervento.get("descrizione"))
 
             with st.container(border=True):
-                st.markdown(f"**Intervento #{numero}** — {stato_int}")
+                st.markdown(
+                    f'<div class="intervention-head">🔧 Intervento #{numero} — {_safe(stato_int)}</div>',
+                    unsafe_allow_html=True,
+                )
                 st.caption(f"👷 {tecnico_int}  •  📅 {data_int}")
                 st.write(descrizione_int)
 
