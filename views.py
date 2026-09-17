@@ -1808,8 +1808,8 @@ def pagina_amministrazione():
 
     st.title("⚙️ Amministrazione")
 
-    tab1, tab2, tab3, tab4 = st.tabs(
-        ["👥 Utenti", "🔐 Password", "🗂️ Categorie", "✍️ Firma amministratore"]
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["👥 Utenti", "🔐 Password", "🗂️ Categorie", "🗑️ Elimina ticket", "✍️ Firma amministratore"]
     )
 
     with tab1:
@@ -2015,6 +2015,60 @@ def pagina_amministrazione():
                         st.error(msg)
 
     with tab4:
+        st.subheader("🗑️ Elimina ticket")
+        st.warning(
+            "L'eliminazione di un ticket è definitiva e rimuove anche interventi, "
+            "messaggi, allegati, foto e firme collegati al ticket."
+        )
+
+        tickets = db.get_tickets()
+        if not tickets:
+            st.info("Non ci sono ticket da eliminare.")
+        else:
+            opzioni = []
+            mappa = {}
+            for t in tickets:
+                tid = t.get("id")
+                titolo = str(t.get("titolo") or "Senza titolo")
+                stato = str(t.get("stato") or "")
+                label = f"#{tid} — {titolo} — {stato}"
+                opzioni.append(label)
+                mappa[label] = tid
+
+            scelta = st.selectbox(
+                "Seleziona il ticket da eliminare",
+                opzioni,
+                key="admin_delete_ticket_select",
+            )
+
+            ticket_id = mappa[scelta]
+            ticket = next((t for t in tickets if t.get("id") == ticket_id), None)
+            if ticket:
+                st.markdown(
+                    f"**Ticket #{ticket_id}**  \n"
+                    f"Titolo: **{ticket.get('titolo') or 'Senza titolo'}**  \n"
+                    f"Stato: **{ticket.get('stato') or '—'}**"
+                )
+
+            conferma = st.checkbox(
+                "Confermo di voler eliminare definitivamente questo ticket",
+                key="admin_delete_ticket_confirm",
+            )
+
+            if st.button(
+                "🗑️ Elimina definitivamente il ticket",
+                type="primary",
+                disabled=not conferma,
+                use_container_width=True,
+                key="admin_delete_ticket_button",
+            ):
+                if db.elimina_ticket_completo(ticket_id):
+                    st.success(f"Ticket #{ticket_id} eliminato definitivamente.")
+                    st.rerun()
+                else:
+                    st.error("Il ticket non è stato eliminato.")
+
+    with tab5:
         st.subheader("✍️ Firma amministratore")
         st.caption(
             "Carica la firma che verrà inserita automaticamente nel PDF "
