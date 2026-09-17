@@ -1,3 +1,4 @@
+from pathlib import Path
 import streamlit as st
 import views
 
@@ -123,6 +124,11 @@ if not st.session_state.logged_in:
 
 
 with st.sidebar:
+    # Caricamento e visualizzazione del logo della farfalla nella sidebar
+    logo_path = Path(__file__).resolve().parent / "assets" / "farfalla.jpg"
+    if logo_path.exists():
+        st.image(str(logo_path), width=54)
+
     st.title("🎫 Gestione Ticket")
     st.write(f"**Utente:** {st.session_state.username}")
     st.write(f"**Ruolo:** {st.session_state.ruolo}")
