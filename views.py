@@ -3,6 +3,7 @@ from io import BytesIO
 from datetime import date
 
 import pandas as pd
+import altair as alt
 import streamlit as st
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
@@ -1632,35 +1633,98 @@ def pagina_statistiche():
     # --------------------------------------------------------
     # GRAFICI PRINCIPALI
     # --------------------------------------------------------
+    # I grafici sono realizzati con Altair in modalità NON interattiva:
+    # la rotella del mouse non effettua zoom e non modifica la scala.
+    # L'asse Y è esplicitamente quantitativo con origine a zero.
+    def _grafico_barre(data, categoria, valore, ordinamento=None, altezza=280):
+        chart = (
+            alt.Chart(data)
+            .mark_bar()
+            .encode(
+                x=alt.X(
+                    f"{categoria}:N",
+                    sort=ordinamento,
+                    axis=alt.Axis(labelAngle=-90),
+                ),
+                y=alt.Y(
+                    f"{valore}:Q",
+                    scale=alt.Scale(zero=True),
+                    axis=alt.Axis(title=None),
+                ),
+                tooltip=[
+                    alt.Tooltip(f"{categoria}:N", title=categoria.capitalize()),
+                    alt.Tooltip(f"{valore}:Q", title="Ticket", format="d"),
+                ],
+            )
+            .properties(height=altezza)
+        )
+        return chart
+
     g1, g2 = st.columns(2)
 
     with g1:
         st.markdown("### 📊 Ticket per stato")
-        stato_counts = filtrato["stato"].value_counts()
-        stato_counts = stato_counts.reindex(
-            [x for x in STATI if x in stato_counts.index], fill_value=0
+        stato_counts = (
+            filtrato["stato"]
+            .value_counts()
+            .reindex([x for x in STATI if x in set(filtrato["stato"])], fill_value=0)
+            .reset_index()
         )
-        st.bar_chart(stato_counts)
+        stato_counts.columns = ["stato", "ticket"]
+        st.altair_chart(
+            _grafico_barre(stato_counts, "stato", "ticket", STATI),
+            use_container_width=True,
+            theme=None,
+        )
 
     with g2:
         st.markdown("### 🚦 Ticket per priorità")
-        priorita_counts = filtrato["priorita"].value_counts()
-        priorita_counts = priorita_counts.reindex(
-            [x for x in PRIORITA if x in priorita_counts.index], fill_value=0
+        priorita_counts = (
+            filtrato["priorita"]
+            .value_counts()
+            .reindex([x for x in PRIORITA if x in set(filtrato["priorita"])], fill_value=0)
+            .reset_index()
         )
-        st.bar_chart(priorita_counts)
+        priorita_counts.columns = ["priorita", "ticket"]
+        st.altair_chart(
+            _grafico_barre(priorita_counts, "priorita", "ticket", PRIORITA),
+            use_container_width=True,
+            theme=None,
+        )
 
     g3, g4 = st.columns(2)
 
     with g3:
         st.markdown("### 🗂️ Ticket per categoria")
-        categoria_counts = filtrato["categoria"].replace("", "Non specificata").value_counts()
-        st.bar_chart(categoria_counts)
+        categoria_counts = (
+            filtrato["categoria"]
+            .replace("", "Non specificata")
+            .value_counts()
+            .rename_axis("categoria")
+            .reset_index(name="ticket")
+        )
+        st.altair_chart(
+            _grafico_barre(categoria_counts, "categoria", "ticket",
+                           categoria_counts["categoria"].tolist()),
+            use_container_width=True,
+            theme=None,
+        )
 
     with g4:
         st.markdown("### 👷 Ticket per tecnico")
-        tecnico_counts = filtrato["assegnato_a"].replace("", "Non assegnato").value_counts()
-        st.bar_chart(tecnico_counts)
+        tecnico_counts = (
+            filtrato["assegnato_a"]
+            .replace("", "Non assegnato")
+            .value_counts()
+            .rename_axis("tecnico")
+            .reset_index(name="ticket")
+        )
+        st.altair_chart(
+            _grafico_barre(tecnico_counts, "tecnico", "ticket",
+                           tecnico_counts["tecnico"].tolist()),
+            use_container_width=True,
+            theme=None,
+        )
 
     # --------------------------------------------------------
     # TABELLA REPORT
