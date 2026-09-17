@@ -129,14 +129,6 @@ def pagina_login():
             border-radius: 0 0 18px 18px !important;
             padding: 0 28px 26px 28px !important;
             box-shadow: 0 18px 35px rgba(38, 91, 145, .10);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        /* Adatta gli elementi interni del form per centrare correttamente il pulsante */
-        [data-testid="stForm"] > div {
-            width: 100%;
         }
 
         .login-form-title {
@@ -171,7 +163,14 @@ def pagina_login():
             box-shadow: 0 0 0 2px rgba(181,31,43,.10) !important;
         }
 
-        /* Pulsante ACCEDI ridotto e perfettamente centrato */
+        /* Centramento del wrapper nativo di Streamlit del pulsante di invio */
+        [data-testid="stFormSubmitButton"] {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+        }
+
+        /* Pulsante ACCEDI ridotto e centrato perfettamente */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
             display: block !important;
