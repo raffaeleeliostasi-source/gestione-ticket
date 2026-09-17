@@ -28,10 +28,11 @@ def _safe(value):
 
 
 def _tecnici_assegnati(ticket_id, row=None):
-    """Restituisce tutti i tecnici assegnati, usando ticket_tecnici.
+    """Restituisce tutti i tecnici assegnati al ticket.
 
-    Mantiene un fallback al campo legacy tickets.assegnato_a per i ticket
-    eventualmente creati con la vecchia versione dell'app.
+    Usa la tabella ticket_tecnici e mantiene il fallback al vecchio
+    campo tickets.assegnato_a per i ticket creati con la versione precedente.
+    Compatibile sia con dict sia con pandas.Series.
     """
     try:
         tecnici = db.get_tecnici_ticket(int(ticket_id))
@@ -39,11 +40,18 @@ def _tecnici_assegnati(ticket_id, row=None):
         tecnici = []
 
     if tecnici:
-        return tecnici
+        return [str(x).strip() for x in tecnici if str(x).strip()]
 
-    legacy = _safe((row or {}).get("assegnato_a"))
+    legacy = ""
+    if row is not None:
+        try:
+            legacy = _safe(row.get("assegnato_a"))
+        except Exception:
+            legacy = ""
+
     if legacy:
         return [x.strip() for x in legacy.split(",") if x.strip()]
+
     return []
 
 def _reset_dashboard_filters():
@@ -1997,7 +2005,7 @@ def _excel_bytes(df):
 
     preferred = [
         "id", "titolo", "descrizione", "categoria", "priorita",
-        "stato", "assegnato_a", "creato_da", "data_chiusura", "chiuso_da"
+        "stato", "tecnici_assegnati", "creato_da", "data_chiusura", "chiuso_da"
     ]
     ordered = [c for c in preferred if c in export_df.columns]
     ordered += [c for c in export_df.columns if c not in ordered]
