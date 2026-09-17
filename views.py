@@ -163,22 +163,22 @@ def pagina_login():
             box-shadow: 0 0 0 2px rgba(181,31,43,.10) !important;
         }
 
-        /* Pulsante ACCEDI esattamente come da foto */
+        /* Pulsante ACCEDI identico alla foto richiesta */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
             min-height: 48px !important;
-            border-radius: 8px !important;
-            background: linear-gradient(180deg, #9C1C24, #80131A) !important;
+            border-radius: 6px !important;
+            background: linear-gradient(180deg, #9C1C24, #7E1219) !important;
             border: none !important;
             color: white !important;
             font-weight: 900 !important;
-            font-size: 1.1rem !important;
-            letter-spacing: 1px !important;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15) !important;
+            font-size: 1.15rem !important;
+            letter-spacing: 1.2px !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18) !important;
         }
 
         [data-testid="stForm"] button[type="submit"]:hover {
-            background: linear-gradient(180deg, #80131A, #660E14) !important;
+            background: linear-gradient(180deg, #7E1219, #600D12) !important;
         }
 
         @media (max-width: 640px) {
@@ -2224,7 +2224,7 @@ def pagina_amministrazione():
                         st.success(f"Ticket #{ticket_id} eliminato definitivamente.")
                         st.rerun()
                     else:
-                        st.error("El ticket non è stato eliminato.")
+                        st.error("Il ticket non è stato eliminato.")
 
     with tab5:
         st.subheader("✍️ Firma amministratore")
