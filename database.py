@@ -59,97 +59,16 @@ def get_ticket(ticket_id):
     return res.data
 
 
-def get_tecnici_ticket(ticket_id):
-    """Restituisce tutti i tecnici assegnati al ticket."""
-    try:
-        res = (
-            supabase.table("ticket_tecnici")
-            .select("tecnico")
-            .eq("ticket_id", ticket_id)
-            .order("tecnico")
-            .execute()
-        )
-        return [
-            str(row.get("tecnico", "")).strip()
-            for row in (res.data or [])
-            if str(row.get("tecnico", "")).strip()
-        ]
-    except Exception as e:
-        st.error(f"Errore caricamento tecnici assegnati: {e}")
-        return []
-
-
-def is_tecnico_assegnato(ticket_id, username):
-    """Verifica l'assegnazione del tecnico tramite la tabella ticket_tecnici."""
-    username = str(username or "").strip()
-    if not username:
-        return False
-    try:
-        res = (
-            supabase.table("ticket_tecnici")
-            .select("id")
-            .eq("ticket_id", ticket_id)
-            .eq("tecnico", username)
-            .limit(1)
-            .execute()
-        )
-        return bool(res.data)
-    except Exception:
-        return False
-
-
-def assegna_tecnici_ticket(ticket_id, tecnici):
-    """Sostituisce completamente l'elenco dei tecnici assegnati al ticket."""
-    tecnici_puliti = []
-    for tecnico in tecnici or []:
-        tecnico = str(tecnico or "").strip()
-        if tecnico and tecnico not in tecnici_puliti:
-            tecnici_puliti.append(tecnico)
-
-    supabase.table("ticket_tecnici").delete().eq("ticket_id", ticket_id).execute()
-
-    if tecnici_puliti:
-        supabase.table("ticket_tecnici").insert([
-            {"ticket_id": ticket_id, "tecnico": tecnico}
-            for tecnico in tecnici_puliti
-        ]).execute()
-
-    # Manteniamo assegnato_a per compatibilità con il codice esistente.
-    valore_legacy = ", ".join(tecnici_puliti)
-    supabase.table("tickets").update({"assegnato_a": valore_legacy}).eq("id", ticket_id).execute()
-    return tecnici_puliti
-
-
 def get_tickets_tecnico(username, limit=500):
-    """Restituisce i ticket assegnati al tecnico tramite ticket_tecnici."""
-    username = str(username or "").strip()
-    if not username:
-        return []
-
-    try:
-        assegnazioni = (
-            supabase.table("ticket_tecnici")
-            .select("ticket_id")
-            .eq("tecnico", username)
-            .execute()
-        ).data or []
-
-        ticket_ids = [row.get("ticket_id") for row in assegnazioni if row.get("ticket_id") is not None]
-        if not ticket_ids:
-            return []
-
-        res = (
-            supabase.table("tickets")
-            .select("*")
-            .in_("id", ticket_ids)
-            .order("id", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        return res.data or []
-    except Exception as e:
-        st.error(f"Errore caricamento ticket del tecnico: {e}")
-        return []
+    res = (
+        supabase.table("tickets")
+        .select("*")
+        .eq("assegnato_a", username)
+        .order("id", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return res.data or []
 
 
 def get_tecnici_attivi():
@@ -180,14 +99,23 @@ def get_utenti():
 
 
 def get_utente(username):
-    return (
-        supabase.table("utenti")
-        .select("*")
-        .eq("username", username)
-        .maybe_single()
-        .execute()
-        .data
-    )
+    try:
+        risposta = (
+            supabase.table("utenti")
+            .select("*")
+            .eq("username", username)
+            .maybe_single()
+            .execute()
+        )
+
+        if risposta is None:
+            return None
+
+        return getattr(risposta, "data", None)
+
+    except Exception as e:
+        st.error(f"Errore caricamento utente: {e}")
+        return None
 
 
 def crea_utente(username, password_hash, ruolo, attivo=True):
@@ -304,63 +232,22 @@ def get_audit_log(ticket_id):
         return []
 
 
-def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a=None, creato_da=None, tecnici=None):
-    """Crea un ticket e assegna uno o più tecnici.
-
-    `assegnato_a` viene mantenuto per compatibilità con la versione precedente.
-    Il dato autorevole delle assegnazioni è la tabella `ticket_tecnici`.
-    """
-    if tecnici is None:
-        if isinstance(assegnato_a, (list, tuple, set)):
-            tecnici = list(assegnato_a)
-        elif assegnato_a:
-            tecnici = [assegnato_a]
-        else:
-            tecnici = []
-
-    tecnici_puliti = []
-    for tecnico in tecnici:
-        tecnico = str(tecnico or "").strip()
-        if tecnico and tecnico not in tecnici_puliti:
-            tecnici_puliti.append(tecnico)
-
-    if not tecnici_puliti:
-        raise ValueError("È necessario assegnare almeno un tecnico.")
-
-    assegnazione_legacy = ", ".join(tecnici_puliti)
-
+def crea_ticket(titolo, descrizione, categoria, priorita, assegnato_a, creato_da):
     payload = {
         "titolo": titolo,
         "descrizione": descrizione,
         "categoria": categoria,
         "priorita": priorita,
-        "assegnato_a": assegnazione_legacy,
+        "assegnato_a": assegnato_a,
         "stato": "Aperto",
         "creato_da": creato_da,
     }
-
     ticket = supabase.table("tickets").insert(payload).execute().data[0]
-    ticket_id = ticket["id"]
-
-    try:
-        supabase.table("ticket_tecnici").insert([
-            {"ticket_id": ticket_id, "tecnico": tecnico}
-            for tecnico in tecnici_puliti
-        ]).execute()
-    except Exception:
-        # Evita di lasciare un ticket senza le sue assegnazioni se l'inserimento
-        # nella tabella di collegamento non va a buon fine.
-        try:
-            supabase.table("tickets").delete().eq("id", ticket_id).execute()
-        except Exception:
-            pass
-        raise
-
     registra_evento(
-        ticket_id,
+        ticket["id"],
         creato_da,
         "Ticket creato",
-        f"Ticket creato e assegnato a: {', '.join(tecnici_puliti)}.",
+        f"Ticket creato e assegnato a {assegnato_a}.",
     )
     return ticket
 
@@ -489,7 +376,7 @@ def salva_intervento_tecnico(
     if not ticket:
         raise ValueError("Ticket non trovato.")
 
-    if not is_tecnico_assegnato(ticket_id, tecnico):
+    if str(ticket.get("assegnato_a", "")).strip() != str(tecnico).strip():
         raise PermissionError("Il tecnico può intervenire solo sui ticket a lui assegnati.")
 
     if ticket.get("stato") in {"Risolto", "Chiuso"}:
@@ -524,6 +411,7 @@ def salva_intervento_tecnico(
         supabase.table("tickets")
         .update({"stato": nuovo_stato})
         .eq("id", ticket_id)
+        .eq("assegnato_a", tecnico)
         .select("id, stato")
         .execute()
     )
@@ -619,7 +507,6 @@ def elimina_ticket_completo(ticket_id):
         supabase.table("ticket_allegati").delete().eq("ticket_id", ticket_id).execute()
         supabase.table("ticket_messaggi").delete().eq("ticket_id", ticket_id).execute()
         supabase.table("ticket_interventi").delete().eq("ticket_id", ticket_id).execute()
-        supabase.table("ticket_tecnici").delete().eq("ticket_id", ticket_id).execute()
         try:
             supabase.table("audit_log").delete().eq("ticket_id", ticket_id).execute()
         except Exception:
