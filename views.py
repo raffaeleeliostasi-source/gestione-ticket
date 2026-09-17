@@ -129,6 +129,14 @@ def pagina_login():
             border-radius: 0 0 18px 18px !important;
             padding: 0 28px 26px 28px !important;
             box-shadow: 0 18px 35px rgba(38, 91, 145, .10);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Adatta gli elementi interni del form per centrare correttamente il pulsante */
+        [data-testid="stForm"] > div {
+            width: 100%;
         }
 
         .login-form-title {
@@ -163,13 +171,12 @@ def pagina_login():
             box-shadow: 0 0 0 2px rgba(181,31,43,.10) !important;
         }
 
-        /* Pulsante ACCEDI ridotto in larghezza e centrato */
+        /* Pulsante ACCEDI ridotto e perfettamente centrato */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
             display: block !important;
-            margin: 10px auto 0 auto !important;
-            min-width: 200px !important;
-            max-width: 260px !important;
+            margin: 12px auto 0 auto !important;
+            width: 220px !important;
             min-height: 46px !important;
             border-radius: 6px !important;
             background: linear-gradient(180deg, #9C1C24, #7E1219) !important;
