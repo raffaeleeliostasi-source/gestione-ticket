@@ -33,42 +33,275 @@ def _reset_dashboard_filters():
 
 
 def pagina_login():
-    st.title("🎫 Gestione Ticket")
-    st.subheader("Accesso")
+    """Schermata di accesso moderna e responsive."""
+    from pathlib import Path
 
-    with st.form("login_form_main"):
-        username = st.text_input("Utente", key="login_username")
-        password = st.text_input("Password", type="password", key="login_password")
-        submit = st.form_submit_button("🔐 Accedi", use_container_width=True)
+    logo_path = Path(__file__).resolve().parent / "assets" / "farfalla.jpg"
+    logo_html = ""
+    if logo_path.exists():
+        import base64
+        logo_b64 = base64.b64encode(logo_path.read_bytes()).decode("utf-8")
+        logo_html = f'<img class="login-butterfly" src="data:image/jpeg;base64,{logo_b64}" alt="Logo" />'
 
-    if submit:
-        username = username.strip().lower()
-        if not username or not password:
-            st.error("Inserisci utente e password.")
-            return
+    st.markdown(
+        """
+        <style>
+        /* Sfondo e contenitore principale della pagina di accesso */
+        [data-testid="stAppViewContainer"] {
+            background:
+                radial-gradient(circle at 82% 8%, rgba(180, 214, 255, .55) 0, rgba(180, 214, 255, 0) 34%),
+                radial-gradient(circle at 8% 92%, rgba(191, 219, 254, .60) 0, rgba(191, 219, 254, 0) 35%),
+                #F7FBFF;
+        }
 
-        try:
-            user = db.get_utente(username)
-        except Exception as e:
-            st.error("Errore durante il collegamento al database.")
-            st.exception(e)
-            return
+        [data-testid="stHeader"] {
+            background: transparent;
+        }
 
-        if not user or user.get("attivo", True) is False:
-            st.error("Credenziali non valide o utente disattivato.")
-            return
+        .login-page {
+            position: relative;
+            max-width: 760px;
+            margin: 3.2rem auto 1.5rem auto;
+        }
 
-        if not auth.verifica_password(password, user.get("password", "")):
-            st.error("Credenziali non valide.")
-            return
+        .login-brand {
+            background: rgba(255,255,255,.98);
+            border-radius: 18px 18px 0 0;
+            padding: 28px 34px 24px 34px;
+            box-shadow: 0 12px 35px rgba(38, 91, 145, .10);
+            text-align: center;
+        }
 
-        if "$" not in str(user.get("password", "")):
-            db.aggiorna_utente(username, password=auth.hash_password(password))
+        .login-brand-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
 
-        st.session_state.logged_in = True
-        st.session_state.username = username
-        st.session_state.ruolo = user.get("ruolo", "")
-        st.rerun()
+        .login-butterfly {
+            width: 92px;
+            height: 112px;
+            object-fit: contain;
+            mix-blend-mode: multiply;
+            flex: 0 0 auto;
+        }
+
+        .login-brand-text {
+            text-align: left;
+        }
+
+        .login-title {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 3.25rem;
+            line-height: .94;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            color: #173B68;
+        }
+
+        .login-title .ticket {
+            display: block;
+            color: #B51F2B;
+        }
+
+        .login-subtitle {
+            margin-top: 14px;
+            color: #627B9D;
+            font-size: 1.05rem;
+            font-weight: 500;
+        }
+
+        .login-divider {
+            height: 2px;
+            background: #D5E6FA;
+            margin-top: 26px;
+            border-radius: 2px;
+        }
+
+        /* La card del form completa visivamente la card superiore */
+        [data-testid="stForm"] {
+            max-width: 760px;
+            margin: 0 auto;
+            background: rgba(255,255,255,.98);
+            border: 0 !important;
+            border-radius: 0 0 18px 18px !important;
+            padding: 0 34px 30px 34px !important;
+            box-shadow: 0 18px 35px rgba(38, 91, 145, .10);
+        }
+
+        .login-form-title {
+            text-align: center;
+            color: #173B68;
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 0 0 4px 0;
+        }
+
+        .login-form-subtitle {
+            text-align: center;
+            color: #6C84A5;
+            font-size: 1rem;
+            margin: 0 0 26px 0;
+        }
+
+        [data-testid="stForm"] label {
+            color: #173B68 !important;
+            font-weight: 700 !important;
+        }
+
+        [data-testid="stForm"] input {
+            border: 1.5px solid #C9DCF2 !important;
+            border-radius: 10px !important;
+            min-height: 48px !important;
+            background: #FFFFFF !important;
+        }
+
+        [data-testid="stForm"] input:focus {
+            border-color: #2D73E8 !important;
+            box-shadow: 0 0 0 2px rgba(45,115,232,.10) !important;
+        }
+
+        [data-testid="stForm"] button[kind="primaryFormSubmit"],
+        [data-testid="stForm"] button[type="submit"] {
+            min-height: 54px !important;
+            border-radius: 10px !important;
+            background: linear-gradient(90deg, #1769E8, #287CF2) !important;
+            border: none !important;
+            color: white !important;
+            font-weight: 800 !important;
+            font-size: 1.05rem !important;
+        }
+
+        [data-testid="stForm"] button[type="submit"]:hover {
+            background: linear-gradient(90deg, #155FD2, #236ED9) !important;
+        }
+
+        @media (max-width: 640px) {
+            .login-page {
+                margin: 1rem auto .75rem auto;
+                max-width: 100%;
+            }
+
+            .login-brand {
+                border-radius: 16px 16px 0 0;
+                padding: 22px 18px 18px 18px;
+            }
+
+            .login-brand-row {
+                gap: 12px;
+            }
+
+            .login-butterfly {
+                width: 66px;
+                height: 82px;
+            }
+
+            .login-title {
+                font-size: 2.15rem;
+                letter-spacing: -1px;
+            }
+
+            .login-subtitle {
+                font-size: .82rem;
+                margin-top: 8px;
+            }
+
+            .login-divider {
+                margin-top: 18px;
+            }
+
+            [data-testid="stForm"] {
+                border-radius: 0 0 16px 16px !important;
+                padding: 0 18px 22px 18px !important;
+            }
+
+            .login-form-title {
+                font-size: 1.55rem;
+            }
+
+            .login-form-subtitle {
+                font-size: .88rem;
+                margin-bottom: 20px;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Colonna centrale: mantiene la schermata compatta su PC e piena su mobile.
+    _, login_col, _ = st.columns([1, 2.1, 1])
+    with login_col:
+        st.markdown(
+            f"""
+            <div class="login-page">
+                <div class="login-brand">
+                    <div class="login-brand-row">
+                        {logo_html}
+                        <div class="login-brand-text">
+                            <div class="login-title">
+                                Gestione
+                                <span class="ticket">Ticket</span>
+                            </div>
+                            <div class="login-subtitle">Sistema di ticketing e assistenza</div>
+                        </div>
+                    </div>
+                    <div class="login-divider"></div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        with st.form("login_form_main"):
+            st.markdown(
+                '<div class="login-form-title">Accedi alla tua area di lavoro</div>'
+                '<div class="login-form-subtitle">Inserisci le tue credenziali per continuare</div>',
+                unsafe_allow_html=True,
+            )
+            username = st.text_input(
+                "Utente",
+                placeholder="Inserisci il tuo utente",
+                key="login_username",
+            )
+            password = st.text_input(
+                "Password",
+                type="password",
+                placeholder="Inserisci la tua password",
+                key="login_password",
+            )
+            submit = st.form_submit_button("🔐  Accedi", use_container_width=True, type="primary")
+
+        if submit:
+            username = username.strip().lower()
+            if not username or not password:
+                st.error("Inserisci utente e password.")
+                return
+
+            try:
+                user = db.get_utente(username)
+            except Exception as e:
+                st.error("Errore durante il collegamento al database.")
+                st.exception(e)
+                return
+
+            if not user or user.get("attivo", True) is False:
+                st.error("Credenziali non valide o utente disattivato.")
+                return
+
+            if not auth.verifica_password(password, user.get("password", "")):
+                st.error("Credenziali non valide.")
+                return
+
+            if "$" not in str(user.get("password", "")):
+                db.aggiorna_utente(username, password=auth.hash_password(password))
+
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.session_state.ruolo = user.get("ruolo", "")
+            st.rerun()
 
 
 def pagina_dashboard():
