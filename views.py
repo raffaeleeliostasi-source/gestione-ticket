@@ -1540,70 +1540,175 @@ def pagina_statistiche():
         return
 
     st.title("📈 Statistiche & Report")
+    st.caption("Cruscotto amministrativo per monitorare andamento, carichi di lavoro e stato dei ticket.")
+
     rows = db.get_tickets()
     df = pd.DataFrame(rows)
 
     if df.empty:
-        st.info("Non ci sono dati.")
+        st.info("Non ci sono ticket disponibili per generare le statistiche.")
         return
 
-    total = len(df)
-    aperti = int((df["stato"] == "Aperto").sum())
-    lavorazione = int((df["stato"] == "In Lavorazione").sum())
-    risolti = int((df["stato"] == "Risolto").sum())
-    chiusi = int((df["stato"] == "Chiuso").sum())
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Totali", total)
-    c2.metric("Aperti", aperti)
-    c3.metric("In lavorazione", lavorazione)
-    c4.metric("Risolti", risolti)
-    c5.metric("Chiusi", chiusi)
-
-    st.subheader("Ticket per stato")
-    st.bar_chart(df["stato"].value_counts())
-
-    if "priorita" in df.columns:
-        st.subheader("Ticket per priorità")
-        st.bar_chart(df["priorita"].value_counts())
-
-    if "assegnato_a" in df.columns:
-        st.subheader("Ticket per tecnico")
-        st.bar_chart(df["assegnato_a"].fillna("Non assegnato").value_counts())
-
-    for col in ["data_chiusura", "chiuso_da"]:
+    # Normalizzazione minima dei campi utilizzati dal report.
+    for col in ["stato", "priorita", "categoria", "assegnato_a"]:
         if col not in df.columns:
             df[col] = ""
+        df[col] = df[col].fillna("").astype(str).str.strip()
 
-    st.subheader("📋 Dati")
+    # --------------------------------------------------------
+    # FILTRI REPORT
+    # --------------------------------------------------------
+    st.markdown("### 🔎 Filtra il report")
+    with st.container(border=True):
+        f1, f2, f3, f4 = st.columns(4)
+
+        with f1:
+            stati_presenti = [x for x in STATI if x in set(df["stato"])]
+            filtro_stato = st.selectbox(
+                "Stato",
+                ["Tutti"] + stati_presenti,
+                key="statistiche_stato",
+            )
+
+        with f2:
+            priorita_presenti = [x for x in PRIORITA if x in set(df["priorita"])]
+            filtro_priorita = st.selectbox(
+                "Priorità",
+                ["Tutte"] + priorita_presenti,
+                key="statistiche_priorita",
+            )
+
+        with f3:
+            categorie = sorted([x for x in df["categoria"].unique() if x])
+            filtro_categoria = st.selectbox(
+                "Categoria",
+                ["Tutte"] + categorie,
+                key="statistiche_categoria",
+            )
+
+        with f4:
+            tecnici = sorted([x for x in df["assegnato_a"].unique() if x])
+            filtro_tecnico = st.selectbox(
+                "Tecnico",
+                ["Tutti"] + tecnici,
+                key="statistiche_tecnico",
+            )
+
+    filtrato = df.copy()
+    if filtro_stato != "Tutti":
+        filtrato = filtrato[filtrato["stato"] == filtro_stato]
+    if filtro_priorita != "Tutte":
+        filtrato = filtrato[filtrato["priorita"] == filtro_priorita]
+    if filtro_categoria != "Tutte":
+        filtrato = filtrato[filtrato["categoria"] == filtro_categoria]
+    if filtro_tecnico != "Tutti":
+        filtrato = filtrato[filtrato["assegnato_a"] == filtro_tecnico]
+
+    if filtrato.empty:
+        st.warning("Nessun ticket corrisponde ai filtri selezionati.")
+        return
+
+    st.caption(f"Report filtrato: **{len(filtrato)} ticket** su {len(df)} totali.")
+
+    # --------------------------------------------------------
+    # KPI
+    # --------------------------------------------------------
+    stati_filtrati = filtrato["stato"]
+    total = len(filtrato)
+    aperti = int((stati_filtrati == "Aperto").sum())
+    lavorazione = int((stati_filtrati == "In Lavorazione").sum())
+    risolti = int((stati_filtrati == "Risolto").sum())
+    chiusi = int((stati_filtrati == "Chiuso").sum())
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("🎫 Totali", total)
+    c2.metric("🟡 Aperti", aperti)
+    c3.metric("🟠 In lavorazione", lavorazione)
+    c4.metric("🟢 Risolti", risolti)
+    c5.metric("⚪ Chiusi", chiusi)
+
+    st.markdown("")
+
+    # --------------------------------------------------------
+    # GRAFICI PRINCIPALI
+    # --------------------------------------------------------
+    g1, g2 = st.columns(2)
+
+    with g1:
+        st.markdown("### 📊 Ticket per stato")
+        stato_counts = filtrato["stato"].value_counts()
+        stato_counts = stato_counts.reindex(
+            [x for x in STATI if x in stato_counts.index], fill_value=0
+        )
+        st.bar_chart(stato_counts)
+
+    with g2:
+        st.markdown("### 🚦 Ticket per priorità")
+        priorita_counts = filtrato["priorita"].value_counts()
+        priorita_counts = priorita_counts.reindex(
+            [x for x in PRIORITA if x in priorita_counts.index], fill_value=0
+        )
+        st.bar_chart(priorita_counts)
+
+    g3, g4 = st.columns(2)
+
+    with g3:
+        st.markdown("### 🗂️ Ticket per categoria")
+        categoria_counts = filtrato["categoria"].replace("", "Non specificata").value_counts()
+        st.bar_chart(categoria_counts)
+
+    with g4:
+        st.markdown("### 👷 Ticket per tecnico")
+        tecnico_counts = filtrato["assegnato_a"].replace("", "Non assegnato").value_counts()
+        st.bar_chart(tecnico_counts)
+
+    # --------------------------------------------------------
+    # TABELLA REPORT
+    # --------------------------------------------------------
+    st.markdown("### 📋 Dettaglio ticket")
+
+    report_df = filtrato.copy()
+    for col in ["data_chiusura", "chiuso_da"]:
+        if col not in report_df.columns:
+            report_df[col] = ""
+
+    preferred = [
+        "id", "titolo", "categoria", "priorita", "stato",
+        "assegnato_a", "creato_da", "data_chiusura", "chiuso_da", "descrizione"
+    ]
+    visible = [c for c in preferred if c in report_df.columns]
+    report_view = report_df[visible].copy()
 
     st.dataframe(
-        df,
+        report_view,
         use_container_width=True,
         hide_index=True,
         column_config={
             "id": st.column_config.NumberColumn("ID", width="small"),
-            "titolo": st.column_config.TextColumn("Titolo Ticket"),
+            "titolo": st.column_config.TextColumn("Titolo"),
             "descrizione": st.column_config.TextColumn("Descrizione", width="large"),
             "categoria": st.column_config.TextColumn("Categoria"),
             "priorita": st.column_config.TextColumn("Priorità"),
             "stato": st.column_config.TextColumn("Stato"),
-            "assegnato_a": st.column_config.TextColumn("Tecnico Assegnato"),
+            "assegnato_a": st.column_config.TextColumn("Tecnico"),
             "creato_da": st.column_config.TextColumn("Creato da"),
-            "data_chiusura": st.column_config.TextColumn("Data Chiusura"),
+            "data_chiusura": st.column_config.TextColumn("Data chiusura"),
             "chiuso_da": st.column_config.TextColumn("Chiuso da"),
-        }
+        },
     )
 
-    excel_bytes = _excel_bytes(df)
+    # --------------------------------------------------------
+    # ESPORTAZIONE
+    # --------------------------------------------------------
+    st.markdown("### 📥 Esportazione")
+    excel_bytes = _excel_bytes(report_df)
     st.download_button(
-        "📊 Esporta in Excel",
+        "📊 Esporta report filtrato in Excel",
         data=excel_bytes,
-        file_name="report_ticket.xlsx",
+        file_name="report_ticket_filtrato.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
-
 
 def _excel_bytes(df):
     output = BytesIO()
