@@ -30,12 +30,14 @@ def _safe(value):
 def _tecnici_assegnati(ticket_id, row=None):
     """Restituisce tutti i tecnici assegnati al ticket.
 
-    Usa la tabella ticket_tecnici e mantiene il fallback al vecchio
-    campo tickets.assegnato_a per i ticket creati con la versione precedente.
+    Legge dalla tabella ticket_tecnici tramite la funzione disponibile
+    in database.py e mantiene il fallback al vecchio campo
+    tickets.assegnato_a per i ticket creati con la versione precedente.
+
     Compatibile sia con dict sia con pandas.Series.
     """
     try:
-        tecnici = db.get_tecnici_ticket(int(ticket_id))
+        tecnici = db.get_ticket_tecnici(int(ticket_id))
     except Exception:
         tecnici = []
 
@@ -46,7 +48,7 @@ def _tecnici_assegnati(ticket_id, row=None):
     if row is not None:
         try:
             legacy = _safe(row.get("assegnato_a"))
-        except Exception:
+        except AttributeError:
             legacy = ""
 
     if legacy:
@@ -2005,7 +2007,7 @@ def _excel_bytes(df):
 
     preferred = [
         "id", "titolo", "descrizione", "categoria", "priorita",
-        "stato", "tecnici_assegnati", "creato_da", "data_chiusura", "chiuso_da"
+        "stato", "assegnato_a", "creato_da", "data_chiusura", "chiuso_da"
     ]
     ordered = [c for c in preferred if c in export_df.columns]
     ordered += [c for c in export_df.columns if c not in ordered]
