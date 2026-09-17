@@ -175,7 +175,7 @@ def get_tecnici_attivi():
 def get_utenti():
     return (
         supabase.table("utenti")
-        .select("username, ruolo, attivo")
+        .select("nome, cognome, username, ruolo, attivo")
         .order("username")
         .execute()
         .data
@@ -200,10 +200,19 @@ def get_utente(username):
         return None
 
 
-def crea_utente(username, password_hash, ruolo, attivo=True):
+def crea_utente(
+    username,
+    password_hash,
+    ruolo,
+    attivo=True,
+    nome="",
+    cognome="",
+):
     return (
         supabase.table("utenti")
         .insert({
+            "nome": str(nome or "").strip(),
+            "cognome": str(cognome or "").strip(),
             "username": username,
             "password": password_hash,
             "ruolo": ruolo,
