@@ -19,35 +19,37 @@ st.markdown(
         overflow-x: hidden;
     }
 
-    /* Stile personalizzato per il logo e la testata nella sidebar */
+    /* Stile personalizzato per il logo e la testata nella sidebar allineati a sinistra */
     .sidebar-brand-container {
         display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        margin-bottom: 1rem;
+        flex-direction: row;
+        align-items: flex-end;
+        justify-content: flex-start;
+        gap: 12px;
+        margin-bottom: 1.2rem;
     }
 
     .sidebar-logo {
-        width: 58px;
-        height: 72px;
+        width: 48px;
+        height: 60px;
         object-fit: contain;
         mix-blend-mode: multiply;
-        margin-bottom: 6px;
+        flex: 0 0 auto;
     }
 
     .sidebar-title {
-        font-size: 1.15rem !important;
+        font-size: 1.25rem !important;
         font-weight: 800 !important;
         color: #17365D !important;
         white-space: nowrap !important;
         margin: 0 !important;
         padding: 0 !important;
+        line-height: 1.1 !important;
     }
 
     /* Spazio extra per staccare i dati dell'utente verso il basso */
     .sidebar-user-info {
-        margin-top: 1.2rem;
+        margin-top: 1.4rem;
     }
 
     @media (max-width: 640px) {
@@ -155,7 +157,6 @@ if not st.session_state.logged_in:
 
 
 with st.sidebar:
-    # Caricamento del logo e generazione HTML per posizionare la scritta centrata sotto la farfalla
     logo_path = Path(__file__).resolve().parent / "assets" / "farfalla.jpg"
     logo_sidebar_html = ""
     if logo_path.exists():
@@ -173,7 +174,6 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # Blocco con margine superiore aumentato per distanziare l'utente
     st.markdown(
         f"""
         <div class="sidebar-user-info">
