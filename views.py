@@ -26,6 +26,26 @@ def _safe(value):
     return "" if value is None else str(value)
 
 
+
+def _tecnici_assegnati(ticket_id, row=None):
+    """Restituisce tutti i tecnici assegnati, usando ticket_tecnici.
+
+    Mantiene un fallback al campo legacy tickets.assegnato_a per i ticket
+    eventualmente creati con la vecchia versione dell'app.
+    """
+    try:
+        tecnici = db.get_tecnici_ticket(int(ticket_id))
+    except Exception:
+        tecnici = []
+
+    if tecnici:
+        return tecnici
+
+    legacy = _safe((row or {}).get("assegnato_a"))
+    if legacy:
+        return [x.strip() for x in legacy.split(",") if x.strip()]
+    return []
+
 def _reset_dashboard_filters():
     st.session_state["dashboard_filter_version"] = (
         int(st.session_state.get("dashboard_filter_version", 0)) + 1
@@ -566,15 +586,15 @@ def pagina_dashboard():
 
     with c4:
         if admin:
-            assegnati = sorted(
-                [
-                    str(x)
-                    for x in df.get(
-                        "assegnato_a", pd.Series(dtype=str)
-                    ).dropna().unique()
-                    if str(x).strip()
-                ]
-            )
+            tecnici_per_ticket = {
+                int(row["id"]): _tecnici_assegnati(int(row["id"]), row)
+                for _, row in df.iterrows()
+            }
+            assegnati = sorted({
+                tecnico
+                for elenco in tecnici_per_ticket.values()
+                for tecnico in elenco
+            })
             assegnato = st.selectbox(
                 "Assegnato a",
                 ["Tutti"] + assegnati,
@@ -614,8 +634,12 @@ def pagina_dashboard():
     if priorita != "Tutte" and "priorita" in filtrato.columns:
         filtrato = filtrato[filtrato["priorita"] == priorita]
 
-    if admin and assegnato != "Tutti" and "assegnato_a" in filtrato.columns:
-        filtrato = filtrato[filtrato["assegnato_a"] == assegnato]
+    if admin and assegnato != "Tutti":
+        filtrato = filtrato[
+            filtrato["id"].apply(
+                lambda ticket_id: assegnato in _tecnici_assegnati(int(ticket_id))
+            )
+        ]
 
     st.markdown(
         f'<div class="result-line"><strong>{len(filtrato)}</strong> ticket visualizzati</div>',
@@ -646,7 +670,8 @@ def pagina_dashboard():
         stato_val = _safe(row.get("stato")) or "—"
         priorita_val = _safe(row.get("priorita")) or "—"
         categoria_val = _safe(row.get("categoria")) or "—"
-        tecnico_val = _safe(row.get("assegnato_a")) or "NON ASSEGNATO"
+        tecnici_ticket = _tecnici_assegnati(ticket_id, row)
+        tecnico_val = ", ".join(tecnici_ticket) if tecnici_ticket else "NON ASSEGNATO"
 
         descrizione = _safe(row.get("descrizione")).strip()
         if len(descrizione) > 150:
@@ -782,7 +807,11 @@ def pagina_nuovo_ticket():
         c1, c2, c3 = st.columns(3)
         categoria = c1.selectbox("Categoria", categorie)
         priorita = c2.selectbox("Priorità", PRIORITA)
-        assegnato_a = c3.selectbox("Assegna a tecnico", tecnici)
+        tecnici_selezionati = c3.multiselect(
+            "Assegna a tecnici",
+            tecnici,
+            placeholder="Seleziona uno o più tecnici",
+        )
 
         st.markdown("---")
         st.markdown("### 📎 Allegati e Contenuti Multimediali")
@@ -806,13 +835,17 @@ def pagina_nuovo_ticket():
         st.error("Titolo e descrizione sono obbligatori.")
         return
 
+    if not tecnici_selezionati:
+        st.error("Seleziona almeno un tecnico da assegnare al ticket.")
+        return
+
     try:
         ticket = db.crea_ticket(
             titolo=titolo.strip(),
             descrizione=descrizione.strip(),
             categoria=categoria,
             priorita=priorita,
-            assegnato_a=assegnato_a,
+            tecnici=tecnici_selezionati,
             creato_da=st.session_state.username,
         )
         ticket_id = ticket["id"]
@@ -960,10 +993,11 @@ def mostra_dettaglio_ticket(ticket_id):
 
     admin = is_admin()
     username = st.session_state.username
-    assegnato = _safe(ticket.get("assegnato_a"))
+    tecnici_assegnati = _tecnici_assegnati(ticket_id, ticket)
+    assegnato = ", ".join(tecnici_assegnati)
     stato_attuale = _safe(ticket.get("stato"))
 
-    if not admin and assegnato != username:
+    if not admin and username not in tecnici_assegnati:
         st.error("Accesso non autorizzato a questo ticket.")
         return
 
@@ -1418,7 +1452,8 @@ def pagina_gestione_interventi():
             stato = _safe(row.get("stato")) or "—"
             priorita = _safe(row.get("priorita")) or "—"
             categoria = _safe(row.get("categoria")) or "—"
-            tecnico = _safe(row.get("assegnato_a")) or "Non assegnato"
+            tecnici_ticket = _tecnici_assegnati(ticket_id, row)
+            tecnico = ", ".join(tecnici_ticket) if tecnici_ticket else "Non assegnato"
 
             interventi = db.get_interventi(ticket_id)
             ultimo = interventi[-1] if interventi else None
@@ -1736,10 +1771,15 @@ def pagina_statistiche():
         st.info("Non ci sono ticket disponibili per generare le statistiche.")
         return
 
-    for col in ["stato", "priorita", "categoria", "assegnato_a"]:
+    for col in ["stato", "priorita", "categoria"]:
         if col not in df.columns:
             df[col] = ""
         df[col] = df[col].fillna("").astype(str).str.strip()
+
+    df["tecnici_assegnati"] = df.apply(
+        lambda row: ", ".join(_tecnici_assegnati(int(row["id"]), row)),
+        axis=1,
+    )
 
     st.markdown("### 🔎 Filtra il report")
     with st.container(border=True):
@@ -1770,7 +1810,12 @@ def pagina_statistiche():
             )
 
         with f4:
-            tecnici = sorted([x for x in df["assegnato_a"].unique() if x])
+            tecnici = sorted({
+                tecnico
+                for elenco in df["tecnici_assegnati"]
+                for tecnico in [x.strip() for x in str(elenco).split(",")]
+                if tecnico
+            })
             filtro_tecnico = st.selectbox(
                 "Tecnico",
                 ["Tutti"] + tecnici,
@@ -1785,7 +1830,11 @@ def pagina_statistiche():
     if filtro_categoria != "Tutte":
         filtrato = filtrato[filtrato["categoria"] == filtro_categoria]
     if filtro_tecnico != "Tutti":
-        filtrato = filtrato[filtrato["assegnato_a"] == filtro_tecnico]
+        filtrato = filtrato[
+            filtrato["tecnici_assegnati"].apply(
+                lambda elenco: filtro_tecnico in [x.strip() for x in str(elenco).split(",")]
+            )
+        ]
 
     if filtrato.empty:
         st.warning("Nessun ticket corrisponde ai filtri selezionati.")
@@ -1886,7 +1935,7 @@ def pagina_statistiche():
     with g4:
         st.markdown("### 👷 Ticket per tecnico")
         tecnico_counts = (
-            filtrato["assegnato_a"]
+            filtrato["tecnici_assegnati"]
             .replace("", "Non assegnato")
             .value_counts()
             .rename_axis("tecnico")
@@ -1908,7 +1957,7 @@ def pagina_statistiche():
 
     preferred = [
         "id", "titolo", "categoria", "priorita", "stato",
-        "assegnato_a", "creato_da", "data_chiusura", "chiuso_da", "descrizione"
+        "tecnici_assegnati", "creato_da", "data_chiusura", "chiuso_da", "descrizione"
     ]
     visible = [c for c in preferred if c in report_df.columns]
     report_view = report_df[visible].copy()
@@ -1924,7 +1973,7 @@ def pagina_statistiche():
             "categoria": st.column_config.TextColumn("Categoria"),
             "priorita": st.column_config.TextColumn("Priorità"),
             "stato": st.column_config.TextColumn("Stato"),
-            "assegnato_a": st.column_config.TextColumn("Tecnico"),
+            "tecnici_assegnati": st.column_config.TextColumn("Tecnici assegnati"),
             "creato_da": st.column_config.TextColumn("Creato da"),
             "data_chiusura": st.column_config.TextColumn("Data chiusura"),
             "chiuso_da": st.column_config.TextColumn("Chiuso da"),
