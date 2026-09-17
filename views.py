@@ -163,16 +163,20 @@ def pagina_login():
             box-shadow: 0 0 0 2px rgba(181,31,43,.10) !important;
         }
 
-        /* Pulsante ACCEDI identico alla foto richiesta */
+        /* Pulsante ACCEDI ridotto in larghezza e centrato */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
-            min-height: 48px !important;
+            display: block !important;
+            margin: 10px auto 0 auto !important;
+            min-width: 200px !important;
+            max-width: 260px !important;
+            min-height: 46px !important;
             border-radius: 6px !important;
             background: linear-gradient(180deg, #9C1C24, #7E1219) !important;
             border: none !important;
             color: white !important;
             font-weight: 900 !important;
-            font-size: 1.15rem !important;
+            font-size: 1.1rem !important;
             letter-spacing: 1.2px !important;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18) !important;
         }
@@ -228,6 +232,11 @@ def pagina_login():
                 font-size: .82rem;
                 margin-bottom: 16px;
             }
+
+            [data-testid="stForm"] button[type="submit"] {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
         }
         </style>
         """,
@@ -274,7 +283,7 @@ def pagina_login():
                 placeholder="Inserisci la tua password",
                 key="login_password",
             )
-            submit = st.form_submit_button("ACCEDI", use_container_width=True, type="primary")
+            submit = st.form_submit_button("ACCEDI", use_container_width=False, type="primary")
 
         if submit:
             username = username.strip().lower()
