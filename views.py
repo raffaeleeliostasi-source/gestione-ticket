@@ -60,14 +60,14 @@ def pagina_login():
 
         .login-page {
             position: relative;
-            max-width: 760px;
+            max-width: 580px;
             margin: 3.2rem auto 1.5rem auto;
         }
 
         .login-brand {
             background: rgba(255,255,255,.98);
             border-radius: 18px 18px 0 0;
-            padding: 28px 34px 24px 34px;
+            padding: 24px 28px 20px 28px;
             box-shadow: 0 12px 35px rgba(38, 91, 145, .10);
             text-align: center;
         }
@@ -76,12 +76,12 @@ def pagina_login():
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 20px;
+            gap: 18px;
         }
 
         .login-butterfly {
-            width: 92px;
-            height: 112px;
+            width: 76px;
+            height: 94px;
             object-fit: contain;
             mix-blend-mode: multiply;
             flex: 0 0 auto;
@@ -94,7 +94,7 @@ def pagina_login():
         .login-title {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 3.25rem;
+            font-size: 2.75rem;
             line-height: .94;
             font-weight: 800;
             letter-spacing: -1.5px;
@@ -107,34 +107,34 @@ def pagina_login():
         }
 
         .login-subtitle {
-            margin-top: 14px;
+            margin-top: 10px;
             color: #627B9D;
-            font-size: 1.05rem;
+            font-size: 0.98rem;
             font-weight: 500;
         }
 
         .login-divider {
             height: 2px;
             background: #D5E6FA;
-            margin-top: 26px;
+            margin-top: 20px;
             border-radius: 2px;
         }
 
-        /* La card del form completa visivamente la card superiore */
+        /* La card del form ridotta in larghezza e centrata */
         [data-testid="stForm"] {
-            max-width: 760px;
+            max-width: 580px;
             margin: 0 auto;
             background: rgba(255,255,255,.98);
             border: 0 !important;
             border-radius: 0 0 18px 18px !important;
-            padding: 0 34px 30px 34px !important;
+            padding: 0 28px 26px 28px !important;
             box-shadow: 0 18px 35px rgba(38, 91, 145, .10);
         }
 
         .login-form-title {
             text-align: center;
             color: #173B68;
-            font-size: 2rem;
+            font-size: 1.65rem;
             font-weight: 800;
             margin: 0 0 4px 0;
         }
@@ -142,8 +142,8 @@ def pagina_login():
         .login-form-subtitle {
             text-align: center;
             color: #6C84A5;
-            font-size: 1rem;
-            margin: 0 0 26px 0;
+            font-size: 0.92rem;
+            margin: 0 0 20px 0;
         }
 
         [data-testid="stForm"] label {
@@ -154,28 +154,29 @@ def pagina_login():
         [data-testid="stForm"] input {
             border: 1.5px solid #C9DCF2 !important;
             border-radius: 10px !important;
-            min-height: 48px !important;
+            min-height: 44px !important;
             background: #FFFFFF !important;
         }
 
         [data-testid="stForm"] input:focus {
-            border-color: #2D73E8 !important;
-            box-shadow: 0 0 0 2px rgba(45,115,232,.10) !important;
+            border-color: #B51F2B !important;
+            box-shadow: 0 0 0 2px rgba(181,31,43,.10) !important;
         }
 
+        /* Pulsante Accedi colorato come la farfalla (rosso bordeaux coordinato) */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
-            min-height: 54px !important;
+            min-height: 48px !important;
             border-radius: 10px !important;
-            background: linear-gradient(90deg, #1769E8, #287CF2) !important;
+            background: linear-gradient(90deg, #B51F2B, #C92A38) !important;
             border: none !important;
             color: white !important;
             font-weight: 800 !important;
-            font-size: 1.05rem !important;
+            font-size: 1.0rem !important;
         }
 
         [data-testid="stForm"] button[type="submit"]:hover {
-            background: linear-gradient(90deg, #155FD2, #236ED9) !important;
+            background: linear-gradient(90deg, #9E1924, #B51F2B) !important;
         }
 
         @media (max-width: 640px) {
@@ -186,7 +187,7 @@ def pagina_login():
 
             .login-brand {
                 border-radius: 16px 16px 0 0;
-                padding: 22px 18px 18px 18px;
+                padding: 20px 16px 16px 16px;
             }
 
             .login-brand-row {
@@ -194,36 +195,36 @@ def pagina_login():
             }
 
             .login-butterfly {
-                width: 66px;
-                height: 82px;
+                width: 60px;
+                height: 74px;
             }
 
             .login-title {
-                font-size: 2.15rem;
+                font-size: 1.95rem;
                 letter-spacing: -1px;
             }
 
             .login-subtitle {
-                font-size: .82rem;
-                margin-top: 8px;
+                font-size: .8rem;
+                margin-top: 6px;
             }
 
             .login-divider {
-                margin-top: 18px;
+                margin-top: 14px;
             }
 
             [data-testid="stForm"] {
                 border-radius: 0 0 16px 16px !important;
-                padding: 0 18px 22px 18px !important;
+                padding: 0 16px 18px 16px !important;
             }
 
             .login-form-title {
-                font-size: 1.55rem;
+                font-size: 1.35rem;
             }
 
             .login-form-subtitle {
-                font-size: .88rem;
-                margin-bottom: 20px;
+                font-size: .82rem;
+                margin-bottom: 16px;
             }
         }
         </style>
@@ -231,8 +232,7 @@ def pagina_login():
         unsafe_allow_html=True,
     )
 
-    # Colonna centrale: mantiene la schermata compatta su PC e piena su mobile.
-    _, login_col, _ = st.columns([1, 2.1, 1])
+    _, login_col, _ = st.columns([1, 1.6, 1])
     with login_col:
         st.markdown(
             f"""
@@ -257,7 +257,7 @@ def pagina_login():
 
         with st.form("login_form_main"):
             st.markdown(
-                '<div class="login-form-title">Accedi alla tua area di lavoro</div>'
+                '<div class="login-form-title">Accedi alla tua area</div>'
                 '<div class="login-form-subtitle">Inserisci le tue credenziali per continuare</div>',
                 unsafe_allow_html=True,
             )
@@ -622,11 +622,6 @@ def pagina_dashboard():
         mostra_dettaglio_ticket(int(selected))
         return
 
-    # --------------------------------------------------------
-    # SCHEDE TICKET
-    # --------------------------------------------------------
-    # Il pulsante PDF è volutamente subito dopo il blocco
-    # "Assegnato a", come richiesto.
     for _, row in filtrato.iterrows():
         ticket_id = int(row["id"])
 
@@ -696,8 +691,6 @@ def pagina_dashboard():
             unsafe_allow_html=True,
         )
 
-        # L'apertura del ticket è disponibile a tutti.
-        # Il download PDF resta riservato all'amministratore.
         if admin:
             col_open, col_pdf = st.columns([5.8, 1.2])
         else:
@@ -867,7 +860,6 @@ def _mostra_allegati(ticket_id):
 
 
 def _firma_da_canvas(canvas_result):
-    """Converte la firma del canvas in PNG, se presente."""
     if canvas_result is None:
         return None
 
@@ -919,7 +911,6 @@ def _mostra_cronologia_interventi(ticket_id):
 
 
 def _mostra_storico_ticket(ticket_id):
-    """Mostra lo storico audit completo del ticket."""
     eventi = db.get_audit_log(ticket_id)
 
     st.markdown("### 🧾 Storico attività ticket")
@@ -959,13 +950,9 @@ def mostra_dettaglio_ticket(ticket_id):
         st.error("Accesso non autorizzato a questo ticket.")
         return
 
-    # Carica sempre tutta la cronologia: ogni intervento è una riga distinta.
     interventi = db.get_interventi(ticket_id)
     ultimo_intervento = interventi[-1] if interventi else None
 
-    # --------------------------------------------------------
-    # INTESTAZIONE E DATI DEL TICKET
-    # --------------------------------------------------------
     st.markdown(
         """
         <style>
@@ -1052,9 +1039,6 @@ def mostra_dettaglio_ticket(ticket_id):
 
     _mostra_allegati(ticket_id)
 
-    # --------------------------------------------------------
-    # CRONOLOGIA INTERVENTI
-    # --------------------------------------------------------
     if interventi:
         st.markdown("### 🕘 Cronologia interventi")
 
@@ -1093,8 +1077,6 @@ def mostra_dettaglio_ticket(ticket_id):
                     except Exception:
                         firma_bytes = None
 
-                # Fallback sul percorso standard, utile per eventuali record
-                # precedenti in cui firma_path non era valorizzato correttamente.
                 if not firma_bytes and intervento.get("id"):
                     fallback_path = (
                         f"firme/{ticket_id}/intervento_{intervento.get('id')}/firma.png"
@@ -1117,14 +1099,8 @@ def mostra_dettaglio_ticket(ticket_id):
     else:
         st.info("Nessun intervento tecnico registrato.")
 
-    # --------------------------------------------------------
-    # STORICO COMPLETO DEL TICKET
-    # --------------------------------------------------------
     _mostra_storico_ticket(ticket_id)
 
-    # --------------------------------------------------------
-    # AMMINISTRATORE
-    # --------------------------------------------------------
     if admin:
         with st.container(border=True):
             st.markdown("### 🛠️ Gestione Amministrativa")
@@ -1169,9 +1145,6 @@ def mostra_dettaglio_ticket(ticket_id):
 
         return
 
-    # --------------------------------------------------------
-    # TECNICO — NUOVO INTERVENTO
-    # --------------------------------------------------------
     with st.container(border=True):
         st.markdown("### 🔧 Nuovo intervento tecnico")
 
@@ -1253,9 +1226,6 @@ def mostra_dettaglio_ticket(ticket_id):
                         st.error("Inserisci la firma prima di risolvere il ticket.")
                         return
 
-                # 1. Crea SEMPRE una nuova riga e recupera il suo ID.
-                # Uso parametri posizionali per mantenere compatibilita
-                # anche con la versione precedente di database.py.
                 intervento = db.salva_intervento_tecnico(
                     ticket_id,
                     username,
@@ -1272,7 +1242,6 @@ def mostra_dettaglio_ticket(ticket_id):
                     st.error("Supabase non ha restituito l'ID del nuovo intervento.")
                     return
 
-                # 2. La foto viene associata ESATTAMENTE a questa riga.
                 foto_da_salvare = foto_file or foto_camera
                 if foto_da_salvare is not None:
                     percorso_foto = db.salva_foto_intervento(
@@ -1285,7 +1254,6 @@ def mostra_dettaglio_ticket(ticket_id):
                             "L'intervento è stato salvato, ma la foto non è stata associata correttamente."
                         )
 
-                # 3. La firma viene associata ESATTAMENTE a questa riga.
                 if firma_bytes is not None:
                     percorso_firma = db.salva_firma_intervento(
                         intervento_id=intervento_id,
@@ -1296,7 +1264,6 @@ def mostra_dettaglio_ticket(ticket_id):
                     if not percorso_firma:
                         raise RuntimeError("La firma non è stata associata correttamente.")
 
-                    # Verifica immediata della firma nello Storage.
                     firma_verifica = db.scarica_firma_intervento(percorso_firma)
                     if not firma_verifica:
                         raise RuntimeError(
@@ -1320,9 +1287,7 @@ def mostra_dettaglio_ticket(ticket_id):
                 st.exception(e)
 
 
-
 def pagina_gestione_interventi():
-    """Area operativa dedicata al lavoro del tecnico."""
     admin = is_admin()
     username = st.session_state.get("username", "")
 
@@ -1335,9 +1300,6 @@ def pagina_gestione_interventi():
 
     df = pd.DataFrame(tickets)
 
-    # ========================================================
-    # DETTAGLIO TICKET
-    # ========================================================
     selected = st.session_state.get("gestione_interventi_ticket")
 
     if selected is not None:
@@ -1351,11 +1313,6 @@ def pagina_gestione_interventi():
         mostra_dettaglio_ticket(int(selected))
         return
 
-    # ========================================================
-    # AMMINISTRATORE
-    # ========================================================
-    # Per l'amministratore manteniamo la gestione generale degli
-    # interventi, mentre la nuova area operativa è dedicata al tecnico.
     if admin:
         st.title("🛠️ Gestisci gli interventi")
         st.caption(
@@ -1482,9 +1439,6 @@ def pagina_gestione_interventi():
 
         return
 
-    # ========================================================
-    # TECNICO — VERA AREA DI LAVORO
-    # ========================================================
     user_label = username.replace("_", " ").title() if username else "Tecnico"
 
     stati = (
@@ -1498,7 +1452,6 @@ def pagina_gestione_interventi():
     risolti = df[stati == "Risolto"].copy()
     chiusi = df[stati == "Chiuso"].copy()
 
-    # Priorità operative: Urgente → Alta → Media → Bassa.
     ordine_priorita = {
         "Urgente": 0,
         "Alta": 1,
@@ -1541,9 +1494,6 @@ def pagina_gestione_interventi():
     risolti = ordina_operativi(risolti)
     chiusi = ordina_operativi(chiusi)
 
-    # --------------------------------------------------------
-    # INTESTAZIONE
-    # --------------------------------------------------------
     st.markdown(
         f"""
         <div style="
@@ -1565,9 +1515,6 @@ def pagina_gestione_interventi():
         unsafe_allow_html=True,
     )
 
-    # --------------------------------------------------------
-    # RIEPILOGO OPERATIVO
-    # --------------------------------------------------------
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("🎫 Totali", len(df))
     c2.metric("🟡 Da lavorare", len(aperti))
@@ -1576,9 +1523,6 @@ def pagina_gestione_interventi():
 
     st.markdown("")
 
-    # --------------------------------------------------------
-    # FILTRI
-    # --------------------------------------------------------
     with st.container(border=True):
         st.markdown("### 🔎 Cerca nella mia area")
 
@@ -1630,9 +1574,6 @@ def pagina_gestione_interventi():
     risolti = applica_filtri(risolti)
     chiusi = applica_filtri(chiusi)
 
-    # --------------------------------------------------------
-    # CARD TICKET
-    # --------------------------------------------------------
     def mostra_card_ticket(row, tipo):
         ticket_id = int(row["id"])
         titolo = _safe(row.get("titolo")) or "Senza titolo"
@@ -1705,9 +1646,6 @@ def pagina_gestione_interventi():
 
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-    # --------------------------------------------------------
-    # SEZIONE OPERATIVA
-    # --------------------------------------------------------
     def mostra_sezione(frame, titolo, descrizione, emoji, empty_text):
         st.markdown(f"### {emoji} {titolo}")
         st.caption(descrizione)
@@ -1748,9 +1686,6 @@ def pagina_gestione_interventi():
         "Non ci sono ticket risolti in attesa di chiusura.",
     )
 
-    # --------------------------------------------------------
-    # STORICO CHIUSI
-    # --------------------------------------------------------
     st.divider()
 
     with st.expander(
@@ -1768,6 +1703,7 @@ def pagina_gestione_interventi():
             for _, row in chiusi.iterrows():
                 mostra_card_ticket(row, "chiuso")
 
+
 def pagina_statistiche():
     if not is_admin():
         st.error("Accesso non autorizzato.")
@@ -1783,15 +1719,11 @@ def pagina_statistiche():
         st.info("Non ci sono ticket disponibili per generare le statistiche.")
         return
 
-    # Normalizzazione minima dei campi utilizzati dal report.
     for col in ["stato", "priorita", "categoria", "assegnato_a"]:
         if col not in df.columns:
             df[col] = ""
         df[col] = df[col].fillna("").astype(str).str.strip()
 
-    # --------------------------------------------------------
-    # FILTRI REPORT
-    # --------------------------------------------------------
     st.markdown("### 🔎 Filtra il report")
     with st.container(border=True):
         f1, f2, f3, f4 = st.columns(4)
@@ -1844,9 +1776,6 @@ def pagina_statistiche():
 
     st.caption(f"Report filtrato: **{len(filtrato)} ticket** su {len(df)} totali.")
 
-    # --------------------------------------------------------
-    # KPI
-    # --------------------------------------------------------
     stati_filtrati = filtrato["stato"]
     total = len(filtrato)
     aperti = int((stati_filtrati == "Aperto").sum())
@@ -1863,12 +1792,6 @@ def pagina_statistiche():
 
     st.markdown("")
 
-    # --------------------------------------------------------
-    # GRAFICI PRINCIPALI
-    # --------------------------------------------------------
-    # I grafici sono realizzati con Altair in modalità NON interattiva:
-    # la rotella del mouse non effettua zoom e non modifica la scala.
-    # L'asse Y è esplicitamente quantitativo con origine a zero.
     def _grafico_barre(data, categoria, valore, ordinamento=None, altezza=280):
         chart = (
             alt.Chart(data)
@@ -1959,9 +1882,6 @@ def pagina_statistiche():
             theme=None,
         )
 
-    # --------------------------------------------------------
-    # TABELLA REPORT
-    # --------------------------------------------------------
     st.markdown("### 📋 Dettaglio ticket")
 
     report_df = filtrato.copy()
@@ -1994,9 +1914,6 @@ def pagina_statistiche():
         },
     )
 
-    # --------------------------------------------------------
-    # ESPORTAZIONE
-    # --------------------------------------------------------
     st.markdown("### 📥 Esportazione")
     excel_bytes = _excel_bytes(report_df)
     st.download_button(
@@ -2006,6 +1923,7 @@ def pagina_statistiche():
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
+
 
 def _excel_bytes(df):
     output = BytesIO()
@@ -2268,8 +2186,6 @@ def pagina_amministrazione():
                 opzioni.append(label)
                 mappa[label] = tid
 
-            # Nessun ticket viene selezionato automaticamente all'apertura
-            # o dopo l'eliminazione di un ticket.
             placeholder = "— Seleziona un ticket —"
             scelta = st.selectbox(
                 "Seleziona il ticket da eliminare",
