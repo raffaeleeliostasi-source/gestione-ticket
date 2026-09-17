@@ -297,7 +297,6 @@ def pagina_dashboard():
             "Cerca",
             placeholder="Titolo, descrizione o categoria",
             key=f"dashboard_cerca_{filter_version}",
-            label_visibility="collapsed",
         )
 
     with c2:
@@ -305,7 +304,6 @@ def pagina_dashboard():
             "Stato",
             ["Tutti"] + STATI,
             key=f"dashboard_stato_{filter_version}",
-            label_visibility="collapsed",
         )
 
     with c3:
@@ -313,7 +311,6 @@ def pagina_dashboard():
             "Priorità",
             ["Tutte"] + PRIORITA,
             key=f"dashboard_priorita_{filter_version}",
-            label_visibility="collapsed",
         )
 
     with c4:
@@ -331,8 +328,7 @@ def pagina_dashboard():
                 "Assegnato a",
                 ["Tutti"] + assegnati,
                 key=f"dashboard_assegnato_{filter_version}",
-                label_visibility="collapsed",
-            )
+                )
         else:
             assegnato = "Tutti"
 
