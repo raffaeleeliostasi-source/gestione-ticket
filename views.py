@@ -1079,18 +1079,19 @@ def pagina_dashboard():
 
                 </div>
 
-                {
-                    f'<div style="
-                        margin-top:11px;
-                        color:#94A3B8;
-                        font-size:.72rem;
-                    ">
-                        CREATO IL&nbsp;&nbsp;
-                        {_safe(data_ticket)}
-                    </div>'
-                    if data_ticket
-                    else ''
-                }
+                st.markdown(
+    f"""
+    <div style="
+        margin-top:11px;
+        color:#94A3B8;
+        font-size:.72rem;
+    ">
+        CREATO IL&nbsp;&nbsp;
+        {_safe(data_ticket) if data_ticket else ""}
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
             </div>
             """,
