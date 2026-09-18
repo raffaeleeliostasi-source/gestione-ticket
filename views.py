@@ -46,42 +46,47 @@ def pagina_login():
     st.markdown(
         """
         <style>
-        /* Sfondo e contenitore principale della pagina di accesso */
+        /* ====================================================
+           LOGIN — grafica approvata
+           ==================================================== */
         [data-testid="stAppViewContainer"] {
             background:
-                radial-gradient(circle at 82% 8%, rgba(180, 214, 255, .55) 0, rgba(180, 214, 255, 0) 34%),
-                radial-gradient(circle at 8% 92%, rgba(191, 219, 254, .60) 0, rgba(191, 219, 254, 0) 35%),
-                #F7FBFF;
+                radial-gradient(circle at 88% 10%, rgba(188, 218, 250, .55) 0, rgba(188, 218, 250, 0) 38%),
+                radial-gradient(circle at 8% 90%, rgba(205, 228, 250, .65) 0, rgba(205, 228, 250, 0) 42%),
+                #F4F9FE;
         }
 
         [data-testid="stHeader"] {
             background: transparent;
         }
 
-        .login-page {
-            position: relative;
-            max-width: 760px;
-            margin: 3.2rem auto 1.5rem auto;
+        [data-testid="stMainBlockContainer"] {
+            padding-top: 18px !important;
         }
 
+        .login-page {
+            max-width: 760px;
+            margin: 0 auto;
+        }
+
+        /* Testata superiore */
         .login-brand {
             background: rgba(255,255,255,.98);
             border-radius: 18px 18px 0 0;
-            padding: 28px 34px 24px 34px;
-            box-shadow: 0 12px 35px rgba(38, 91, 145, .10);
-            text-align: center;
+            padding: 28px 34px 20px 34px;
+            box-shadow: 0 10px 30px rgba(38, 91, 145, .08);
         }
 
         .login-brand-row {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 20px;
+            justify-content: flex-start;
+            gap: 22px;
         }
 
         .login-butterfly {
-            width: 92px;
-            height: 112px;
+            width: 70px;
+            height: 88px;
             object-fit: contain;
             mix-blend-mode: multiply;
             flex: 0 0 auto;
@@ -95,9 +100,9 @@ def pagina_login():
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
             font-size: 3.25rem;
-            line-height: .94;
+            line-height: .92;
             font-weight: 800;
-            letter-spacing: -1.5px;
+            letter-spacing: -1.6px;
             color: #173B68;
         }
 
@@ -107,54 +112,55 @@ def pagina_login():
         }
 
         .login-subtitle {
-            margin-top: 14px;
+            margin-top: 13px;
             color: #627B9D;
-            font-size: 1.05rem;
+            font-size: 1rem;
             font-weight: 500;
         }
 
         .login-divider {
             height: 2px;
             background: #D5E6FA;
-            margin-top: 26px;
+            margin-top: 24px;
             border-radius: 2px;
         }
 
-        /* La card del form completa visivamente la card superiore */
+        /* Form separato visivamente dalla testata */
         [data-testid="stForm"] {
             max-width: 760px;
-            margin: 0 auto;
+            margin: 24px auto 0 auto;
             background: rgba(255,255,255,.98);
             border: 0 !important;
             border-radius: 0 0 18px 18px !important;
-            padding: 0 34px 30px 34px !important;
-            box-shadow: 0 18px 35px rgba(38, 91, 145, .10);
+            padding: 0 28px 27px 28px !important;
+            box-shadow: 0 16px 32px rgba(38, 91, 145, .09);
         }
 
         .login-form-title {
             text-align: center;
             color: #173B68;
-            font-size: 2rem;
+            font-size: 1.95rem;
             font-weight: 800;
-            margin: 0 0 4px 0;
+            margin: 0 0 3px 0;
         }
 
         .login-form-subtitle {
             text-align: center;
             color: #6C84A5;
-            font-size: 1rem;
-            margin: 0 0 26px 0;
+            font-size: .93rem;
+            margin: 0 0 25px 0;
         }
 
         [data-testid="stForm"] label {
             color: #173B68 !important;
-            font-weight: 700 !important;
+            font-weight: 600 !important;
+            font-size: .82rem !important;
         }
 
         [data-testid="stForm"] input {
-            border: 1.5px solid #C9DCF2 !important;
-            border-radius: 10px !important;
-            min-height: 48px !important;
+            border: 1px solid #C9DCF2 !important;
+            border-radius: 9px !important;
+            min-height: 46px !important;
             background: #FFFFFF !important;
         }
 
@@ -163,25 +169,29 @@ def pagina_login():
             box-shadow: 0 0 0 2px rgba(45,115,232,.10) !important;
         }
 
+        /* Pulsante rosso come nella schermata approvata */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
-            min-height: 54px !important;
-            border-radius: 10px !important;
-            background: linear-gradient(90deg, #1769E8, #287CF2) !important;
+            width: 220px !important;
+            min-height: 46px !important;
+            border-radius: 6px !important;
+            background: linear-gradient(180deg, #B51F2B, #971520) !important;
             border: none !important;
             color: white !important;
             font-weight: 800 !important;
-            font-size: 1.05rem !important;
+            font-size: .86rem !important;
+            letter-spacing: .04em !important;
+            box-shadow: 0 7px 14px rgba(120, 25, 32, .18) !important;
         }
 
         [data-testid="stForm"] button[type="submit"]:hover {
-            background: linear-gradient(90deg, #155FD2, #236ED9) !important;
+            background: linear-gradient(180deg, #C32632, #A31622) !important;
         }
 
         @media (max-width: 640px) {
             .login-page {
-                margin: 1rem auto .75rem auto;
                 max-width: 100%;
+                margin: 0 auto;
             }
 
             .login-brand {
@@ -190,16 +200,16 @@ def pagina_login():
             }
 
             .login-brand-row {
-                gap: 12px;
+                gap: 14px;
             }
 
             .login-butterfly {
-                width: 66px;
-                height: 82px;
+                width: 58px;
+                height: 74px;
             }
 
             .login-title {
-                font-size: 2.15rem;
+                font-size: 2.35rem;
                 letter-spacing: -1px;
             }
 
@@ -213,6 +223,7 @@ def pagina_login():
             }
 
             [data-testid="stForm"] {
+                margin-top: 18px;
                 border-radius: 0 0 16px 16px !important;
                 padding: 0 18px 22px 18px !important;
             }
@@ -222,8 +233,14 @@ def pagina_login():
             }
 
             .login-form-subtitle {
-                font-size: .88rem;
+                font-size: .86rem;
                 margin-bottom: 20px;
+            }
+
+            [data-testid="stForm"] button[kind="primaryFormSubmit"],
+            [data-testid="stForm"] button[type="submit"] {
+                width: 220px !important;
+                max-width: 100% !important;
             }
         }
         </style>
@@ -272,7 +289,7 @@ def pagina_login():
                 placeholder="Inserisci la tua password",
                 key="login_password",
             )
-            submit = st.form_submit_button("🔐  Accedi", use_container_width=True, type="primary")
+            submit = st.form_submit_button("ACCEDI", use_container_width=False, type="primary")
 
         if submit:
             username = username.strip().lower()
