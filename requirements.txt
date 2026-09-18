@@ -7,3 +7,4 @@ Pillow
 streamlit-drawable-canvas
 reportlab
 requests
+streamlit-cookies-controller==0.0.4
