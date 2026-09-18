@@ -13,8 +13,10 @@ import auth
 import database as db
 import pdf_generator
 
+
 STATI = ["Aperto", "In Lavorazione", "Risolto", "Chiuso"]
 PRIORITA = ["Bassa", "Media", "Alta", "Urgente"]
+
 COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
 
 
@@ -23,6 +25,13 @@ COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
 # ============================================================
 
 def get_cookie_controller():
+    if "cookie_controller" not in st.session_state:
+        st.session_state["cookie_controller"] = EncryptedCookieManager(
+            prefix="gestione-ticket/",
+            password=st.secrets["COOKIES_PASSWORD"],
+        )
+
+    return st.session_state["cookie_controller"]
     """
     Restituisce il gestore dei cookie cifrati.
 
@@ -41,16 +50,16 @@ def get_cookie_controller():
 def ripristina_login_persistente():
     """
     Ripristina automaticamente la sessione tramite il cookie
-    creato quando l'utente seleziona 'Ricordami'.
+    creato con la funzione 'Ricordami'.
     """
+
     if st.session_state.get("logged_in"):
         return True
 
     try:
         cookies = get_cookie_controller()
 
-        # Il componente deve essere pronto prima di poter leggere
-        # il cookie dal browser.
+        # Il componente deve prima essere pronto
         if not cookies.ready():
             st.stop()
 
@@ -59,23 +68,30 @@ def ripristina_login_persistente():
         if not token:
             return False
 
+        # Verifica il token presente nel database
         utente = db.verifica_login_token(token)
 
-        # Token non valido, scaduto o revocato.
         if not utente:
             try:
                 del cookies[COOKIE_LOGIN_TOKEN]
                 cookies.save()
             except Exception:
                 pass
+
             return False
 
-        username = str(utente.get("username") or "").strip()
-        ruolo = str(utente.get("ruolo") or "").strip()
+        username = str(
+            utente.get("username") or ""
+        ).strip()
+
+        ruolo = str(
+            utente.get("ruolo") or ""
+        ).strip()
 
         if not username:
             return False
 
+        # Ripristina la sessione Streamlit
         st.session_state.logged_in = True
         st.session_state.username = username
         st.session_state.ruolo = ruolo
