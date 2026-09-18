@@ -13,9 +13,173 @@ import auth
 import database as db
 import pdf_generator
 
-STATI = ["Aperto", "In Lavorazione", "Risolto", "Chiuso"]
-PRIORITA = ["Bassa", "Media", "Alta", "Urgente"]
+
+STATI = [
+    "Aperto",
+    "In Lavorazione",
+    "Risolto",
+    "Chiuso",
+]
+
+PRIORITA = [
+    "Bassa",
+    "Media",
+    "Alta",
+    "Urgente",
+]
+
 COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
+
+
+# ============================================================
+# COOKIE CONTROLLER
+# ============================================================
+
+def get_cookie_controller():
+    """
+    Restituisce il controller dei cookie associato
+    alla sessione Streamlit corrente.
+    """
+
+    if "cookie_controller" not in st.session_state:
+
+        st.session_state["cookie_controller"] = CookieController(
+            key="gestione_ticket_cookies"
+        )
+
+    return st.session_state["cookie_controller"]
+
+
+# ============================================================
+# RIPRISTINO LOGIN PERSISTENTE
+# ============================================================
+
+def ripristina_login_persistente():
+    """
+    Ripristina automaticamente la sessione tramite
+    il cookie generato dalla funzione 'Ricordami'.
+
+    Il primo caricamento viene utilizzato per inizializzare
+    correttamente il componente dei cookie. Al rerun successivo
+    il cookie viene letto e verificato tramite Supabase.
+    """
+
+    if st.session_state.get("logged_in"):
+        return True
+
+    try:
+
+        cookies = get_cookie_controller()
+
+        # ----------------------------------------------------
+        # Primo passaggio:
+        # lasciamo inizializzare il componente dei cookie.
+        # ----------------------------------------------------
+
+        if not st.session_state.get(
+            "_cookie_controller_ready",
+            False,
+        ):
+
+            st.session_state[
+                "_cookie_controller_ready"
+            ] = True
+
+            st.rerun()
+
+        # ----------------------------------------------------
+        # Lettura token persistente
+        # ----------------------------------------------------
+
+        token = cookies.get(
+            COOKIE_LOGIN_TOKEN
+        )
+
+        if not token:
+            return False
+
+        # ----------------------------------------------------
+        # Verifica token su Supabase
+        # ----------------------------------------------------
+
+        utente = db.verifica_login_token(token)
+
+        if not utente:
+
+            try:
+                cookies.remove(
+                    COOKIE_LOGIN_TOKEN
+                )
+            except Exception:
+                pass
+
+            return False
+
+        # ----------------------------------------------------
+        # Ripristino sessione Streamlit
+        # ----------------------------------------------------
+
+        username = str(
+            utente.get("username") or ""
+        ).strip()
+
+        ruolo = str(
+            utente.get("ruolo") or ""
+        ).strip()
+
+        if not username:
+            return False
+
+        st.session_state.logged_in = True
+        st.session_state.username = username
+        st.session_state.ruolo = ruolo
+
+        st.session_state[
+            "remembered_username"
+        ] = username
+
+        return True
+
+    except Exception:
+        return False
+
+
+# ============================================================
+# AUTORIZZAZIONI
+# ============================================================
+
+def is_admin():
+    return str(
+        st.session_state.get(
+            "ruolo",
+            "",
+        )
+    ).strip().lower() in {
+        "amministratore",
+        "admin",
+    }
+
+
+# ============================================================
+# UTILITY
+# ============================================================
+
+def _safe(value):
+    return "" if value is None else str(value)
+
+
+def _reset_dashboard_filters():
+    st.session_state[
+        "dashboard_filter_version"
+    ] = (
+        int(
+            st.session_state.get(
+                "dashboard_filter_version",
+                0,
+            )
+        )
+        + 1
+    )
 
 
 def get_cookie_controller():
