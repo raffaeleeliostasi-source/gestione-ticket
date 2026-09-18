@@ -4,10 +4,13 @@ import secrets
 import streamlit as st
 
 PBKDF2_ITERATIONS = 200_000
+PASSWORD_MAX_LENGTH = 256
 PASSWORD_MIN_LENGTH = 8
 
 
 def hash_password(password: str) -> str:
+    if not isinstance(password, str) or len(password) > PASSWORD_MAX_LENGTH:
+        raise ValueError("Password non valida.")
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac(
         "sha256",
@@ -19,6 +22,8 @@ def hash_password(password: str) -> str:
 
 
 def verifica_password(password: str, stored_password: str) -> bool:
+    if not isinstance(password, str) or len(password) > PASSWORD_MAX_LENGTH:
+        return False
     if not stored_password:
         return False
 
@@ -42,6 +47,10 @@ def verifica_password(password: str, stored_password: str) -> bool:
 
 
 def password_valida(password: str) -> tuple[bool, str]:
+    if not isinstance(password, str):
+        return False, "La password non è valida."
+    if len(password) > PASSWORD_MAX_LENGTH:
+        return False, "La password è troppo lunga."
     if len(password) < PASSWORD_MIN_LENGTH:
         return False, "La password deve contenere almeno 8 caratteri."
     if not any(c.isupper() for c in password):
