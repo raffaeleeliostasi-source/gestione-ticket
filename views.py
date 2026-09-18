@@ -71,9 +71,9 @@ def pagina_login():
 
         /* Testata superiore */
         .login-brand {
-            background: rgba(255,255,255,.98);
+            background: #FFFFFF;
             border-radius: 18px 18px 0 0;
-            padding: 28px 34px 20px 34px;
+            padding: 30px 34px 8px 34px;
             box-shadow: 0 10px 30px rgba(38, 91, 145, .08);
         }
 
@@ -81,12 +81,12 @@ def pagina_login():
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 22px;
+            gap: 16px;
         }
 
         .login-butterfly {
-            width: 70px;
-            height: 88px;
+            width: 62px;
+            height: 78px;
             object-fit: contain;
             mix-blend-mode: multiply;
             flex: 0 0 auto;
@@ -99,10 +99,10 @@ def pagina_login():
         .login-title {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 2.925rem;
+            font-size: 2.55rem;
             line-height: .92;
             font-weight: 800;
-            letter-spacing: -1.6px;
+            letter-spacing: -1.4px;
             color: #173B68;
         }
 
@@ -112,34 +112,31 @@ def pagina_login():
         }
 
         .login-subtitle {
-            margin-top: 13px;
+            margin-top: 9px;
             color: #627B9D;
             font-size: 1rem;
             font-weight: 500;
         }
 
         .login-divider {
-            height: 2px;
-            background: #D5E6FA;
-            margin-top: 24px;
-            border-radius: 2px;
+            display: none;
         }
 
         /* Form separato visivamente dalla testata */
         [data-testid="stForm"] {
             max-width: 760px;
-            margin: 24px auto 0 auto;
-            background: rgba(255,255,255,.98);
+            margin: 0 auto !important;
+            background: #FFFFFF;
             border: 0 !important;
             border-radius: 0 0 18px 18px !important;
-            padding: 0 28px 27px 28px !important;
+            padding: 0 28px 30px 28px !important;
             box-shadow: 0 16px 32px rgba(38, 91, 145, .09);
         }
 
         .login-form-title {
             text-align: center;
             color: #173B68;
-            font-size: 1.95rem;
+            font-size: 1.72rem;
             font-weight: 800;
             margin: 0 0 3px 0;
         }
@@ -147,8 +144,20 @@ def pagina_login():
         .login-form-subtitle {
             text-align: center;
             color: #6C84A5;
-            font-size: .93rem;
-            margin: 0 0 25px 0;
+            font-size: .91rem;
+            margin: 0 0 24px 0;
+        }
+
+        [data-testid="stForm"] [data-testid="stTextInput"] {
+            max-width: 530px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        [data-testid="stForm"] [data-testid="stFormSubmitButton"] {
+            max-width: 530px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         [data-testid="stForm"] label {
@@ -202,7 +211,7 @@ def pagina_login():
 
             .login-brand {
                 border-radius: 16px 16px 0 0;
-                padding: 22px 18px 18px 18px;
+                padding: 22px 18px 8px 18px;
             }
 
             .login-brand-row {
@@ -210,12 +219,12 @@ def pagina_login():
             }
 
             .login-butterfly {
-                width: 58px;
-                height: 74px;
+                width: 52px;
+                height: 66px;
             }
 
             .login-title {
-                font-size: 2.12rem;
+                font-size: 1.95rem;
                 letter-spacing: -1px;
             }
 
@@ -235,12 +244,16 @@ def pagina_login():
             }
 
             .login-form-title {
-                font-size: 1.55rem;
+                font-size: 1.42rem;
             }
 
             .login-form-subtitle {
                 font-size: .86rem;
                 margin-bottom: 20px;
+            }
+
+            [data-testid="stForm"] [data-testid="stTextInput"] {
+                max-width: 100%;
             }
 
             [data-testid="stForm"] button[kind="primaryFormSubmit"],
