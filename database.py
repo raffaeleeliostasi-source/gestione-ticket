@@ -58,8 +58,13 @@ def _require_technician_on_ticket(ticket_id):
     return utente,ticket
 
 def _ticket_id_da_path(path):
-    m=re.match(r"^ticket_(\d+)(?:/|$)",str(path or ""))
-    return int(m.group(1)) if m else None
+    # I percorsi degli allegati/foto iniziano con ticket_<id>,
+    # mentre le firme tecniche sono salvate come firme/<id>/... .
+    valore = str(path or "").strip()
+    m = re.match(r"^(?:ticket_(\d+)|firme/(\d+))(?:/|$)", valore)
+    if not m:
+        return None
+    return int(m.group(1) or m.group(2))
 
 
 
