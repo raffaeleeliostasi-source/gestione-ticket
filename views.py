@@ -1,4 +1,5 @@
 import base64
+import time
 from io import BytesIO
 from datetime import date
 
@@ -36,19 +37,12 @@ COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
 # ============================================================
 
 def get_cookie_controller():
-    """
-    Restituisce il controller dei cookie associato
-    alla sessione Streamlit corrente.
-    """
-
     if "cookie_controller" not in st.session_state:
-
         st.session_state["cookie_controller"] = CookieController(
             key="gestione_ticket_cookies"
         )
 
     return st.session_state["cookie_controller"]
-
 
 # ============================================================
 # RIPRISTINO LOGIN PERSISTENTE
@@ -56,20 +50,67 @@ def get_cookie_controller():
 
 def ripristina_login_persistente():
     """
-    Ripristina automaticamente la sessione tramite
-    il cookie generato dalla funzione 'Ricordami'.
-
-    Il primo caricamento viene utilizzato per inizializzare
-    correttamente il componente dei cookie. Al rerun successivo
-    il cookie viene letto e verificato tramite Supabase.
+    Controlla se nel browser è presente il token di login persistente
+    e, se valido, ripristina automaticamente la sessione.
     """
 
     if st.session_state.get("logged_in"):
         return True
 
     try:
-
         cookies = get_cookie_controller()
+
+        # Il componente CookieController necessita di un primo
+        # passaggio per inizializzarsi nel browser.
+        if not st.session_state.get("_cookie_controller_ready"):
+            st.session_state["_cookie_controller_ready"] = True
+            time.sleep(0.5)
+            st.rerun()
+
+        # Recuperiamo tutti i cookie presenti nel browser.
+        tutti_cookie = cookies.getAll()
+
+        if not tutti_cookie:
+            return False
+
+        token = tutti_cookie.get(COOKIE_LOGIN_TOKEN)
+
+        if not token:
+            return False
+
+        # Verifica del token nel database Supabase.
+        utente = db.verifica_login_token(token)
+
+        if not utente:
+            try:
+                cookies.remove(COOKIE_LOGIN_TOKEN)
+                time.sleep(0.5)
+            except Exception:
+                pass
+
+            return False
+
+        username = str(
+            utente.get("username") or ""
+        ).strip()
+
+        ruolo = str(
+            utente.get("ruolo") or ""
+        ).strip()
+
+        if not username:
+            return False
+
+        # Ripristino della sessione.
+        st.session_state.logged_in = True
+        st.session_state.username = username
+        st.session_state.ruolo = ruolo
+        st.session_state["remembered_username"] = username
+
+        return True
+
+    except Exception:
+        return False
 
         # ----------------------------------------------------
         # Primo passaggio:
@@ -91,12 +132,16 @@ def ripristina_login_persistente():
         # Lettura token persistente
         # ----------------------------------------------------
 
-        token = cookies.get(
-            COOKIE_LOGIN_TOKEN
+        cookies.set(
+            COOKIE_LOGIN_TOKEN,
+            token,
+            max_age=db.LOGIN_TOKEN_DAYS * 24 * 60 * 60,
         )
+        
+        # Diamo al componente browser il tempo di completare
+        # la scrittura del cookie prima del rerun.
+        time.sleep(0.8)
 
-        if not token:
-            return False
 
         # ----------------------------------------------------
         # Verifica token su Supabase
