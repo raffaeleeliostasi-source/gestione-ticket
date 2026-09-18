@@ -7,6 +7,7 @@ import altair as alt
 import streamlit as st
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
+from streamlit_cookies_controller import CookieController
 
 import auth
 import database as db
@@ -14,6 +15,39 @@ import pdf_generator
 
 STATI = ["Aperto", "In Lavorazione", "Risolto", "Chiuso"]
 PRIORITA = ["Bassa", "Media", "Alta", "Urgente"]
+COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
+
+
+def get_cookie_controller():
+    if "cookie_controller" not in st.session_state:
+        st.session_state["cookie_controller"] = CookieController()
+    return st.session_state["cookie_controller"]
+
+
+def ripristina_login_persistente():
+    """Ripristina automaticamente una sessione tramite il cookie Ricordami."""
+    if st.session_state.get("logged_in"):
+        return True
+    try:
+        cookies = get_cookie_controller()
+        token = cookies.get(COOKIE_LOGIN_TOKEN)
+        if not token:
+            return False
+        utente = db.verifica_login_token(token)
+        if not utente:
+            try:
+                cookies.remove(COOKIE_LOGIN_TOKEN)
+            except Exception:
+                pass
+            return False
+        st.session_state.logged_in = True
+        st.session_state.username = str(utente.get("username") or "").strip()
+        st.session_state.ruolo = str(utente.get("ruolo") or "").strip()
+        st.session_state["remembered_username"] = st.session_state.username
+        return True
+    except Exception:
+        return False
+
 
 
 def is_admin():
@@ -335,14 +369,30 @@ def pagina_login():
             st.session_state.username = username
             st.session_state.ruolo = user.get("ruolo", "")
 
-            # "Ricordami" mantiene l'username nella sessione Streamlit
-            # per i successivi rerun della stessa sessione. Non memorizziamo
-            # mai la password. Un vero login persistente oltre la chiusura
-            # del browser richiederebbe un sistema di token/cookie dedicato.
+            # "Ricordami": crea un token persistente sicuro.
+            # La password non viene mai salvata nel browser.
             if ricordami:
-                st.session_state["remembered_username"] = username
+                try:
+                    db.revoca_token_utente(username)
+                    token = db.crea_login_token(username)
+                    cookies = get_cookie_controller()
+                    cookies.set(
+                        COOKIE_LOGIN_TOKEN,
+                        token,
+                        max_age=db.LOGIN_TOKEN_DAYS * 24 * 60 * 60,
+                    )
+                    st.session_state["remembered_username"] = username
+                except Exception:
+                    st.warning(
+                        "Accesso effettuato, ma non è stato possibile attivare il login automatico."
+                    )
+                    st.session_state["remembered_username"] = username
             else:
                 st.session_state.pop("remembered_username", None)
+                try:
+                    get_cookie_controller().remove(COOKIE_LOGIN_TOKEN)
+                except Exception:
+                    pass
 
             st.rerun()
 
