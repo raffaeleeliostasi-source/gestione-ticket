@@ -13,12 +13,10 @@ import auth
 import database as db
 import pdf_generator
 
-
 STATI = ["Aperto", "In Lavorazione", "Risolto", "Chiuso"]
 PRIORITA = ["Bassa", "Media", "Alta", "Urgente"]
 
 COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
-
 
 # ============================================================
 # COOKIE — LOGIN PERSISTENTE
@@ -32,6 +30,7 @@ def get_cookie_controller():
         )
 
     return st.session_state["cookie_controller"]
+    
     """
     Restituisce il gestore dei cookie cifrati.
 
