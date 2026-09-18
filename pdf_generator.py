@@ -735,18 +735,29 @@ def genera_pdf(ticket):
     # La firma del tecnico viene mostrata una sola volta e proviene
     # dall'intervento finale che ha portato il ticket a RISOLTO.
     technician_signature = None
+    firma_path = None
+    raw_signature = None
+    tecnico_firma_debug = "INTERVENTO: NO"
     if intervento:
+        tecnico_firma_debug = "INTERVENTO: SI"
         firma_path = _first(intervento, "firma_path", "signature_path")
         if firma_path:
+            tecnico_firma_debug += " | FIRMA_PATH: PRESENTE"
             try:
                 raw_signature = db.scarica_firma_intervento(firma_path)
             except Exception:
                 raw_signature = None
+            if raw_signature:
+                tecnico_firma_debug += " | DOWNLOAD: OK"
+            else:
+                tecnico_firma_debug += " | DOWNLOAD: FALLITO"
             technician_signature = _image_from_bytes(
                 raw_signature,
                 max_width=65 * mm,
                 max_height=28 * mm,
             )
+        else:
+            tecnico_firma_debug += " | FIRMA_PATH: ASSENTE"
 
     # La firma dell'amministratore viene recuperata dall'account che
     # ha effettivamente chiuso il ticket.
@@ -771,6 +782,9 @@ def genera_pdf(ticket):
         technician_signature_content.append([Spacer(1, 18 * mm)])
     technician_signature_content.append(
         [Paragraph("________________________________", STYLES["small"])]
+    )
+    technician_signature_content.append(
+        [Paragraph(_txt(tecnico_firma_debug), STYLES["small"])]
     )
 
     responsible_signature_content = [
