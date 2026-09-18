@@ -1,131 +1,13 @@
-from pathlib import Path
 import streamlit as st
 import views
+import database as db
 
 
 st.set_page_config(
     page_title="Gestione Ticket",
     page_icon="🎫",
     layout="wide",
-    initial_sidebar_state="auto",
-)
-
-# Adattamento globale per smartphone e tablet.
-st.markdown(
-    """
-    <style>
-    /* Evita scroll orizzontale accidentale sui display stretti. */
-    [data-testid="stAppViewContainer"] {
-        overflow-x: hidden;
-    }
-
-    /* Stile personalizzato per il logo e la testata nella sidebar allineati a sinistra */
-    .sidebar-brand-container {
-        display: flex;
-        flex-direction: row;
-        align-items: flex-end;
-        justify-content: flex-start;
-        gap: 12px;
-        margin-bottom: 1.2rem;
-    }
-
-    .sidebar-logo {
-        width: 48px;
-        height: 60px;
-        object-fit: contain;
-        mix-blend-mode: multiply;
-        flex: 0 0 auto;
-    }
-
-    .sidebar-title {
-        font-size: 1.25rem !important;
-        font-weight: 800 !important;
-        color: #17365D !important;
-        white-space: nowrap !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1.1 !important;
-    }
-
-    /* Spazio extra per staccare i dati dell'utente verso il basso */
-    .sidebar-user-info {
-        margin-top: 1.4rem;
-    }
-
-    @media (max-width: 640px) {
-        .block-container {
-            padding-left: 0.75rem;
-            padding-right: 0.75rem;
-            padding-top: 1rem;
-        }
-
-        [data-testid="stHorizontalBlock"] {
-            gap: 0.6rem;
-        }
-
-        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-            min-width: 100% !important;
-            width: 100% !important;
-            flex: 1 1 100% !important;
-        }
-
-        [data-testid="stTabs"] [role="tablist"] {
-            overflow-x: auto;
-            flex-wrap: nowrap;
-            scrollbar-width: thin;
-        }
-
-        [data-testid="stDataFrame"] {
-            max-width: 100%;
-            overflow-x: auto;
-        }
-
-        img {
-            max-width: 100% !important;
-            height: auto !important;
-        }
-
-        h1 {
-            font-size: 1.7rem !important;
-        }
-
-        h2 {
-            font-size: 1.4rem !important;
-        }
-
-        h3 {
-            font-size: 1.2rem !important;
-        }
-
-        button, [role="button"] {
-            min-height: 42px;
-        }
-    }
-
-    @media (min-width: 641px) and (max-width: 900px) {
-        .block-container {
-            padding-left: 1rem;
-            padding-right: 1rem;
-        }
-
-        [data-testid="stHorizontalBlock"] {
-            gap: 0.75rem;
-        }
-
-        [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-            min-width: calc(50% - 0.4rem) !important;
-            width: calc(50% - 0.4rem) !important;
-            flex: 1 1 calc(50% - 0.4rem) !important;
-        }
-
-        img {
-            max-width: 100% !important;
-            height: auto !important;
-        }
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
+    initial_sidebar_state="expanded",
 )
 
 
@@ -146,10 +28,23 @@ def is_admin():
 
 
 def logout():
+    try:
+        cookies = views.get_cookie_controller()
+        token = cookies.get(views.COOKIE_LOGIN_TOKEN)
+        if token:
+            db.revoca_login_token(token)
+        cookies.remove(views.COOKIE_LOGIN_TOKEN)
+    except Exception:
+        pass
+
     for key in ("logged_in", "username", "ruolo"):
         st.session_state[key] = "" if key != "logged_in" else False
+    st.session_state.pop("remembered_username", None)
     st.rerun()
 
+
+if not st.session_state.logged_in:
+    views.ripristina_login_persistente()
 
 if not st.session_state.logged_in:
     views.pagina_login()
@@ -157,32 +52,9 @@ if not st.session_state.logged_in:
 
 
 with st.sidebar:
-    logo_path = Path(__file__).resolve().parent / "assets" / "farfalla.jpg"
-    logo_sidebar_html = ""
-    if logo_path.exists():
-        import base64
-        logo_b64 = base64.b64encode(logo_path.read_bytes()).decode("utf-8")
-        logo_sidebar_html = f'<img class="sidebar-logo" src="data:image/jpeg;base64,{logo_b64}" alt="Logo" />'
-
-    st.markdown(
-        f"""
-        <div class="sidebar-brand-container">
-            {logo_sidebar_html}
-            <div class="sidebar-title">Gestione Ticket</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"""
-        <div class="sidebar-user-info">
-            <b>Utente:</b> {st.session_state.username}<br>
-            <b>Ruolo:</b> {st.session_state.ruolo}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.title("🎫 Gestione Ticket")
+    st.write(f"**Utente:** {st.session_state.username}")
+    st.write(f"**Ruolo:** {st.session_state.ruolo}")
     st.divider()
 
     if is_admin():
