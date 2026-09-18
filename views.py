@@ -99,7 +99,7 @@ def pagina_login():
         .login-title {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 3.25rem;
+            font-size: 2.85rem;
             line-height: .92;
             font-weight: 800;
             letter-spacing: -1.6px;
@@ -119,16 +119,13 @@ def pagina_login():
         }
 
         .login-divider {
-            height: 2px;
-            background: #D5E6FA;
-            margin-top: 24px;
-            border-radius: 2px;
+            display: none;
         }
 
         /* Form separato visivamente dalla testata */
         [data-testid="stForm"] {
             max-width: 760px;
-            margin: 24px auto 0 auto;
+            margin: 0 auto;
             background: rgba(255,255,255,.98);
             border: 0 !important;
             border-radius: 0 0 18px 18px !important;
