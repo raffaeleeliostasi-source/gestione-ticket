@@ -136,7 +136,7 @@ def pagina_login():
         .login-form-title {
             text-align: center;
             color: #173B68;
-            font-size: 1.95rem;
+            font-size: 1.65rem;
             font-weight: 800;
             margin: 0 0 3px 0;
         }
@@ -226,7 +226,7 @@ def pagina_login():
             }
 
             .login-form-title {
-                font-size: 1.55rem;
+                font-size: 1.40rem;
             }
 
             .login-form-subtitle {
