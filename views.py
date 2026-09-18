@@ -1009,9 +1009,10 @@ def pagina_dashboard():
             "s-chiuso"
         )
 
-        st.markdown(
+               st.markdown(
             f"""
             <div class="ticket-card">
+
                 <div class="ticket-id">
                     TICKET #{ticket_id}
                 </div>
@@ -1079,24 +1080,83 @@ def pagina_dashboard():
 
                 </div>
 
-                st.markdown(
-    f"""
-    <div style="
-        margin-top:11px;
-        color:#94A3B8;
-        font-size:.72rem;
-    ">
-        CREATO IL&nbsp;&nbsp;
-        {_safe(data_ticket) if data_ticket else ""}
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+                <div style="
+                    margin-top:11px;
+                    color:#94A3B8;
+                    font-size:.72rem;
+                ">
+                    CREATO IL&nbsp;&nbsp;
+                    {_safe(data_ticket) if data_ticket else ""}
+                </div>
 
             </div>
             """,
             unsafe_allow_html=True,
         )
+
+        if admin:
+            col_open, col_pdf = st.columns(
+                [5.8, 1.2]
+            )
+        else:
+            col_open = st.container()
+            col_pdf = None
+
+        with col_open:
+            if st.button(
+                "Apri ticket  ›",
+                key=f"dashboard_open_{ticket_id}",
+                use_container_width=True,
+            ):
+                st.session_state[
+                    "dashboard_ticket_aperto"
+                ] = ticket_id
+
+                st.rerun()
+
+        if admin and col_pdf is not None:
+            with col_pdf:
+                try:
+                    ticket_completo = db.get_ticket(
+                        ticket_id
+                    )
+
+                    if not ticket_completo:
+                        st.button(
+                            "📄",
+                            key=(
+                                f"dashboard_pdf_disabled_"
+                                f"{ticket_id}"
+                            ),
+                            help="Ticket non disponibile",
+                            disabled=True,
+                            use_container_width=True,
+                        )
+                    else:
+                        pdf_bytes = (
+                            pdf_generator.genera_pdf(
+                                ticket_completo
+                            )
+                        )
+
+                        st.download_button(
+                            "📄",
+                            data=pdf_bytes,
+                            file_name=(
+                                f"ticket_{ticket_id}.pdf"
+                            ),
+                            mime="application/pdf",
+                            key=(
+                                f"dashboard_pdf_"
+                                f"{ticket_id}"
+                            ),
+                            use_container_width=True,
+                        )
+
+                except Exception as e:
+                    st.error(
+                        f"Errore nella generazione del PDF: {e}"
+                    )
 
         if admin:
             col_open, col_pdf = st.columns(
