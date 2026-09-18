@@ -310,7 +310,9 @@ def pagina_login():
                 max_chars=30,
                 key="login_password",
             )
-            submit = st.form_submit_button("ACCEDI", use_container_width=False, type="primary")
+            _, login_button_col, _ = st.columns([1, 1, 1])
+            with login_button_col:
+                submit = st.form_submit_button("ACCEDI", use_container_width=True, type="primary")
 
         if submit:
             username = username.strip().lower()
