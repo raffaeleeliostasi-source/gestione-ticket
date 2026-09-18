@@ -71,16 +71,16 @@ def pagina_login():
 
         /* Testata superiore */
         .login-brand {
-            background: #FFFFFF;
+            background: rgba(255,255,255,.98);
             border-radius: 18px 18px 0 0;
-            padding: 24px 34px 18px 34px;
-            box-shadow: none;
+            padding: 28px 34px 20px 34px;
+            box-shadow: 0 10px 30px rgba(38, 91, 145, .08);
         }
 
         .login-brand-row {
             display: flex;
             align-items: center;
-            justify-content: flex-start;
+            justify-content: center;
             gap: 22px;
         }
 
@@ -99,7 +99,7 @@ def pagina_login():
         .login-title {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 2.85rem;
+            font-size: 2.925rem;
             line-height: .92;
             font-weight: 800;
             letter-spacing: -1.6px;
@@ -119,13 +119,16 @@ def pagina_login():
         }
 
         .login-divider {
-            display: none;
+            height: 2px;
+            background: #D5E6FA;
+            margin-top: 24px;
+            border-radius: 2px;
         }
 
         /* Form separato visivamente dalla testata */
         [data-testid="stForm"] {
             max-width: 760px;
-            margin: 0 auto;
+            margin: 24px auto 0 auto;
             background: rgba(255,255,255,.98);
             border: 0 !important;
             border-radius: 0 0 18px 18px !important;
@@ -136,7 +139,7 @@ def pagina_login():
         .login-form-title {
             text-align: center;
             color: #173B68;
-            font-size: 1.65rem;
+            font-size: 1.95rem;
             font-weight: 800;
             margin: 0 0 3px 0;
         }
@@ -167,6 +170,12 @@ def pagina_login():
         }
 
         /* Pulsante rosso come nella schermata approvata */
+        [data-testid="stFormSubmitButton"] {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+        }
+
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
             width: 220px !important;
@@ -206,7 +215,7 @@ def pagina_login():
             }
 
             .login-title {
-                font-size: 2.35rem;
+                font-size: 2.12rem;
                 letter-spacing: -1px;
             }
 
@@ -220,13 +229,13 @@ def pagina_login():
             }
 
             [data-testid="stForm"] {
-                margin-top: 0 !important;
+                margin-top: 18px;
                 border-radius: 0 0 16px 16px !important;
                 padding: 0 18px 22px 18px !important;
             }
 
             .login-form-title {
-                font-size: 1.40rem;
+                font-size: 1.55rem;
             }
 
             .login-form-subtitle {
@@ -275,31 +284,20 @@ def pagina_login():
                 '<div class="login-form-subtitle">Inserisci le tue credenziali per continuare</div>',
                 unsafe_allow_html=True,
             )
-            # Campi centrati e limitati a 30 caratteri.
-            _, login_fields, _ = st.columns([1, 2.2, 1])
-            with login_fields:
-                username = st.text_input(
-                    "Utente",
-                    placeholder="Inserisci il tuo utente",
-                    max_chars=30,
-                    key="login_username",
-                )
-                password = st.text_input(
-                    "Password",
-                    type="password",
-                    placeholder="Inserisci la tua password",
-                    max_chars=30,
-                    key="login_password",
-                )
-
-            # Pulsante centrato nella pagina.
-            _, login_button, _ = st.columns([1, 1, 1])
-            with login_button:
-                submit = st.form_submit_button(
-                    "ACCEDI",
-                    use_container_width=True,
-                    type="primary",
-                )
+            username = st.text_input(
+                "Utente",
+                placeholder="Inserisci il tuo utente",
+                max_chars=30,
+                key="login_username",
+            )
+            password = st.text_input(
+                "Password",
+                type="password",
+                placeholder="Inserisci la tua password",
+                max_chars=30,
+                key="login_password",
+            )
+            submit = st.form_submit_button("ACCEDI", use_container_width=False, type="primary")
 
         if submit:
             username = username.strip().lower()
