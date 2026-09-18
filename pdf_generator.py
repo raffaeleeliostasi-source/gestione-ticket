@@ -272,43 +272,31 @@ def _get_attachments(ticket_id):
         return []
 
 
-def _get_intervention(ticket_id):
-    """Restituisce l'intervento finale utile alla chiusura.
-
-    Per la firma tecnica non basta prendere genericamente il primo/ultimo
-    record: il PDF deve usare l'intervento che porta il ticket a RISOLTO
-    e che contiene la firma.
-    """
+def _get_interventions(ticket_id):
+    """Restituisce tutti gli interventi, dal più vecchio al più recente."""
     try:
         interventi = db.get_interventi(ticket_id)
+        return interventi or []
     except Exception:
-        interventi = []
+        return []
 
-    if interventi:
-        # Prima scelta: ultimo intervento RISOLTO con firma.
-        firmati_risolti = [
-            i for i in interventi
-            if str(i.get("stato", "")).strip().lower() == "risolto"
-            and i.get("firma_path")
-        ]
-        if firmati_risolti:
-            return firmati_risolti[-1]
 
-        # Seconda scelta: ultimo RISOLTO.
-        risolti = [
-            i for i in interventi
-            if str(i.get("stato", "")).strip().lower() == "risolto"
-        ]
-        if risolti:
-            return risolti[-1]
+def _get_final_resolved_intervention(ticket_id):
+    """Individua l'intervento finale Risolto con firma tecnica."""
+    interventi = _get_interventions(ticket_id)
+    candidati = [
+        i for i in interventi
+        if isinstance(i, dict)
+        and str(i.get("stato") or "").strip().lower() == "risolto"
+        and i.get("firma_path")
+    ]
+    if candidati:
+        return candidati[-1]
 
-        return interventi[-1]
-
-    # Compatibilità con versioni precedenti di database.py.
-    try:
-        return db.get_intervento(ticket_id)
-    except Exception:
-        return None
+    # Fallback: ultimo intervento con firma, se il valore dello stato
+    # non è presente/normalizzato come previsto.
+    firmati = [i for i in interventi if isinstance(i, dict) and i.get("firma_path")]
+    return firmati[-1] if firmati else (interventi[-1] if interventi else None)
 
 
 # ------------------------------------------------------------
@@ -682,7 +670,8 @@ def genera_pdf(ticket):
     # INTERVENTO TECNICO
     # --------------------------------------------------------
 
-    intervento = _get_intervention(ticket_id)
+    interventi = _get_interventions(ticket_id)
+    intervento = _get_final_resolved_intervention(ticket_id)
 
     if intervento:
         tecnico = _first(intervento, "tecnico", "technician")
@@ -740,8 +729,11 @@ def genera_pdf(ticket):
     story.append(_info_table(closure_rows))
     story.append(Spacer(1, 4 * mm))
 
-    # La firma del tecnico viene mostrata una sola volta, alla chiusura,
-    # utilizzando la firma salvata nell'intervento che ha portato il ticket a Risolto.
+    # --------------------------------------------------------
+    # FIRME DI CHIUSURA
+    # --------------------------------------------------------
+    # La firma del tecnico viene mostrata una sola volta e proviene
+    # dall'intervento finale che ha portato il ticket a RISOLTO.
     technician_signature = None
     if intervento:
         firma_path = _first(intervento, "firma_path", "signature_path")
@@ -750,12 +742,25 @@ def genera_pdf(ticket):
                 raw_signature = db.scarica_firma_intervento(firma_path)
             except Exception:
                 raw_signature = None
-
             technician_signature = _image_from_bytes(
                 raw_signature,
                 max_width=65 * mm,
                 max_height=28 * mm,
             )
+
+    # La firma dell'amministratore viene recuperata dall'account che
+    # ha effettivamente chiuso il ticket.
+    administrator_signature = None
+    if chiuso_da:
+        try:
+            raw_admin_signature = db.scarica_firma_amministratore(chiuso_da)
+        except Exception:
+            raw_admin_signature = None
+        administrator_signature = _image_from_bytes(
+            raw_admin_signature,
+            max_width=65 * mm,
+            max_height=28 * mm,
+        )
 
     technician_signature_content = [
         [Paragraph("FIRMA DEL TECNICO", STYLES["signature"])],
@@ -770,9 +775,17 @@ def genera_pdf(ticket):
 
     responsible_signature_content = [
         [Paragraph("FIRMA DEL RESPONSABILE", STYLES["signature"])],
-        [Spacer(1, 18 * mm)],
-        [Paragraph("________________________________", STYLES["small"])],
     ]
+    if administrator_signature:
+        responsible_signature_content.append([administrator_signature])
+    else:
+        responsible_signature_content.append([Spacer(1, 18 * mm)])
+    responsible_signature_content.append(
+        [Paragraph(
+            f"________________________________  ({_txt(chiuso_da)})" if chiuso_da else "________________________________",
+            STYLES["small"],
+        )]
+    )
 
     signatures = Table(
         [
