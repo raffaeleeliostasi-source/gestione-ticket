@@ -170,6 +170,12 @@ def pagina_login():
         }
 
         /* Pulsante rosso come nella schermata approvata */
+        [data-testid="stFormSubmitButton"] {
+            display: flex !important;
+            justify-content: center !important;
+            width: 100% !important;
+        }
+
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
             width: 220px !important;
@@ -281,12 +287,14 @@ def pagina_login():
             username = st.text_input(
                 "Utente",
                 placeholder="Inserisci il tuo utente",
+                max_chars=30,
                 key="login_username",
             )
             password = st.text_input(
                 "Password",
                 type="password",
                 placeholder="Inserisci la tua password",
+                max_chars=30,
                 key="login_password",
             )
             submit = st.form_submit_button("ACCEDI", use_container_width=False, type="primary")
