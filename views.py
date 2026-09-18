@@ -26,59 +26,6 @@ def _safe(value):
     return "" if value is None else str(value)
 
 
-
-def _tecnici_assegnati(ticket_id, row=None):
-    """Restituisce tutti i tecnici assegnati al ticket.
-
-    Legge dalla tabella ticket_tecnici tramite la funzione disponibile
-    in database.py e mantiene il fallback al vecchio campo
-    tickets.assegnato_a per i ticket creati con la versione precedente.
-
-    Compatibile sia con dict sia con pandas.Series.
-    """
-    tecnici = []
-
-    # Compatibilità con entrambe le versioni di database.py.
-    for nome_funzione in ("get_ticket_tecnici", "get_tecnici_ticket"):
-        try:
-            funzione = getattr(db, nome_funzione, None)
-            if funzione is not None:
-                tecnici = funzione(int(ticket_id)) or []
-                if tecnici:
-                    break
-        except Exception:
-            continue
-
-    if tecnici:
-        return [str(x).strip() for x in tecnici if str(x).strip()]
-
-    # Usa anche l'eventuale lista già presente nella riga.
-    if row is not None:
-        try:
-            elenco = row.get("tecnici_assegnati")
-            if isinstance(elenco, (list, tuple, set)):
-                valori = [str(x).strip() for x in elenco if str(x).strip()]
-                if valori:
-                    return valori
-            elif elenco is not None and str(elenco).strip():
-                valori = [x.strip() for x in str(elenco).split(",") if x.strip()]
-                if valori:
-                    return valori
-        except AttributeError:
-            pass
-
-    legacy = ""
-    if row is not None:
-        try:
-            legacy = _safe(row.get("assegnato_a"))
-        except AttributeError:
-            legacy = ""
-
-    if legacy:
-        return [x.strip() for x in legacy.split(",") if x.strip()]
-
-    return []
-
 def _reset_dashboard_filters():
     st.session_state["dashboard_filter_version"] = (
         int(st.session_state.get("dashboard_filter_version", 0)) + 1
@@ -113,28 +60,28 @@ def pagina_login():
 
         .login-page {
             position: relative;
-            max-width: 580px;
+            max-width: 760px;
             margin: 3.2rem auto 1.5rem auto;
         }
 
         .login-brand {
             background: rgba(255,255,255,.98);
             border-radius: 18px 18px 0 0;
-            padding: 24px 28px 20px 28px;
+            padding: 28px 34px 24px 34px;
             box-shadow: 0 12px 35px rgba(38, 91, 145, .10);
-            text-align: left;
+            text-align: center;
         }
 
         .login-brand-row {
             display: flex;
             align-items: center;
-            justify-content: flex-start;
-            gap: 18px;
+            justify-content: center;
+            gap: 20px;
         }
 
         .login-butterfly {
-            width: 76px;
-            height: 94px;
+            width: 92px;
+            height: 112px;
             object-fit: contain;
             mix-blend-mode: multiply;
             flex: 0 0 auto;
@@ -147,7 +94,7 @@ def pagina_login():
         .login-title {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 2.75rem;
+            font-size: 3.25rem;
             line-height: .94;
             font-weight: 800;
             letter-spacing: -1.5px;
@@ -160,34 +107,34 @@ def pagina_login():
         }
 
         .login-subtitle {
-            margin-top: 10px;
+            margin-top: 14px;
             color: #627B9D;
-            font-size: 0.98rem;
+            font-size: 1.05rem;
             font-weight: 500;
         }
 
         .login-divider {
             height: 2px;
             background: #D5E6FA;
-            margin-top: 20px;
+            margin-top: 26px;
             border-radius: 2px;
         }
 
-        /* La card del form ridotta in larghezza e centrata */
+        /* La card del form completa visivamente la card superiore */
         [data-testid="stForm"] {
-            max-width: 580px;
+            max-width: 760px;
             margin: 0 auto;
             background: rgba(255,255,255,.98);
             border: 0 !important;
             border-radius: 0 0 18px 18px !important;
-            padding: 0 28px 26px 28px !important;
+            padding: 0 34px 30px 34px !important;
             box-shadow: 0 18px 35px rgba(38, 91, 145, .10);
         }
 
         .login-form-title {
             text-align: center;
             color: #173B68;
-            font-size: 1.65rem;
+            font-size: 2rem;
             font-weight: 800;
             margin: 0 0 4px 0;
         }
@@ -195,8 +142,8 @@ def pagina_login():
         .login-form-subtitle {
             text-align: center;
             color: #6C84A5;
-            font-size: 0.92rem;
-            margin: 0 0 20px 0;
+            font-size: 1rem;
+            margin: 0 0 26px 0;
         }
 
         [data-testid="stForm"] label {
@@ -207,41 +154,28 @@ def pagina_login():
         [data-testid="stForm"] input {
             border: 1.5px solid #C9DCF2 !important;
             border-radius: 10px !important;
-            min-height: 44px !important;
+            min-height: 48px !important;
             background: #FFFFFF !important;
         }
 
         [data-testid="stForm"] input:focus {
-            border-color: #B51F2B !important;
-            box-shadow: 0 0 0 2px rgba(181,31,43,.10) !important;
+            border-color: #2D73E8 !important;
+            box-shadow: 0 0 0 2px rgba(45,115,232,.10) !important;
         }
 
-        /* Centramento del wrapper nativo di Streamlit del pulsante di invio */
-        [data-testid="stFormSubmitButton"] {
-            display: flex !important;
-            justify-content: center !important;
-            width: 100% !important;
-        }
-
-        /* Pulsante ACCEDI ridotto e centrato perfettamente */
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
-            display: block !important;
-            margin: 12px auto 0 auto !important;
-            width: 220px !important;
-            min-height: 46px !important;
-            border-radius: 6px !important;
-            background: linear-gradient(180deg, #9C1C24, #7E1219) !important;
+            min-height: 54px !important;
+            border-radius: 10px !important;
+            background: linear-gradient(90deg, #1769E8, #287CF2) !important;
             border: none !important;
             color: white !important;
-            font-weight: 900 !important;
-            font-size: 1.1rem !important;
-            letter-spacing: 1.2px !important;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18) !important;
+            font-weight: 800 !important;
+            font-size: 1.05rem !important;
         }
 
         [data-testid="stForm"] button[type="submit"]:hover {
-            background: linear-gradient(180deg, #7E1219, #600D12) !important;
+            background: linear-gradient(90deg, #155FD2, #236ED9) !important;
         }
 
         @media (max-width: 640px) {
@@ -252,7 +186,7 @@ def pagina_login():
 
             .login-brand {
                 border-radius: 16px 16px 0 0;
-                padding: 20px 16px 16px 16px;
+                padding: 22px 18px 18px 18px;
             }
 
             .login-brand-row {
@@ -260,41 +194,36 @@ def pagina_login():
             }
 
             .login-butterfly {
-                width: 60px;
-                height: 74px;
+                width: 66px;
+                height: 82px;
             }
 
             .login-title {
-                font-size: 1.95rem;
+                font-size: 2.15rem;
                 letter-spacing: -1px;
             }
 
             .login-subtitle {
-                font-size: .8rem;
-                margin-top: 6px;
+                font-size: .82rem;
+                margin-top: 8px;
             }
 
             .login-divider {
-                margin-top: 14px;
+                margin-top: 18px;
             }
 
             [data-testid="stForm"] {
                 border-radius: 0 0 16px 16px !important;
-                padding: 0 16px 18px 16px !important;
+                padding: 0 18px 22px 18px !important;
             }
 
             .login-form-title {
-                font-size: 1.35rem;
+                font-size: 1.55rem;
             }
 
             .login-form-subtitle {
-                font-size: .82rem;
-                margin-bottom: 16px;
-            }
-
-            [data-testid="stForm"] button[type="submit"] {
-                width: 100% !important;
-                max-width: 100% !important;
+                font-size: .88rem;
+                margin-bottom: 20px;
             }
         }
         </style>
@@ -302,7 +231,8 @@ def pagina_login():
         unsafe_allow_html=True,
     )
 
-    _, login_col, _ = st.columns([1, 1.6, 1])
+    # Colonna centrale: mantiene la schermata compatta su PC e piena su mobile.
+    _, login_col, _ = st.columns([1, 2.1, 1])
     with login_col:
         st.markdown(
             f"""
@@ -327,7 +257,7 @@ def pagina_login():
 
         with st.form("login_form_main"):
             st.markdown(
-                '<div class="login-form-title">Accedi alla tua area</div>'
+                '<div class="login-form-title">Accedi alla tua area di lavoro</div>'
                 '<div class="login-form-subtitle">Inserisci le tue credenziali per continuare</div>',
                 unsafe_allow_html=True,
             )
@@ -342,7 +272,7 @@ def pagina_login():
                 placeholder="Inserisci la tua password",
                 key="login_password",
             )
-            submit = st.form_submit_button("ACCEDI", use_container_width=False, type="primary")
+            submit = st.form_submit_button("🔐  Accedi", use_container_width=True, type="primary")
 
         if submit:
             username = username.strip().lower()
@@ -619,15 +549,15 @@ def pagina_dashboard():
 
     with c4:
         if admin:
-            tecnici_per_ticket = {
-                int(row["id"]): _tecnici_assegnati(int(row["id"]), row)
-                for _, row in df.iterrows()
-            }
-            assegnati = sorted({
-                tecnico
-                for elenco in tecnici_per_ticket.values()
-                for tecnico in elenco
-            })
+            assegnati = sorted(
+                [
+                    str(x)
+                    for x in df.get(
+                        "assegnato_a", pd.Series(dtype=str)
+                    ).dropna().unique()
+                    if str(x).strip()
+                ]
+            )
             assegnato = st.selectbox(
                 "Assegnato a",
                 ["Tutti"] + assegnati,
@@ -667,12 +597,8 @@ def pagina_dashboard():
     if priorita != "Tutte" and "priorita" in filtrato.columns:
         filtrato = filtrato[filtrato["priorita"] == priorita]
 
-    if admin and assegnato != "Tutti":
-        filtrato = filtrato[
-            filtrato["id"].apply(
-                lambda ticket_id: assegnato in _tecnici_assegnati(int(ticket_id))
-            )
-        ]
+    if admin and assegnato != "Tutti" and "assegnato_a" in filtrato.columns:
+        filtrato = filtrato[filtrato["assegnato_a"] == assegnato]
 
     st.markdown(
         f'<div class="result-line"><strong>{len(filtrato)}</strong> ticket visualizzati</div>',
@@ -696,6 +622,11 @@ def pagina_dashboard():
         mostra_dettaglio_ticket(int(selected))
         return
 
+    # --------------------------------------------------------
+    # SCHEDE TICKET
+    # --------------------------------------------------------
+    # Il pulsante PDF è volutamente subito dopo il blocco
+    # "Assegnato a", come richiesto.
     for _, row in filtrato.iterrows():
         ticket_id = int(row["id"])
 
@@ -703,8 +634,7 @@ def pagina_dashboard():
         stato_val = _safe(row.get("stato")) or "—"
         priorita_val = _safe(row.get("priorita")) or "—"
         categoria_val = _safe(row.get("categoria")) or "—"
-        tecnici_ticket = _tecnici_assegnati(ticket_id, row)
-        tecnico_val = ", ".join(tecnici_ticket) if tecnici_ticket else "NON ASSEGNATO"
+        tecnico_val = _safe(row.get("assegnato_a")) or "NON ASSEGNATO"
 
         descrizione = _safe(row.get("descrizione")).strip()
         if len(descrizione) > 150:
@@ -766,6 +696,8 @@ def pagina_dashboard():
             unsafe_allow_html=True,
         )
 
+        # L'apertura del ticket è disponibile a tutti.
+        # Il download PDF resta riservato all'amministratore.
         if admin:
             col_open, col_pdf = st.columns([5.8, 1.2])
         else:
@@ -840,11 +772,7 @@ def pagina_nuovo_ticket():
         c1, c2, c3 = st.columns(3)
         categoria = c1.selectbox("Categoria", categorie)
         priorita = c2.selectbox("Priorità", PRIORITA)
-        tecnici_selezionati = c3.multiselect(
-            "Assegna a tecnici",
-            tecnici,
-            placeholder="Seleziona uno o più tecnici",
-        )
+        assegnato_a = c3.selectbox("Assegna a tecnico", tecnici)
 
         st.markdown("---")
         st.markdown("### 📎 Allegati e Contenuti Multimediali")
@@ -868,17 +796,13 @@ def pagina_nuovo_ticket():
         st.error("Titolo e descrizione sono obbligatori.")
         return
 
-    if not tecnici_selezionati:
-        st.error("Seleziona almeno un tecnico da assegnare al ticket.")
-        return
-
     try:
         ticket = db.crea_ticket(
             titolo=titolo.strip(),
             descrizione=descrizione.strip(),
             categoria=categoria,
             priorita=priorita,
-            tecnici=tecnici_selezionati,
+            assegnato_a=assegnato_a,
             creato_da=st.session_state.username,
         )
         ticket_id = ticket["id"]
@@ -943,6 +867,7 @@ def _mostra_allegati(ticket_id):
 
 
 def _firma_da_canvas(canvas_result):
+    """Converte la firma del canvas in PNG, se presente."""
     if canvas_result is None:
         return None
 
@@ -994,6 +919,7 @@ def _mostra_cronologia_interventi(ticket_id):
 
 
 def _mostra_storico_ticket(ticket_id):
+    """Mostra lo storico audit completo del ticket."""
     eventi = db.get_audit_log(ticket_id)
 
     st.markdown("### 🧾 Storico attività ticket")
@@ -1026,17 +952,20 @@ def mostra_dettaglio_ticket(ticket_id):
 
     admin = is_admin()
     username = st.session_state.username
-    tecnici_assegnati = _tecnici_assegnati(ticket_id, ticket)
-    assegnato = ", ".join(tecnici_assegnati)
+    assegnato = _safe(ticket.get("assegnato_a"))
     stato_attuale = _safe(ticket.get("stato"))
 
-    if not admin and username not in tecnici_assegnati:
+    if not admin and assegnato != username:
         st.error("Accesso non autorizzato a questo ticket.")
         return
 
+    # Carica sempre tutta la cronologia: ogni intervento è una riga distinta.
     interventi = db.get_interventi(ticket_id)
     ultimo_intervento = interventi[-1] if interventi else None
 
+    # --------------------------------------------------------
+    # INTESTAZIONE E DATI DEL TICKET
+    # --------------------------------------------------------
     st.markdown(
         """
         <style>
@@ -1123,6 +1052,9 @@ def mostra_dettaglio_ticket(ticket_id):
 
     _mostra_allegati(ticket_id)
 
+    # --------------------------------------------------------
+    # CRONOLOGIA INTERVENTI
+    # --------------------------------------------------------
     if interventi:
         st.markdown("### 🕘 Cronologia interventi")
 
@@ -1161,6 +1093,8 @@ def mostra_dettaglio_ticket(ticket_id):
                     except Exception:
                         firma_bytes = None
 
+                # Fallback sul percorso standard, utile per eventuali record
+                # precedenti in cui firma_path non era valorizzato correttamente.
                 if not firma_bytes and intervento.get("id"):
                     fallback_path = (
                         f"firme/{ticket_id}/intervento_{intervento.get('id')}/firma.png"
@@ -1183,8 +1117,14 @@ def mostra_dettaglio_ticket(ticket_id):
     else:
         st.info("Nessun intervento tecnico registrato.")
 
+    # --------------------------------------------------------
+    # STORICO COMPLETO DEL TICKET
+    # --------------------------------------------------------
     _mostra_storico_ticket(ticket_id)
 
+    # --------------------------------------------------------
+    # AMMINISTRATORE
+    # --------------------------------------------------------
     if admin:
         with st.container(border=True):
             st.markdown("### 🛠️ Gestione Amministrativa")
@@ -1229,6 +1169,9 @@ def mostra_dettaglio_ticket(ticket_id):
 
         return
 
+    # --------------------------------------------------------
+    # TECNICO — NUOVO INTERVENTO
+    # --------------------------------------------------------
     with st.container(border=True):
         st.markdown("### 🔧 Nuovo intervento tecnico")
 
@@ -1310,6 +1253,9 @@ def mostra_dettaglio_ticket(ticket_id):
                         st.error("Inserisci la firma prima di risolvere il ticket.")
                         return
 
+                # 1. Crea SEMPRE una nuova riga e recupera il suo ID.
+                # Uso parametri posizionali per mantenere compatibilita
+                # anche con la versione precedente di database.py.
                 intervento = db.salva_intervento_tecnico(
                     ticket_id,
                     username,
@@ -1326,6 +1272,7 @@ def mostra_dettaglio_ticket(ticket_id):
                     st.error("Supabase non ha restituito l'ID del nuovo intervento.")
                     return
 
+                # 2. La foto viene associata ESATTAMENTE a questa riga.
                 foto_da_salvare = foto_file or foto_camera
                 if foto_da_salvare is not None:
                     percorso_foto = db.salva_foto_intervento(
@@ -1338,6 +1285,7 @@ def mostra_dettaglio_ticket(ticket_id):
                             "L'intervento è stato salvato, ma la foto non è stata associata correttamente."
                         )
 
+                # 3. La firma viene associata ESATTAMENTE a questa riga.
                 if firma_bytes is not None:
                     percorso_firma = db.salva_firma_intervento(
                         intervento_id=intervento_id,
@@ -1348,12 +1296,12 @@ def mostra_dettaglio_ticket(ticket_id):
                     if not percorso_firma:
                         raise RuntimeError("La firma non è stata associata correttamente.")
 
-                    firma_verifica = db.scarica_firma_intervento(percorso_firma)
-                    if not firma_verifica:
-                        raise RuntimeError(
-                            "La firma è stata generata ma non è stato possibile "
-                            "recuperarla da Supabase Storage."
-                        )
+                    # La firma è stata salvata e associata all'intervento.
+                    # Non eseguiamo un download immediato da Storage: alcune
+                    # configurazioni/policy di Storage possono impedire la
+                    # rilettura immediata pur avendo completato correttamente
+                    # l'upload. L'eventuale errore reale viene già intercettato
+                    # da salva_firma_intervento().
 
                 st.session_state["intervento_successo"] = {
                     "ticket_id": ticket_id,
@@ -1371,7 +1319,9 @@ def mostra_dettaglio_ticket(ticket_id):
                 st.exception(e)
 
 
+
 def pagina_gestione_interventi():
+    """Area operativa dedicata al lavoro del tecnico."""
     admin = is_admin()
     username = st.session_state.get("username", "")
 
@@ -1384,6 +1334,9 @@ def pagina_gestione_interventi():
 
     df = pd.DataFrame(tickets)
 
+    # ========================================================
+    # DETTAGLIO TICKET
+    # ========================================================
     selected = st.session_state.get("gestione_interventi_ticket")
 
     if selected is not None:
@@ -1397,6 +1350,11 @@ def pagina_gestione_interventi():
         mostra_dettaglio_ticket(int(selected))
         return
 
+    # ========================================================
+    # AMMINISTRATORE
+    # ========================================================
+    # Per l'amministratore manteniamo la gestione generale degli
+    # interventi, mentre la nuova area operativa è dedicata al tecnico.
     if admin:
         st.title("🛠️ Gestisci gli interventi")
         st.caption(
@@ -1485,8 +1443,7 @@ def pagina_gestione_interventi():
             stato = _safe(row.get("stato")) or "—"
             priorita = _safe(row.get("priorita")) or "—"
             categoria = _safe(row.get("categoria")) or "—"
-            tecnici_ticket = _tecnici_assegnati(ticket_id, row)
-            tecnico = ", ".join(tecnici_ticket) if tecnici_ticket else "Non assegnato"
+            tecnico = _safe(row.get("assegnato_a")) or "Non assegnato"
 
             interventi = db.get_interventi(ticket_id)
             ultimo = interventi[-1] if interventi else None
@@ -1524,6 +1481,9 @@ def pagina_gestione_interventi():
 
         return
 
+    # ========================================================
+    # TECNICO — VERA AREA DI LAVORO
+    # ========================================================
     user_label = username.replace("_", " ").title() if username else "Tecnico"
 
     stati = (
@@ -1537,6 +1497,7 @@ def pagina_gestione_interventi():
     risolti = df[stati == "Risolto"].copy()
     chiusi = df[stati == "Chiuso"].copy()
 
+    # Priorità operative: Urgente → Alta → Media → Bassa.
     ordine_priorita = {
         "Urgente": 0,
         "Alta": 1,
@@ -1579,6 +1540,9 @@ def pagina_gestione_interventi():
     risolti = ordina_operativi(risolti)
     chiusi = ordina_operativi(chiusi)
 
+    # --------------------------------------------------------
+    # INTESTAZIONE
+    # --------------------------------------------------------
     st.markdown(
         f"""
         <div style="
@@ -1600,6 +1564,9 @@ def pagina_gestione_interventi():
         unsafe_allow_html=True,
     )
 
+    # --------------------------------------------------------
+    # RIEPILOGO OPERATIVO
+    # --------------------------------------------------------
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("🎫 Totali", len(df))
     c2.metric("🟡 Da lavorare", len(aperti))
@@ -1608,6 +1575,9 @@ def pagina_gestione_interventi():
 
     st.markdown("")
 
+    # --------------------------------------------------------
+    # FILTRI
+    # --------------------------------------------------------
     with st.container(border=True):
         st.markdown("### 🔎 Cerca nella mia area")
 
@@ -1659,6 +1629,9 @@ def pagina_gestione_interventi():
     risolti = applica_filtri(risolti)
     chiusi = applica_filtri(chiusi)
 
+    # --------------------------------------------------------
+    # CARD TICKET
+    # --------------------------------------------------------
     def mostra_card_ticket(row, tipo):
         ticket_id = int(row["id"])
         titolo = _safe(row.get("titolo")) or "Senza titolo"
@@ -1731,6 +1704,9 @@ def pagina_gestione_interventi():
 
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
+    # --------------------------------------------------------
+    # SEZIONE OPERATIVA
+    # --------------------------------------------------------
     def mostra_sezione(frame, titolo, descrizione, emoji, empty_text):
         st.markdown(f"### {emoji} {titolo}")
         st.caption(descrizione)
@@ -1746,7 +1722,7 @@ def pagina_gestione_interventi():
     mostra_sezione(
         lavorazione,
         "In lavorazione",
-        "Ticket sui quais stai già intervenendo.",
+        "Ticket sui quali stai già intervenendo.",
         "🟠",
         "Nessun ticket attualmente in lavorazione.",
     )
@@ -1771,6 +1747,9 @@ def pagina_gestione_interventi():
         "Non ci sono ticket risolti in attesa di chiusura.",
     )
 
+    # --------------------------------------------------------
+    # STORICO CHIUSI
+    # --------------------------------------------------------
     st.divider()
 
     with st.expander(
@@ -1788,7 +1767,6 @@ def pagina_gestione_interventi():
             for _, row in chiusi.iterrows():
                 mostra_card_ticket(row, "chiuso")
 
-
 def pagina_statistiche():
     if not is_admin():
         st.error("Accesso non autorizzato.")
@@ -1804,16 +1782,15 @@ def pagina_statistiche():
         st.info("Non ci sono ticket disponibili per generare le statistiche.")
         return
 
-    for col in ["stato", "priorita", "categoria"]:
+    # Normalizzazione minima dei campi utilizzati dal report.
+    for col in ["stato", "priorita", "categoria", "assegnato_a"]:
         if col not in df.columns:
             df[col] = ""
         df[col] = df[col].fillna("").astype(str).str.strip()
 
-    df["tecnici_assegnati"] = df.apply(
-        lambda row: ", ".join(_tecnici_assegnati(int(row["id"]), row)),
-        axis=1,
-    )
-
+    # --------------------------------------------------------
+    # FILTRI REPORT
+    # --------------------------------------------------------
     st.markdown("### 🔎 Filtra il report")
     with st.container(border=True):
         f1, f2, f3, f4 = st.columns(4)
@@ -1843,12 +1820,7 @@ def pagina_statistiche():
             )
 
         with f4:
-            tecnici = sorted({
-                tecnico
-                for elenco in df["tecnici_assegnati"]
-                for tecnico in [x.strip() for x in str(elenco).split(",")]
-                if tecnico
-            })
+            tecnici = sorted([x for x in df["assegnato_a"].unique() if x])
             filtro_tecnico = st.selectbox(
                 "Tecnico",
                 ["Tutti"] + tecnici,
@@ -1863,11 +1835,7 @@ def pagina_statistiche():
     if filtro_categoria != "Tutte":
         filtrato = filtrato[filtrato["categoria"] == filtro_categoria]
     if filtro_tecnico != "Tutti":
-        filtrato = filtrato[
-            filtrato["tecnici_assegnati"].apply(
-                lambda elenco: filtro_tecnico in [x.strip() for x in str(elenco).split(",")]
-            )
-        ]
+        filtrato = filtrato[filtrato["assegnato_a"] == filtro_tecnico]
 
     if filtrato.empty:
         st.warning("Nessun ticket corrisponde ai filtri selezionati.")
@@ -1875,6 +1843,9 @@ def pagina_statistiche():
 
     st.caption(f"Report filtrato: **{len(filtrato)} ticket** su {len(df)} totali.")
 
+    # --------------------------------------------------------
+    # KPI
+    # --------------------------------------------------------
     stati_filtrati = filtrato["stato"]
     total = len(filtrato)
     aperti = int((stati_filtrati == "Aperto").sum())
@@ -1891,6 +1862,12 @@ def pagina_statistiche():
 
     st.markdown("")
 
+    # --------------------------------------------------------
+    # GRAFICI PRINCIPALI
+    # --------------------------------------------------------
+    # I grafici sono realizzati con Altair in modalità NON interattiva:
+    # la rotella del mouse non effettua zoom e non modifica la scala.
+    # L'asse Y è esplicitamente quantitativo con origine a zero.
     def _grafico_barre(data, categoria, valore, ordinamento=None, altezza=280):
         chart = (
             alt.Chart(data)
@@ -1967,51 +1944,23 @@ def pagina_statistiche():
 
     with g4:
         st.markdown("### 👷 Ticket per tecnico")
-
-        # Un ticket assegnato a più tecnici deve comparire nel conteggio
-        # di ciascun tecnico, senza però duplicare il totale dei ticket.
-        righe_tecnici = []
-
-        for _, riga in filtrato.iterrows():
-            elenco = riga.get("tecnici_assegnati", "")
-            tecnici_riga = [
-                x.strip()
-                for x in str(elenco).split(",")
-                if x.strip()
-            ]
-
-            if not tecnici_riga:
-                tecnici_riga = ["Non assegnato"]
-
-            for tecnico in tecnici_riga:
-                righe_tecnici.append({
-                    "tecnico": tecnico,
-                    "ticket": 1,
-                })
-
-        if righe_tecnici:
-            tecnico_counts = (
-                pd.DataFrame(righe_tecnici)
-                .groupby("tecnico", as_index=False)["ticket"]
-                .sum()
-                .sort_values(["ticket", "tecnico"], ascending=[False, True])
-            )
-        else:
-            tecnico_counts = pd.DataFrame(
-                [{"tecnico": "Non assegnato", "ticket": 0}]
-            )
-
+        tecnico_counts = (
+            filtrato["assegnato_a"]
+            .replace("", "Non assegnato")
+            .value_counts()
+            .rename_axis("tecnico")
+            .reset_index(name="ticket")
+        )
         st.altair_chart(
-            _grafico_barre(
-                tecnico_counts,
-                "tecnico",
-                "ticket",
-                tecnico_counts["tecnico"].tolist(),
-            ),
+            _grafico_barre(tecnico_counts, "tecnico", "ticket",
+                           tecnico_counts["tecnico"].tolist()),
             use_container_width=True,
             theme=None,
         )
 
+    # --------------------------------------------------------
+    # TABELLA REPORT
+    # --------------------------------------------------------
     st.markdown("### 📋 Dettaglio ticket")
 
     report_df = filtrato.copy()
@@ -2021,7 +1970,7 @@ def pagina_statistiche():
 
     preferred = [
         "id", "titolo", "categoria", "priorita", "stato",
-        "tecnici_assegnati", "creato_da", "data_chiusura", "chiuso_da", "descrizione"
+        "assegnato_a", "creato_da", "data_chiusura", "chiuso_da", "descrizione"
     ]
     visible = [c for c in preferred if c in report_df.columns]
     report_view = report_df[visible].copy()
@@ -2037,13 +1986,16 @@ def pagina_statistiche():
             "categoria": st.column_config.TextColumn("Categoria"),
             "priorita": st.column_config.TextColumn("Priorità"),
             "stato": st.column_config.TextColumn("Stato"),
-            "tecnici_assegnati": st.column_config.TextColumn("Tecnici assegnati"),
+            "assegnato_a": st.column_config.TextColumn("Tecnico"),
             "creato_da": st.column_config.TextColumn("Creato da"),
             "data_chiusura": st.column_config.TextColumn("Data chiusura"),
             "chiuso_da": st.column_config.TextColumn("Chiuso da"),
         },
     )
 
+    # --------------------------------------------------------
+    # ESPORTAZIONE
+    # --------------------------------------------------------
     st.markdown("### 📥 Esportazione")
     excel_bytes = _excel_bytes(report_df)
     st.download_button(
@@ -2054,14 +2006,13 @@ def pagina_statistiche():
         use_container_width=True,
     )
 
-
 def _excel_bytes(df):
     output = BytesIO()
     export_df = df.copy()
 
     preferred = [
         "id", "titolo", "descrizione", "categoria", "priorita",
-        "stato", "tecnici_assegnati", "creato_da", "data_chiusura", "chiuso_da"
+        "stato", "assegnato_a", "creato_da", "data_chiusura", "chiuso_da"
     ]
     ordered = [c for c in preferred if c in export_df.columns]
     ordered += [c for c in export_df.columns if c not in ordered]
@@ -2098,22 +2049,11 @@ def pagina_amministrazione():
         utenti = db.get_utenti()
         if utenti:
             df_utenti = pd.DataFrame(utenti)
-            colonne_utenti = [
-                col for col in ["nome", "cognome", "username", "ruolo", "attivo"]
-                if col in df_utenti.columns
-            ]
-
             st.dataframe(
-                df_utenti[colonne_utenti],
+                df_utenti,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "nome": st.column_config.TextColumn(
-                        "Nome", help="Nome dell'utente"
-                    ),
-                    "cognome": st.column_config.TextColumn(
-                        "Cognome", help="Cognome dell'utente"
-                    ),
                     "username": st.column_config.TextColumn(
                         "Username", help="Nome utente per il login"
                     ),
@@ -2126,37 +2066,16 @@ def pagina_amministrazione():
 
         with st.expander("➕ Crea nuovo utente"):
             with st.form("crea_utente"):
-                col_nome, col_cognome = st.columns(2)
-                with col_nome:
-                    nome = st.text_input("Nome")
-                with col_cognome:
-                    cognome = st.text_input("Cognome")
-
-                col_username, col_ruolo = st.columns(2)
-                with col_username:
-                    username = st.text_input("Username")
-                with col_ruolo:
-                    ruolo = st.selectbox("Ruolo", ["Tecnico", "Amministratore"])
-
-                col_password, col_conferma = st.columns(2)
-                with col_password:
-                    password = st.text_input("Password iniziale", type="password")
-                with col_conferma:
-                    conferma = st.text_input("Conferma password", type="password")
-
+                username = st.text_input("Username")
+                ruolo = st.selectbox("Ruolo", ["Tecnico", "Amministratore"])
+                password = st.text_input("Password iniziale", type="password")
+                conferma = st.text_input("Conferma password", type="password")
                 attivo = st.checkbox("Utente attivo", value=True)
                 crea = st.form_submit_button("Crea utente", use_container_width=True)
 
             if crea:
-                nome = nome.strip()
-                cognome = cognome.strip()
                 username = username.strip().lower()
-
-                if not nome:
-                    st.error("Nome obbligatorio.")
-                elif not cognome:
-                    st.error("Cognome obbligatorio.")
-                elif not username:
+                if not username:
                     st.error("Username obbligatorio.")
                 elif password != conferma:
                     st.error("Le password non coincidono.")
@@ -2172,9 +2091,7 @@ def pagina_amministrazione():
                                 username,
                                 auth.hash_password(password),
                                 ruolo,
-                                attivo,
-                                nome=nome,
-                                cognome=cognome,
+                                attivo
                             )
                             st.success("Utente creato.")
                             st.rerun()
@@ -2185,15 +2102,7 @@ def pagina_amministrazione():
         st.subheader("Gestione utenti")
         for user in utenti:
             username = user["username"]
-            nome = str(user.get("nome") or "").strip()
-            cognome = str(user.get("cognome") or "").strip()
-            nominativo = " ".join(x for x in [nome, cognome] if x).strip()
-
-            titolo_utente = nominativo or username
-            if nominativo and username:
-                titolo_utente = f"{nominativo} — {username}"
-
-            with st.expander(f"{titolo_utente} — {user.get('ruolo', '')}"):
+            with st.expander(f"{username} — {user.get('ruolo', '')}"):
                 new_role = st.selectbox(
                     "Ruolo",
                     ["Tecnico", "Amministratore"],
@@ -2358,6 +2267,8 @@ def pagina_amministrazione():
                 opzioni.append(label)
                 mappa[label] = tid
 
+            # Nessun ticket viene selezionato automaticamente all'apertura
+            # o dopo l'eliminazione di un ticket.
             placeholder = "— Seleziona un ticket —"
             scelta = st.selectbox(
                 "Seleziona il ticket da eliminare",
