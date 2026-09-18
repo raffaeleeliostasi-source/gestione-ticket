@@ -1,5 +1,7 @@
 import re
-from datetime import datetime, timedelta
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
 import streamlit as st
 from supabase import create_client, Client
 
@@ -8,6 +10,99 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 STATI = ["Aperto", "In Lavorazione", "Risolto", "Chiuso"]
 PRIORITA = ["Bassa", "Media", "Alta", "Urgente"]
 BUCKET_ALLEGATI = "allegati"
+
+# ============================================================
+# LOGIN PERSISTENTE / RICORDAMI
+# ============================================================
+LOGIN_TOKEN_DAYS = 30
+
+
+def crea_login_token(username):
+    username = str(username or "").strip().lower()
+    if not username:
+        raise ValueError("Username non valido.")
+    token = secrets.token_urlsafe(48)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=LOGIN_TOKEN_DAYS)).isoformat()
+    supabase.table("login_tokens").insert({
+        "username": username,
+        "token_hash": token_hash,
+        "expires_at": expires_at,
+    }).execute()
+    return token
+
+
+def verifica_login_token(token):
+    token = str(token or "").strip()
+    if not token:
+        return None
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    try:
+        risposta = (
+            supabase.table("login_tokens")
+            .select("*")
+            .eq("token_hash", token_hash)
+            .is_("revoked_at", "null")
+            .maybe_single()
+            .execute()
+        )
+        record = getattr(risposta, "data", None)
+        if not record:
+            return None
+        expires_at = record.get("expires_at")
+        if not expires_at:
+            return None
+        scadenza = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+        if scadenza.tzinfo is None:
+            scadenza = scadenza.replace(tzinfo=timezone.utc)
+        if scadenza <= datetime.now(timezone.utc):
+            supabase.table("login_tokens").update({
+                "revoked_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", record["id"]).execute()
+            return None
+        username = str(record.get("username") or "").strip()
+        if not username:
+            return None
+        utente = get_utente(username)
+        if not utente or utente.get("attivo", True) is False:
+            return None
+        return utente
+    except Exception:
+        return None
+
+
+def revoca_login_token(token):
+    token = str(token or "").strip()
+    if not token:
+        return
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    try:
+        supabase.table("login_tokens").update({
+            "revoked_at": datetime.now(timezone.utc).isoformat()
+        }).eq("token_hash", token_hash).execute()
+    except Exception:
+        pass
+
+
+def revoca_token_utente(username):
+    username = str(username or "").strip().lower()
+    if not username:
+        return
+    try:
+        supabase.table("login_tokens").update({
+            "revoked_at": datetime.now(timezone.utc).isoformat()
+        }).eq("username", username).is_("revoked_at", "null").execute()
+    except Exception:
+        pass
+
+
+def pulisci_login_tokens_scaduti():
+    try:
+        supabase.table("login_tokens").delete().lt(
+            "expires_at", datetime.now(timezone.utc).isoformat()
+        ).execute()
+    except Exception:
+        pass
 
 
 @st.cache_resource
