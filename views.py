@@ -71,10 +71,10 @@ def pagina_login():
 
         /* Testata superiore */
         .login-brand {
-            background: rgba(255,255,255,.98);
+            background: #FFFFFF;
             border-radius: 18px 18px 0 0;
-            padding: 28px 34px 20px 34px;
-            box-shadow: 0 10px 30px rgba(38, 91, 145, .08);
+            padding: 24px 34px 18px 34px;
+            box-shadow: none;
         }
 
         .login-brand-row {
@@ -220,7 +220,7 @@ def pagina_login():
             }
 
             [data-testid="stForm"] {
-                margin-top: 18px;
+                margin-top: 0 !important;
                 border-radius: 0 0 16px 16px !important;
                 padding: 0 18px 22px 18px !important;
             }
