@@ -1009,13 +1009,17 @@ def pagina_dashboard():
             "s-chiuso"
         )
 
-            st.markdown(
-                f"""
-                <div class="ticket-card">
+        st.markdown(
+            f"""
+            <div class="ticket-card">
 
-                    <div class="ticket-id">
-                        TICKET #{ticket_id}
-                    </div>
+                <div class="ticket-id">
+                    TICKET #{ticket_id}
+                </div>
+
+                <div class="ticket-title">
+                    {_safe(titolo)}
+                </div>
 
                     <div class="ticket-title">
                         {_safe(titolo)}
