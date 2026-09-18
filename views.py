@@ -73,20 +73,20 @@ def pagina_login():
         .login-brand {
             background: #FFFFFF;
             border-radius: 18px 18px 0 0;
-            padding: 30px 34px 8px 34px;
-            box-shadow: 0 10px 30px rgba(38, 91, 145, .08);
+            padding: 24px 34px 18px 34px;
+            box-shadow: none;
         }
 
         .login-brand-row {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 16px;
+            justify-content: flex-start;
+            gap: 22px;
         }
 
         .login-butterfly {
-            width: 62px;
-            height: 78px;
+            width: 70px;
+            height: 88px;
             object-fit: contain;
             mix-blend-mode: multiply;
             flex: 0 0 auto;
@@ -99,10 +99,10 @@ def pagina_login():
         .login-title {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 2.55rem;
+            font-size: 2.85rem;
             line-height: .92;
             font-weight: 800;
-            letter-spacing: -1.4px;
+            letter-spacing: -1.6px;
             color: #173B68;
         }
 
@@ -112,7 +112,7 @@ def pagina_login():
         }
 
         .login-subtitle {
-            margin-top: 9px;
+            margin-top: 13px;
             color: #627B9D;
             font-size: 1rem;
             font-weight: 500;
@@ -125,18 +125,18 @@ def pagina_login():
         /* Form separato visivamente dalla testata */
         [data-testid="stForm"] {
             max-width: 760px;
-            margin: 0 auto !important;
-            background: #FFFFFF;
+            margin: 0 auto;
+            background: rgba(255,255,255,.98);
             border: 0 !important;
             border-radius: 0 0 18px 18px !important;
-            padding: 0 28px 30px 28px !important;
+            padding: 0 28px 27px 28px !important;
             box-shadow: 0 16px 32px rgba(38, 91, 145, .09);
         }
 
         .login-form-title {
             text-align: center;
             color: #173B68;
-            font-size: 1.72rem;
+            font-size: 1.95rem;
             font-weight: 800;
             margin: 0 0 3px 0;
         }
@@ -144,20 +144,8 @@ def pagina_login():
         .login-form-subtitle {
             text-align: center;
             color: #6C84A5;
-            font-size: .91rem;
-            margin: 0 0 24px 0;
-        }
-
-        [data-testid="stForm"] [data-testid="stTextInput"] {
-            max-width: 530px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        [data-testid="stForm"] [data-testid="stFormSubmitButton"] {
-            max-width: 530px;
-            margin-left: auto;
-            margin-right: auto;
+            font-size: .93rem;
+            margin: 0 0 25px 0;
         }
 
         [data-testid="stForm"] label {
@@ -179,12 +167,6 @@ def pagina_login():
         }
 
         /* Pulsante rosso come nella schermata approvata */
-        [data-testid="stFormSubmitButton"] {
-            display: flex !important;
-            justify-content: center !important;
-            width: 100% !important;
-        }
-
         [data-testid="stForm"] button[kind="primaryFormSubmit"],
         [data-testid="stForm"] button[type="submit"] {
             width: 220px !important;
@@ -211,7 +193,7 @@ def pagina_login():
 
             .login-brand {
                 border-radius: 16px 16px 0 0;
-                padding: 22px 18px 8px 18px;
+                padding: 22px 18px 18px 18px;
             }
 
             .login-brand-row {
@@ -219,12 +201,12 @@ def pagina_login():
             }
 
             .login-butterfly {
-                width: 52px;
-                height: 66px;
+                width: 58px;
+                height: 74px;
             }
 
             .login-title {
-                font-size: 1.95rem;
+                font-size: 2.35rem;
                 letter-spacing: -1px;
             }
 
@@ -238,22 +220,18 @@ def pagina_login():
             }
 
             [data-testid="stForm"] {
-                margin-top: 18px;
+                margin-top: 0 !important;
                 border-radius: 0 0 16px 16px !important;
                 padding: 0 18px 22px 18px !important;
             }
 
             .login-form-title {
-                font-size: 1.42rem;
+                font-size: 1.55rem;
             }
 
             .login-form-subtitle {
                 font-size: .86rem;
                 margin-bottom: 20px;
-            }
-
-            [data-testid="stForm"] [data-testid="stTextInput"] {
-                max-width: 100%;
             }
 
             [data-testid="stForm"] button[kind="primaryFormSubmit"],
@@ -297,22 +275,37 @@ def pagina_login():
                 '<div class="login-form-subtitle">Inserisci le tue credenziali per continuare</div>',
                 unsafe_allow_html=True,
             )
-            username = st.text_input(
-                "Utente",
-                placeholder="Inserisci il tuo utente",
-                max_chars=30,
-                key="login_username",
-            )
-            password = st.text_input(
-                "Password",
-                type="password",
-                placeholder="Inserisci la tua password",
-                max_chars=30,
-                key="login_password",
-            )
-            _, login_button_col, _ = st.columns([1, 1, 1])
-            with login_button_col:
-                submit = st.form_submit_button("ACCEDI", use_container_width=True, type="primary")
+            # Campi centrati e limitati a 30 caratteri.
+            _, login_fields, _ = st.columns([1, 2.2, 1])
+            with login_fields:
+                username = st.text_input(
+                    "Utente",
+                    placeholder="Inserisci il tuo utente",
+                    max_chars=30,
+                    value=st.session_state.get("remembered_username", ""),
+                    key="login_username",
+                )
+                password = st.text_input(
+                    "Password",
+                    type="password",
+                    placeholder="Inserisci la tua password",
+                    max_chars=30,
+                    key="login_password",
+                )
+
+                ricordami = st.checkbox(
+                    "Ricordami",
+                    key="login_ricordami",
+                )
+
+            # Pulsante centrato nella pagina.
+            _, login_button, _ = st.columns([1, 1, 1])
+            with login_button:
+                submit = st.form_submit_button(
+                    "ACCEDI",
+                    use_container_width=True,
+                    type="primary",
+                )
 
         if submit:
             username = username.strip().lower()
@@ -341,6 +334,16 @@ def pagina_login():
             st.session_state.logged_in = True
             st.session_state.username = username
             st.session_state.ruolo = user.get("ruolo", "")
+
+            # "Ricordami" mantiene l'username nella sessione Streamlit
+            # per i successivi rerun della stessa sessione. Non memorizziamo
+            # mai la password. Un vero login persistente oltre la chiusura
+            # del browser richiederebbe un sistema di token/cookie dedicato.
+            if ricordami:
+                st.session_state["remembered_username"] = username
+            else:
+                st.session_state.pop("remembered_username", None)
+
             st.rerun()
 
 
