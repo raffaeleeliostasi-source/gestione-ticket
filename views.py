@@ -7,7 +7,7 @@ import altair as alt
 import streamlit as st
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
-from streamlit_cookies_controller import CookieController
+from streamlit_cookies_manager import EncryptedCookieManager
 
 import auth
 import database as db
@@ -19,13 +19,30 @@ COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
 
 
 def get_cookie_controller():
+    """Restituisce il gestore dei cookie persistenti."""
     if "cookie_controller" not in st.session_state:
-        st.session_state["cookie_controller"] = CookieController()
+        import os
+        password = st.secrets.get("COOKIE_SECRET", os.environ.get("COOKIE_SECRET", ""))
+        if not password:
+            password = st.secrets.get("SUPABASE_KEY", "")
+        if not password:
+            raise RuntimeError("Manca COOKIE_SECRET nei secrets di Streamlit.")
+
+        cookies = EncryptedCookieManager(
+            prefix="gestione-ticket/",
+            password=str(password),
+        )
+
+        if not cookies.ready():
+            st.stop()
+
+        st.session_state["cookie_controller"] = cookies
+
     return st.session_state["cookie_controller"]
 
 
 def ripristina_login_persistente():
-    """Ripristina automaticamente una sessione tramite il cookie Ricordami."""
+    """Ripristina automaticamente la sessione tramite il cookie Ricordami."""
     if st.session_state.get("logged_in"):
         return True
 
@@ -44,7 +61,8 @@ def ripristina_login_persistente():
 
         if not utente:
             try:
-                cookies.remove(COOKIE_LOGIN_TOKEN)
+                del cookies[COOKIE_LOGIN_TOKEN]
+                cookies.save()
             except Exception:
                 pass
             return False
@@ -63,8 +81,6 @@ def ripristina_login_persistente():
 
     except Exception:
         return False
-
-
 
 def is_admin():
     return str(st.session_state.get("ruolo", "")).strip().lower() in {
@@ -392,33 +408,21 @@ def pagina_login():
                     db.revoca_token_utente(username)
                     token = db.crea_login_token(username)
                     cookies = get_cookie_controller()
-
-                    # streamlit-cookies-controller usa un oggetto con
-                    # valore e data di scadenza, non il parametro max_age.
-                    from datetime import datetime, timedelta
-
-                    scadenza = datetime.now() + timedelta(
-                        days=db.LOGIN_TOKEN_DAYS
-                    )
-
-                    cookies.set(
-                        COOKIE_LOGIN_TOKEN,
-                        {
-                            "value": token,
-                            "expiry_date": scadenza.isoformat(),
-                        },
-                    )
-
+                    cookies[COOKIE_LOGIN_TOKEN] = token
+                    cookies.save()
                     st.session_state["remembered_username"] = username
                 except Exception as e:
                     st.warning(
-                        "Accesso effettuato, ma non è stato possibile attivare il login automatico."
+                        f"Accesso effettuato, ma non è stato possibile attivare il login automatico: {e}"
                     )
                     st.session_state["remembered_username"] = username
             else:
                 st.session_state.pop("remembered_username", None)
                 try:
-                    get_cookie_controller().remove(COOKIE_LOGIN_TOKEN)
+                    cookies = get_cookie_controller()
+                    if COOKIE_LOGIN_TOKEN in cookies:
+                        del cookies[COOKIE_LOGIN_TOKEN]
+                        cookies.save()
                 except Exception:
                     pass
 
