@@ -1,10 +1,11 @@
 import base64
 from io import BytesIO
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 import altair as alt
 import streamlit as st
+import time
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 
@@ -327,6 +328,8 @@ def pagina_login():
             st.session_state.username = username
             st.session_state.ruolo = user.get("ruolo", "")
 
+            # Login normale: la sessione resta attiva finché l'utente non effettua il logout.
+            # Nessuna password o sessione persistente viene salvata nel browser.
             st.rerun()
 
 
