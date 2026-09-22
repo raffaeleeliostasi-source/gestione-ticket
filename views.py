@@ -19,9 +19,15 @@ COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
 
 
 def get_cookie_controller():
-    """Restituisce il controller dei cookie, creato una sola volta per sessione."""
+    """
+    Restituisce il controller dei cookie.
+
+    Il controller viene creato una sola volta per ogni
+    sessione Streamlit.
+    """
     if "cookie_controller" not in st.session_state:
         st.session_state["cookie_controller"] = CookieController()
+
     return st.session_state["cookie_controller"]
 
 
@@ -32,47 +38,88 @@ def rimuovi_cookie_login():
     except Exception:
         pass
 
-
 def ripristina_login_persistente():
     """
-    Ripristina automaticamente la sessione tramite il cookie Ricordami.
+    Ripristina automaticamente la sessione tramite il cookie
+    creato dalla funzione 'Ricordami'.
 
-    La password non viene mai salvata nel browser: il cookie contiene
-    esclusivamente il token generato da database.crea_login_token().
+    La password non viene mai salvata nel cookie.
+    Nel browser viene conservato esclusivamente il token
+    di autenticazione persistente.
     """
+
+    # Se la sessione Streamlit è già autenticata,
+    # non dobbiamo fare nulla.
     if st.session_state.get("logged_in"):
         return True
 
     try:
         cookies = get_cookie_controller()
+
+        # Il componente dei cookie può avere bisogno di un
+        # primo caricamento prima che il valore sia disponibile.
         token = cookies.get(COOKIE_LOGIN_TOKEN)
+
+        if token is None:
+            return False
+
+        token = str(token).strip()
 
         if not token:
             return False
 
+        # Verifica del token tramite Supabase.
+        # database.py controlla:
+        # - esistenza del token
+        # - revoca
+        # - scadenza
+        # - esistenza dell'utente
+        # - stato attivo dell'utente
         utente = db.verifica_login_token(token)
 
         if not utente:
-            rimuovi_cookie_login()
+            # Token non più valido.
+            try:
+                cookies.remove(COOKIE_LOGIN_TOKEN)
+            except Exception:
+                pass
+
             return False
 
-        username = str(utente.get("username") or "").strip()
-        ruolo = str(utente.get("ruolo") or "").strip()
+        username = str(
+            utente.get("username") or ""
+        ).strip()
 
+        ruolo = str(
+            utente.get("ruolo") or ""
+        ).strip()
+
+        # Controllo ulteriore di sicurezza.
         if not username:
-            rimuovi_cookie_login()
+            try:
+                cookies.remove(COOKIE_LOGIN_TOKEN)
+            except Exception:
+                pass
+
             return False
 
+        # Ricostruzione della sessione Streamlit.
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
         st.session_state["ruolo"] = ruolo
+
+        # Manteniamo lo username disponibile nel campo login
+        # nel caso la schermata venga nuovamente visualizzata.
         st.session_state["remembered_username"] = username
 
         return True
 
     except Exception:
-        # Un problema del cookie non deve impedire il login manuale.
+        # Se il componente cookie non è ancora pronto oppure
+        # si verifica un problema temporaneo, lasciamo comunque
+        # disponibile il normale login manuale.
         return False
+
 
 def is_admin():
     return str(st.session_state.get("ruolo", "")).strip().lower() in {
