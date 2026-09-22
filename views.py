@@ -7,7 +7,7 @@ import altair as alt
 import streamlit as st
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
-from streamlit_cookies_manager import EncryptedCookieManager
+from streamlit_cookies_controller import CookieController
 
 import auth
 import database as db
