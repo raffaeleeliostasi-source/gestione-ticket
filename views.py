@@ -5,6 +5,7 @@ from datetime import date
 import pandas as pd
 import altair as alt
 import streamlit as st
+import time
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 from streamlit_cookies_controller import CookieController
@@ -17,19 +18,15 @@ STATI = ["Aperto", "In Lavorazione", "Risolto", "Chiuso"]
 PRIORITA = ["Bassa", "Media", "Alta", "Urgente"]
 COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
 
-
 def get_cookie_controller():
     """
     Restituisce il controller dei cookie.
-
-    Il controller viene creato una sola volta per ogni
-    sessione Streamlit.
+    Viene creato una sola volta per la sessione Streamlit.
     """
     if "cookie_controller" not in st.session_state:
         st.session_state["cookie_controller"] = CookieController()
 
     return st.session_state["cookie_controller"]
-
 
 def rimuovi_cookie_login():
     """Rimuove dal browser il cookie utilizzato per il login persistente."""
@@ -41,23 +38,26 @@ def rimuovi_cookie_login():
 def ripristina_login_persistente():
     """
     Ripristina automaticamente la sessione tramite il cookie
-    creato dalla funzione 'Ricordami'.
+    'Ricordami'.
 
-    La password non viene mai salvata nel cookie.
-    Nel browser viene conservato esclusivamente il token
-    di autenticazione persistente.
+    Il cookie contiene esclusivamente il token di autenticazione.
+    La password NON viene mai salvata.
     """
 
-    # Se la sessione Streamlit è già autenticata,
-    # non dobbiamo fare nulla.
+    # Se siamo già autenticati non facciamo nulla.
     if st.session_state.get("logged_in"):
         return True
 
     try:
         cookies = get_cookie_controller()
 
-        # Il componente dei cookie può avere bisogno di un
-        # primo caricamento prima che il valore sia disponibile.
+        # Il componente CookieController viene caricato
+        # dal browser separatamente da Streamlit.
+        #
+        # Al primo avvio il cookie potrebbe non essere ancora
+        # immediatamente disponibile.
+        time.sleep(1)
+
         token = cookies.get(COOKIE_LOGIN_TOKEN)
 
         if token is None:
@@ -68,17 +68,10 @@ def ripristina_login_persistente():
         if not token:
             return False
 
-        # Verifica del token tramite Supabase.
-        # database.py controlla:
-        # - esistenza del token
-        # - revoca
-        # - scadenza
-        # - esistenza dell'utente
-        # - stato attivo dell'utente
+        # Verifica il token direttamente su Supabase.
         utente = db.verifica_login_token(token)
 
         if not utente:
-            # Token non più valido.
             try:
                 cookies.remove(COOKIE_LOGIN_TOKEN)
             except Exception:
@@ -94,7 +87,6 @@ def ripristina_login_persistente():
             utente.get("ruolo") or ""
         ).strip()
 
-        # Controllo ulteriore di sicurezza.
         if not username:
             try:
                 cookies.remove(COOKIE_LOGIN_TOKEN)
@@ -103,29 +95,21 @@ def ripristina_login_persistente():
 
             return False
 
-        # Ricostruzione della sessione Streamlit.
+        # Ripristino della sessione Streamlit.
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
         st.session_state["ruolo"] = ruolo
-
-        # Manteniamo lo username disponibile nel campo login
-        # nel caso la schermata venga nuovamente visualizzata.
         st.session_state["remembered_username"] = username
 
         return True
 
     except Exception:
-        # Se il componente cookie non è ancora pronto oppure
-        # si verifica un problema temporaneo, lasciamo comunque
-        # disponibile il normale login manuale.
         return False
-
 
 def is_admin():
     return str(st.session_state.get("ruolo", "")).strip().lower() in {
         "amministratore", "admin"
     }
-
 
 def _safe(value):
     return "" if value is None else str(value)
@@ -135,7 +119,6 @@ def _reset_dashboard_filters():
     st.session_state["dashboard_filter_version"] = (
         int(st.session_state.get("dashboard_filter_version", 0)) + 1
     )
-
 
 def pagina_login():
     """Schermata di accesso moderna e responsive."""
