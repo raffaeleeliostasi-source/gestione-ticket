@@ -28,14 +28,28 @@ def is_admin():
 
 
 def logout():
+    """Chiude la sessione e rimuove il cookie Ricordami."""
     try:
         cookies = views.get_cookie_controller()
         token = cookies.get(views.COOKIE_LOGIN_TOKEN)
+
+        # Con il cookie persistente il controller può restituire un dizionario.
+        if isinstance(token, dict):
+            token = token.get("value")
+
         if token:
-            db.revoca_login_token(token)
-        if views.COOKIE_LOGIN_TOKEN in cookies:
-            del cookies[views.COOKIE_LOGIN_TOKEN]
-            cookies.save()
+            try:
+                db.revoca_login_token(str(token).strip())
+            except Exception:
+                pass
+
+        # Il controller gestisce direttamente la rimozione del cookie.
+        # Non usiamo "in", del o save(), che non sono necessari e possono
+        # generare errori con streamlit-cookies-controller.
+        try:
+            cookies.remove(views.COOKIE_LOGIN_TOKEN)
+        except Exception:
+            pass
     except Exception:
         pass
 
