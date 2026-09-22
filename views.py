@@ -461,24 +461,42 @@ def pagina_login():
             st.session_state["username"] = username
             st.session_state["ruolo"] = user.get("ruolo", "")
 
-            if ricordami:
-                try:
-                    # Invalida eventuali vecchi token dell'utente.
-                    db.revoca_token_utente(username)
+          if ricordami:
+    try:
+        db.revoca_token_utente(username)
 
-                    # Crea un nuovo token persistente.
-                    token = db.crea_login_token(username)
+        token = db.crea_login_token(username)
 
-                    # Nel browser viene salvato solo il token.
-                    cookies = get_cookie_controller()
-                    cookies.set(
-                        COOKIE_LOGIN_TOKEN,
-                        token,
-                        max_age=db.LOGIN_TOKEN_DAYS * 24 * 60 * 60,
-                    )
+        cookies = get_cookie_controller()
 
-                    # Lo username viene ricordato solo per comodità del form.
-                    st.session_state["remembered_username"] = username
+        from datetime import datetime, timedelta
+
+        scadenza = datetime.now() + timedelta(
+            days=db.LOGIN_TOKEN_DAYS
+        )
+
+        cookies.set(
+            COOKIE_LOGIN_TOKEN,
+            {
+                "value": token,
+                "expiry_date": scadenza.isoformat(),
+            },
+        )
+
+        st.session_state["remembered_username"] = username
+
+    except Exception as e:
+        st.warning(
+            f"Accesso effettuato, ma il login automatico non è stato attivato: {e}"
+        )
+        st.session_state["remembered_username"] = username
+else:
+    st.session_state.pop("remembered_username", None)
+
+    try:
+        get_cookie_controller().remove(COOKIE_LOGIN_TOKEN)
+    except Exception:
+        pass
 
                 except Exception:
                     st.warning(
