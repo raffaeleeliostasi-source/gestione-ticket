@@ -1,14 +1,12 @@
 import base64
 from io import BytesIO
-from datetime import date, datetime, timedelta
+from datetime import date
 
 import pandas as pd
 import altair as alt
 import streamlit as st
-import time
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
-from streamlit_cookies_controller import CookieController
 
 import auth
 import database as db
@@ -16,62 +14,6 @@ import pdf_generator
 
 STATI = ["Aperto", "In Lavorazione", "Risolto", "Chiuso"]
 PRIORITA = ["Bassa", "Media", "Alta", "Urgente"]
-COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
-
-
-def get_cookie_controller():
-    """Restituisce il controller dei cookie persistenti."""
-    if "cookie_controller" not in st.session_state:
-        st.session_state["cookie_controller"] = CookieController()
-    return st.session_state["cookie_controller"]
-
-
-def ripristina_login_persistente():
-    """Ripristina automaticamente una sessione tramite il cookie Ricordami."""
-    if st.session_state.get("logged_in"):
-        return True
-    if st.session_state.get("logout_requested"):
-        return False
-
-    try:
-        cookies = get_cookie_controller()
-        token = cookies.get(COOKIE_LOGIN_TOKEN)
-        if not token:
-            return False
-
-        # Alcune versioni del componente restituiscono il valore semplice,
-        # altre possono restituire la struttura usata per expiry_date.
-        if isinstance(token, dict):
-            token = token.get("value")
-
-        token = str(token).strip()
-        if not token:
-            return False
-
-        utente = db.verifica_login_token(token)
-        if not utente:
-            try:
-                cookies.remove(COOKIE_LOGIN_TOKEN)
-            except Exception:
-                pass
-            return False
-
-        username = str(utente.get("username") or "").strip()
-        ruolo = str(utente.get("ruolo") or "").strip()
-        if not username:
-            return False
-
-        st.session_state["logged_in"] = True
-        st.session_state["username"] = username
-        st.session_state["ruolo"] = ruolo
-        st.session_state["remembered_username"] = username
-        st.session_state["login_persistent_token"] = token
-        st.session_state["logout_requested"] = False
-        return True
-    except Exception:
-        return False
-
-
 def is_admin():
     return str(st.session_state.get("ruolo", "")).strip().lower() in {
         "amministratore", "admin"
@@ -338,7 +280,6 @@ def pagina_login():
                     "Utente",
                     placeholder="Inserisci il tuo utente",
                     max_chars=30,
-                    value=st.session_state.get("remembered_username", ""),
                     key="login_username",
                 )
                 password = st.text_input(
@@ -347,11 +288,6 @@ def pagina_login():
                     placeholder="Inserisci la tua password",
                     max_chars=30,
                     key="login_password",
-                )
-
-                ricordami = st.checkbox(
-                    "Ricordami",
-                    key="login_ricordami",
                 )
 
             # Pulsante centrato nella pagina.
@@ -390,42 +326,6 @@ def pagina_login():
             st.session_state.logged_in = True
             st.session_state.username = username
             st.session_state.ruolo = user.get("ruolo", "")
-
-            # "Ricordami": crea un token persistente sicuro.
-            # La password non viene mai salvata nel browser.
-            if ricordami:
-                try:
-                    db.revoca_token_utente(username)
-                    token = db.crea_login_token(username)
-                    cookies = get_cookie_controller()
-                    # Cookie persistente per 30 giorni.
-                    # Senza expiry_date il browser lo tratta come cookie di sessione
-                    # e lo elimina quando Chrome viene chiuso.
-                    cookies.set(
-                        COOKIE_LOGIN_TOKEN,
-                        {
-                            "value": token,
-                            "expiry_date": (
-                                datetime.now() + timedelta(days=30)
-                            ).isoformat(),
-                        },
-                    )
-                    st.session_state["remembered_username"] = username
-                    st.session_state["login_persistent_token"] = token
-                    st.session_state["logout_requested"] = False
-                except Exception:
-                    st.warning(
-                        "Accesso effettuato, ma non è stato possibile attivare il login automatico."
-                    )
-                    st.session_state["remembered_username"] = username
-            else:
-                st.session_state.pop("remembered_username", None)
-                st.session_state.pop("login_persistent_token", None)
-                st.session_state["logout_requested"] = False
-                try:
-                    get_cookie_controller().remove(COOKIE_LOGIN_TOKEN)
-                except Exception:
-                    pass
 
             st.rerun()
 
