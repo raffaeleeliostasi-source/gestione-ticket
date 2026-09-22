@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import altair as alt
 import streamlit as st
+import time
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 from streamlit_cookies_controller import CookieController
@@ -29,6 +30,8 @@ def ripristina_login_persistente():
     """Ripristina automaticamente una sessione tramite il cookie Ricordami."""
     if st.session_state.get("logged_in"):
         return True
+    if st.session_state.get("logout_requested"):
+        return False
 
     try:
         cookies = get_cookie_controller()
@@ -62,6 +65,8 @@ def ripristina_login_persistente():
         st.session_state["username"] = username
         st.session_state["ruolo"] = ruolo
         st.session_state["remembered_username"] = username
+        st.session_state["login_persistent_token"] = token
+        st.session_state["logout_requested"] = False
         return True
     except Exception:
         return False
@@ -406,6 +411,8 @@ def pagina_login():
                         },
                     )
                     st.session_state["remembered_username"] = username
+                    st.session_state["login_persistent_token"] = token
+                    st.session_state["logout_requested"] = False
                 except Exception:
                     st.warning(
                         "Accesso effettuato, ma non è stato possibile attivare il login automatico."
@@ -413,6 +420,8 @@ def pagina_login():
                     st.session_state["remembered_username"] = username
             else:
                 st.session_state.pop("remembered_username", None)
+                st.session_state.pop("login_persistent_token", None)
+                st.session_state["logout_requested"] = False
                 try:
                     get_cookie_controller().remove(COOKIE_LOGIN_TOKEN)
                 except Exception:
