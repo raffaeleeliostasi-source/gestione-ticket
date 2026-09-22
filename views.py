@@ -37,41 +37,71 @@ def rimuovi_cookie_login():
 
 def ripristina_login_persistente():
     """
-    Ripristina automaticamente la sessione tramite il cookie
-    'Ricordami'.
+    Ripristina il login tramite il cookie 'Ricordami'.
 
-    Il cookie contiene esclusivamente il token di autenticazione.
-    La password NON viene mai salvata.
+    Il primo caricamento del CookieController può avvenire
+    dopo l'esecuzione iniziale di Streamlit. In quel caso
+    facciamo una nuova esecuzione dell'app invece di mostrare
+    immediatamente la schermata di login.
     """
 
-    # Se siamo già autenticati non facciamo nulla.
     if st.session_state.get("logged_in"):
         return True
 
     try:
         cookies = get_cookie_controller()
 
-        # Il componente CookieController viene caricato
-        # dal browser separatamente da Streamlit.
-        #
-        # Al primo avvio il cookie potrebbe non essere ancora
-        # immediatamente disponibile.
-        time.sleep(1)
+        # Primo caricamento del componente.
+        # Aspettiamo brevemente che il browser risponda.
+        time.sleep(0.5)
 
         token = cookies.get(COOKIE_LOGIN_TOKEN)
 
+        # ----------------------------------------------------
+        # Il componente non ha ancora restituito i cookie.
+        # Non consideriamo questo come "cookie assente".
+        # ----------------------------------------------------
         if token is None:
+
+            tentativi = int(
+                st.session_state.get(
+                    "_cookie_login_tentativi",
+                    0
+                )
+            )
+
+            if tentativi < 3:
+                st.session_state["_cookie_login_tentativi"] = tentativi + 1
+
+                time.sleep(1)
+
+                st.rerun()
+
+            # Dopo 3 tentativi consideriamo realmente
+            # assente il cookie.
+            st.session_state.pop(
+                "_cookie_login_tentativi",
+                None
+            )
+
             return False
+
+        # Cookie trovato: azzeriamo i tentativi.
+        st.session_state.pop(
+            "_cookie_login_tentativi",
+            None
+        )
 
         token = str(token).strip()
 
         if not token:
             return False
 
-        # Verifica il token direttamente su Supabase.
+        # Verifica il token su Supabase.
         utente = db.verifica_login_token(token)
 
         if not utente:
+            # Token scaduto/non valido.
             try:
                 cookies.remove(COOKIE_LOGIN_TOKEN)
             except Exception:
@@ -95,7 +125,9 @@ def ripristina_login_persistente():
 
             return False
 
-        # Ripristino della sessione Streamlit.
+        # ----------------------------------------------------
+        # RIPRISTINO SESSIONE
+        # ----------------------------------------------------
         st.session_state["logged_in"] = True
         st.session_state["username"] = username
         st.session_state["ruolo"] = ruolo
