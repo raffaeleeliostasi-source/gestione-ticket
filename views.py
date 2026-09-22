@@ -19,37 +19,20 @@ COOKIE_LOGIN_TOKEN = "gestione_ticket_login"
 
 
 def get_cookie_controller():
-    """Restituisce il gestore dei cookie persistenti."""
+    """Restituisce il controller dei cookie persistenti."""
     if "cookie_controller" not in st.session_state:
-        import os
-        password = st.secrets.get("COOKIE_SECRET", os.environ.get("COOKIE_SECRET", ""))
-        if not password:
-            password = st.secrets.get("SUPABASE_KEY", "")
-        if not password:
-            raise RuntimeError("Manca COOKIE_SECRET nei secrets di Streamlit.")
-
-        cookies = EncryptedCookieManager(
-            prefix="gestione-ticket/",
-            password=str(password),
-        )
-
-        if not cookies.ready():
-            st.stop()
-
-        st.session_state["cookie_controller"] = cookies
-
+        st.session_state["cookie_controller"] = CookieController()
     return st.session_state["cookie_controller"]
 
 
 def ripristina_login_persistente():
-    """Ripristina automaticamente la sessione tramite il cookie Ricordami."""
+    """Ripristina automaticamente una sessione tramite il cookie Ricordami."""
     if st.session_state.get("logged_in"):
         return True
 
     try:
         cookies = get_cookie_controller()
         token = cookies.get(COOKIE_LOGIN_TOKEN)
-
         if not token:
             return False
 
@@ -58,18 +41,15 @@ def ripristina_login_persistente():
             return False
 
         utente = db.verifica_login_token(token)
-
         if not utente:
             try:
-                del cookies[COOKIE_LOGIN_TOKEN]
-                cookies.save()
+                cookies.remove(COOKIE_LOGIN_TOKEN)
             except Exception:
                 pass
             return False
 
         username = str(utente.get("username") or "").strip()
         ruolo = str(utente.get("ruolo") or "").strip()
-
         if not username:
             return False
 
@@ -78,9 +58,9 @@ def ripristina_login_persistente():
         st.session_state["ruolo"] = ruolo
         st.session_state["remembered_username"] = username
         return True
-
     except Exception:
         return False
+
 
 def is_admin():
     return str(st.session_state.get("ruolo", "")).strip().lower() in {
@@ -408,21 +388,17 @@ def pagina_login():
                     db.revoca_token_utente(username)
                     token = db.crea_login_token(username)
                     cookies = get_cookie_controller()
-                    cookies[COOKIE_LOGIN_TOKEN] = token
-                    cookies.save()
+                    cookies.set(COOKIE_LOGIN_TOKEN, token)
                     st.session_state["remembered_username"] = username
-                except Exception as e:
+                except Exception:
                     st.warning(
-                        f"Accesso effettuato, ma non è stato possibile attivare il login automatico: {e}"
+                        "Accesso effettuato, ma non è stato possibile attivare il login automatico."
                     )
                     st.session_state["remembered_username"] = username
             else:
                 st.session_state.pop("remembered_username", None)
                 try:
-                    cookies = get_cookie_controller()
-                    if COOKIE_LOGIN_TOKEN in cookies:
-                        del cookies[COOKIE_LOGIN_TOKEN]
-                        cookies.save()
+                    get_cookie_controller().remove(COOKIE_LOGIN_TOKEN)
                 except Exception:
                     pass
 
