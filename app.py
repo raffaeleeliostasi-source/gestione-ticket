@@ -1,5 +1,4 @@
 import streamlit as st
-import time
 import views
 import database as db
 
@@ -30,19 +29,11 @@ def is_admin():
 
 def logout():
     """Chiude la sessione e invalida il token Ricordami."""
-    # Blocca il ripristino automatico durante il rerun provocato dal logout.
+    # Impedisce che il cookie venga letto e riattivi subito la sessione
+    # nel rerun successivo al logout.
     st.session_state["logout_requested"] = True
 
-    # Usiamo prima il token conservato nella sessione: così il logout non
-    # dipende dalla lettura asincrona del cookie dal browser.
     token = st.session_state.get("login_persistent_token")
-    if not token:
-        try:
-            token = views.get_cookie_controller().get(views.COOKIE_LOGIN_TOKEN)
-            if isinstance(token, dict):
-                token = token.get("value")
-        except Exception:
-            token = None
 
     if token:
         try:
@@ -50,19 +41,22 @@ def logout():
         except Exception:
             pass
 
-    # Rimuove il cookie dal browser. Il componente esegue questa operazione
-    # lato browser, quindi lasciamo il tempo necessario prima del rerun.
+    # Rimuove il cookie. Non leggiamo nuovamente il cookie qui: il componente
+    # è asincrono e durante il click potrebbe non avere ancora il valore
+    # aggiornato disponibile a Python.
     try:
         views.get_cookie_controller().remove(views.COOKIE_LOGIN_TOKEN)
     except Exception:
         pass
 
-    for key in ("logged_in", "username", "ruolo"):
-        st.session_state[key] = "" if key != "logged_in" else False
+    st.session_state["logged_in"] = False
+    st.session_state["username"] = ""
+    st.session_state["ruolo"] = ""
     st.session_state.pop("remembered_username", None)
     st.session_state.pop("login_persistent_token", None)
 
-    time.sleep(0.5)
+    # Il rerun mostra immediatamente il login. Il flag logout_requested
+    # impedisce a Ricordami di riaprire la sessione durante questo passaggio.
     st.rerun()
 
 
