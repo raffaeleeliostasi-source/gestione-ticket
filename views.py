@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from datetime import date
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import altair as alt
@@ -35,6 +35,11 @@ def ripristina_login_persistente():
         token = cookies.get(COOKIE_LOGIN_TOKEN)
         if not token:
             return False
+
+        # Alcune versioni del componente restituiscono il valore semplice,
+        # altre possono restituire la struttura usata per expiry_date.
+        if isinstance(token, dict):
+            token = token.get("value")
 
         token = str(token).strip()
         if not token:
@@ -388,7 +393,18 @@ def pagina_login():
                     db.revoca_token_utente(username)
                     token = db.crea_login_token(username)
                     cookies = get_cookie_controller()
-                    cookies.set(COOKIE_LOGIN_TOKEN, token)
+                    # Cookie persistente per 30 giorni.
+                    # Senza expiry_date il browser lo tratta come cookie di sessione
+                    # e lo elimina quando Chrome viene chiuso.
+                    cookies.set(
+                        COOKIE_LOGIN_TOKEN,
+                        {
+                            "value": token,
+                            "expiry_date": (
+                                datetime.now() + timedelta(days=30)
+                            ).isoformat(),
+                        },
+                    )
                     st.session_state["remembered_username"] = username
                 except Exception:
                     st.warning(
