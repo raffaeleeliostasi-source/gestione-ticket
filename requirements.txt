@@ -8,3 +8,4 @@ streamlit-drawable-canvas
 reportlab
 requests
 streamlit-cookies-manager==0.2.0
+streamlit-cookies-controller==0.0.4
