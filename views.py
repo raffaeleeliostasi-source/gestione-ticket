@@ -544,13 +544,42 @@ def pagina_gestisci_ticket():
             """,
             unsafe_allow_html=True,
         )
-        if st.button(
-            "🛠️ Apri ticket",
-            key=f"gestisci_apri_{chiave}_{ticket_id}",
-            use_container_width=True,
-        ):
-            st.session_state["gestisci_ticket_selezionato"] = ticket_id
-            st.rerun()
+        # Per i ticket chiusi mostriamo, affiancato ad "Apri ticket",
+        # anche il download diretto del PDF ufficiale.
+        if stato == "Chiuso":
+            col_apri, col_pdf = st.columns(2)
+
+            with col_apri:
+                if st.button(
+                    "🛠️ Apri ticket",
+                    key=f"gestisci_apri_{chiave}_{ticket_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state["gestisci_ticket_selezionato"] = ticket_id
+                    st.rerun()
+
+            with col_pdf:
+                try:
+                    ticket_pdf = db.get_ticket(ticket_id)
+                    pdf_bytes = pdf_generator.genera_pdf(ticket_pdf)
+                    st.download_button(
+                        "📄 Scarica PDF",
+                        data=pdf_bytes,
+                        file_name=f"ticket_{ticket_id}.pdf",
+                        mime="application/pdf",
+                        key=f"gestisci_pdf_{chiave}_{ticket_id}",
+                        use_container_width=True,
+                    )
+                except Exception:
+                    st.error("PDF non disponibile")
+        else:
+            if st.button(
+                "🛠️ Apri ticket",
+                key=f"gestisci_apri_{chiave}_{ticket_id}",
+                use_container_width=True,
+            ):
+                st.session_state["gestisci_ticket_selezionato"] = ticket_id
+                st.rerun()
 
     if admin:
         for _, row in filtrato.iterrows():
