@@ -694,29 +694,7 @@ def pagina_dashboard():
 
 
 def pagina_nuovo_ticket():
-    # Inseriamo lo stile CSS specifico per il pulsante arancione del nuovo ticket
-    st.markdown("""
-    <style>
-        /* Pulsante principale arancione ispirato all'icona */
-        div[data-testid="stButton"] button[kind="primary"] {
-            background: linear-gradient(135deg, #F97316 0%, #EA580C 100%) !important;
-            color: #FFFFFF !important;
-            border: 1px solid #C2410C !important;
-            border-radius: 12px !important;
-            font-weight: 700 !important;
-            min-height: 48px !important;
-            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3) !important;
-            transition: all 0.2s ease-in-out !important;
-        }
-        div[data-testid="stButton"] button[kind="primary"]:hover {
-            background: linear-gradient(135deg, #FB923C 0%, #F97316 100%) !important;
-            box-shadow: 0 6px 16px rgba(249, 115, 22, 0.45) !important;
-            transform: translateY(-1px);
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.title("📝 Crea un Nuovo Ticket")
+       st.title("📝 Crea un Nuovo Ticket")
     # ... resto del codice della funzione per la creazione del ticket ...
 
     messaggio_ticket = st.session_state.pop("ticket_creato_msg", None)
