@@ -20,7 +20,9 @@ for key, default in {
 
 
 def is_admin():
-    return str(st.session_state.get("ruolo", "")).strip().lower() in {
+    return str(
+        st.session_state.get("ruolo", "")
+    ).strip().lower() in {
         "amministratore",
         "admin",
     }
@@ -32,33 +34,49 @@ def logout():
     st.session_state["username"] = ""
     st.session_state["ruolo"] = ""
 
-    # Pulisce anche i campi del login eventualmente rimasti in sessione.
     st.session_state.pop("login_username", None)
     st.session_state.pop("login_password", None)
-    st.session_state.pop("login_ricordami", None)
-    st.session_state.pop("remembered_username", None)
-    st.session_state.pop("login_persistent_token", None)
     st.session_state.pop("logout_requested", None)
 
+    # Stato relativo ai ticket
+    st.session_state.pop("gestisci_ticket_selezionato", None)
+    st.session_state.pop("dashboard_ticket_aperto", None)
+    st.session_state.pop("gestione_interventi_ticket", None)
+
     st.rerun()
+
+
+# ============================================================
+# LOGIN
+# ============================================================
 
 if not st.session_state.logged_in:
     views.pagina_login()
     st.stop()
 
 
+# ============================================================
+# MENU PRINCIPALE
+# ============================================================
+
 with st.sidebar:
     st.title("🎫 Gestione Ticket")
-    st.write(f"**Utente:** {st.session_state.username}")
-    st.write(f"**Ruolo:** {st.session_state.ruolo}")
+
+    st.write(
+        f"**Utente:** {st.session_state.username}"
+    )
+
+    st.write(
+        f"**Ruolo:** {st.session_state.ruolo}"
+    )
+
     st.divider()
 
     if is_admin():
         menu = st.radio(
             "Menu",
             [
-                "📊 Dashboard",
-                "🛠️ Gestisci interventi",
+                "🎫 Gestisci Ticket",
                 "➕ Nuovo Ticket",
                 "📈 Statistiche & Report",
                 "⚙️ Amministrazione",
@@ -68,28 +86,39 @@ with st.sidebar:
         menu = st.radio(
             "Menu",
             [
-                "📊 Dashboard",
-                "🛠️ Gestisci interventi",
+                "🎫 Gestisci Ticket",
                 "➕ Nuovo Ticket",
             ],
         )
 
     st.divider()
-    if st.button("🚪 Logout", use_container_width=True):
+
+    if st.button(
+        "🚪 Logout",
+        use_container_width=True,
+    ):
         logout()
 
 
-if menu == "📊 Dashboard":
-    views.pagina_dashboard()
-elif menu == "🛠️ Gestisci interventi":
-    views.pagina_gestione_interventi()
+# ============================================================
+# PAGINE
+# ============================================================
+
+if menu == "🎫 Gestisci Ticket":
+    views.pagina_gestisci_ticket()
+
+
 elif menu == "➕ Nuovo Ticket":
     views.pagina_nuovo_ticket()
+
+
 elif menu == "📈 Statistiche & Report":
     if is_admin():
         views.pagina_statistiche()
     else:
         st.error("Accesso non autorizzato.")
+
+
 elif menu == "⚙️ Amministrazione":
     if is_admin():
         views.pagina_amministrazione()
