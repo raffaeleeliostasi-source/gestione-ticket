@@ -554,6 +554,7 @@ def pagina_gestisci_ticket():
                     "🛠️ Apri ticket",
                     key=f"gestisci_apri_{chiave}_{ticket_id}",
                     use_container_width=True,
+                    type="primary",
                 ):
                     st.session_state["gestisci_ticket_selezionato"] = ticket_id
                     st.rerun()
@@ -569,6 +570,7 @@ def pagina_gestisci_ticket():
                         mime="application/pdf",
                         key=f"gestisci_pdf_{chiave}_{ticket_id}",
                         use_container_width=True,
+                        type="secondary",
                     )
                 except Exception:
                     st.error("PDF non disponibile")
