@@ -1303,8 +1303,32 @@ def pagina_gestione_interventi():
     """Compatibilità con eventuali chiamate residue: la gestione è ora unificata."""
     pagina_gestisci_ticket()
 
-
 def pagina_statistiche():
+def pagina_nuovo_ticket():
+    # --- INIZIO STILE PERSONALIZZATO ARANCIONE ---
+    st.markdown("""
+    <style>
+        div[data-testid="stButton"] button[kind="primary"] {
+            background: linear-gradient(135deg, #F97316 0%, #EA580C 100%) !important;
+            color: #FFFFFF !important;
+            border: 1px solid #C2410C !important;
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+            min-height: 48px !important;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3) !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        div[data-testid="stButton"] button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #FB923C 0%, #F97316 100%) !important;
+            box-shadow: 0 6px 16px rgba(249, 115, 22, 0.45) !important;
+            transform: translateY(-1px);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    # --- FINE STILE PERSONALIZZATO ---
+
+    st.title("📝 Crea un Nuovo Ticket")
+         
     if not is_admin():
         st.error("Accesso non autorizzato.")
         return
