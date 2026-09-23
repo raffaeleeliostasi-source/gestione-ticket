@@ -1,6 +1,6 @@
 import base64
 from io import BytesIO
-from datetime import date, datetime
+from datetime import date
 
 import pandas as pd
 import altair as alt
@@ -15,6 +15,8 @@ import pdf_generator
 
 STATI = ["Aperto", "In Lavorazione", "Risolto", "Chiuso"]
 PRIORITA = ["Bassa", "Media", "Alta", "Urgente"]
+
+
 def is_admin():
     return str(st.session_state.get("ruolo", "")).strip().lower() in {
         "amministratore", "admin"
@@ -28,6 +30,12 @@ def _safe(value):
 def _reset_dashboard_filters():
     st.session_state["dashboard_filter_version"] = (
         int(st.session_state.get("dashboard_filter_version", 0)) + 1
+    )
+
+
+def _reset_gestisci_ticket_filters():
+    st.session_state["gestisci_ticket_filter_version"] = (
+        int(st.session_state.get("gestisci_ticket_filter_version", 0)) + 1
     )
 
 
@@ -135,7 +143,7 @@ def pagina_login():
         .login-form-title {
             text-align: center;
             color: #173B68;
-            font-size: 1.95rem;
+            font-size: 1.65rem;
             font-weight: 800;
             margin: 0 0 3px 0;
         }
@@ -225,7 +233,7 @@ def pagina_login():
             }
 
             .login-form-title {
-                font-size: 1.55rem;
+                font-size: 1.40rem;
             }
 
             .login-form-subtitle {
@@ -327,18 +335,18 @@ def pagina_login():
             st.session_state.logged_in = True
             st.session_state.username = username
             st.session_state.ruolo = user.get("ruolo", "")
-
-            # Login normale: la sessione resta attiva finché l'utente non effettua il logout.
-            # Nessuna password o sessione persistente viene salvata nel browser.
             st.rerun()
 
 
-def pagina_dashboard():
-    """Dashboard principale con interfaccia moderna e riepilogo ticket."""
+def pagina_gestisci_ticket():
+    """Pagina unica per la gestione dei ticket, sia admin che tecnico."""
+    admin = is_admin()
+    username = st.session_state.get("username", "")
+
     st.markdown(
         """
         <style>
-        .dash-hero {
+        .manage-hero {
             background: linear-gradient(135deg, #17365D 0%, #245B91 100%);
             border-radius: 18px;
             padding: 24px 28px;
@@ -346,155 +354,50 @@ def pagina_dashboard():
             margin-bottom: 20px;
             box-shadow: 0 8px 24px rgba(23,54,93,.12);
         }
-        .dash-hero h1 {
-            margin: 0;
-            font-size: 2rem;
-            line-height: 1.15;
-            color: white;
+        .manage-hero h1 { margin: 0; font-size: 2rem; line-height: 1.15; color: white; }
+        .manage-hero p { margin: 7px 0 0 0; color: rgba(255,255,255,.82); font-size: .95rem; }
+        .manage-stat {
+            background: white; border: 1px solid #E2E8F0; border-radius: 15px;
+            padding: 16px 18px; min-height: 92px; box-shadow: 0 3px 12px rgba(15,23,42,.05);
         }
-        .dash-hero p {
-            margin: 7px 0 0 0;
-            color: rgba(255,255,255,.82);
-            font-size: .95rem;
+        .manage-stat-label { color: #64748B; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+        .manage-stat-value { color: #17365D; font-size: 1.65rem; font-weight: 800; margin-top: 5px; }
+        .manage-filter {
+            background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 15px;
+            padding: 15px 18px 6px 18px; margin: 18px 0 14px 0;
         }
-        .dash-user {
-            text-align: right;
-            font-size: .82rem;
-            color: rgba(255,255,255,.82);
-            padding-top: 4px;
-        }
-        .stat-card {
-            background: white;
-            border: 1px solid #E2E8F0;
-            border-radius: 15px;
-            padding: 16px 18px;
-            min-height: 92px;
-            box-shadow: 0 3px 12px rgba(15,23,42,.05);
-        }
-        .stat-label {
-            color: #64748B;
-            font-size: .78rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-        }
-        .stat-value {
-            color: #17365D;
-            font-size: 1.65rem;
-            font-weight: 800;
-            margin-top: 5px;
-        }
-        .filter-panel {
-            background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 15px;
-            padding: 15px 18px 6px 18px;
-            margin: 18px 0 14px 0;
-        }
-        .filter-heading {
-            color: #17365D;
-            font-size: 1rem;
-            font-weight: 800;
-            margin-bottom: 8px;
-        }
-        .result-line {
-            color: #64748B;
-            font-size: .88rem;
-            margin: 10px 0 12px 2px;
-        }
-        .result-line strong {
-            color: #17365D;
-        }
-        .ticket-card {
-            background: white;
-            border: 1px solid #E2E8F0;
-            border-radius: 15px;
-            padding: 17px 19px 14px 19px;
-            margin: 0 0 11px 0;
+        .manage-filter-title { color: #17365D; font-size: 1rem; font-weight: 800; margin-bottom: 8px; }
+        .manage-ticket {
+            background: white; border: 1px solid #E2E8F0; border-radius: 15px;
+            padding: 17px 19px 14px 19px; margin: 0 0 11px 0;
             box-shadow: 0 3px 12px rgba(15,23,42,.045);
         }
-        .ticket-id {
-            color: #2F75B5;
-            font-size: .78rem;
-            font-weight: 800;
-            letter-spacing: .04em;
-            text-transform: uppercase;
-        }
-        .ticket-title {
-            color: #17365D;
-            font-size: 1.08rem;
-            font-weight: 800;
-            margin-top: 2px;
-            line-height: 1.25;
-        }
-        .ticket-desc {
-            color: #64748B;
-            font-size: .84rem;
-            line-height: 1.4;
-            margin-top: 8px;
-        }
-        .meta-label {
-            color: #94A3B8;
-            font-size: .67rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-            margin-bottom: 2px;
-        }
-        .meta-value {
-            color: #334155;
-            font-size: .82rem;
-            font-weight: 650;
-        }
-        .badge {
-            display: inline-block;
-            padding: 4px 9px;
-            border-radius: 999px;
-            color: white;
-            font-size: .70rem;
-            font-weight: 800;
-            line-height: 1;
-        }
-        .s-aperto { background: #2563EB; }
-        .s-lavorazione { background: #D97706; }
-        .s-risolto { background: #15803D; }
-        .s-chiuso { background: #64748B; }
-        .p-bassa { background: #15803D; }
-        .p-media { background: #CA8A04; }
-        .p-alta { background: #EA580C; }
-        .p-urgente { background: #B91C1C; }
-        .empty-card {
-            background: #F8FAFC;
-            border: 1px dashed #CBD5E1;
-            border-radius: 15px;
-            padding: 30px;
-            text-align: center;
-            color: #64748B;
-        }
+        .manage-ticket-id { color: #2F75B5; font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .manage-ticket-title { color: #17365D; font-size: 1.08rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
+        .manage-ticket-desc { color: #64748B; font-size: .84rem; line-height: 1.4; margin-top: 8px; }
+        .manage-empty { background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 15px; padding: 30px; text-align: center; color: #64748B; }
+        .manage-section-title { color: #17365D; font-size: 1.15rem; font-weight: 800; margin-top: 18px; }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    admin = is_admin()
-    username = st.session_state.get("username", "")
-
     rows = db.get_tickets() if admin else db.get_tickets_tecnico(username)
+    df = pd.DataFrame(rows) if rows else pd.DataFrame()
 
     user_label = username.replace("_", " ").title() if username else ""
     ruolo_label = st.session_state.get("ruolo", "")
 
     st.markdown(
         f"""
-        <div class="dash-hero">
+        <div class="manage-hero">
             <div style="display:flex;justify-content:space-between;gap:20px;align-items:center;">
                 <div>
-                    <h1>📊 Dashboard</h1>
-                    <p>Gestisci e monitora in modo semplice tutte le richieste di assistenza.</p>
+                    <h1>🎫 Gestisci Ticket</h1>
+                    <p>Un'unica area per consultare, gestire e completare i ticket.</p>
                 </div>
-                <div class="dash-user">
-                    <b>{_safe(user_label)}</b><br/>
-                    {_safe(ruolo_label)}
+                <div style="text-align:right;font-size:.82rem;color:rgba(255,255,255,.82);padding-top:4px;">
+                    <b>{_safe(user_label)}</b><br/>{_safe(ruolo_label)}
                 </div>
             </div>
         </div>
@@ -502,271 +405,210 @@ def pagina_dashboard():
         unsafe_allow_html=True,
     )
 
-    if not rows:
-        st.markdown(
-            '<div class="empty-card">🎫<br/><br/><b>Nessun ticket da visualizzare</b><br/>Non sono presenti richieste disponibili per il tuo profilo.</div>',
-            unsafe_allow_html=True,
-        )
-        return
-
-    df = pd.DataFrame(rows)
-
-    def count_status(name):
-        if "stato" not in df.columns:
-            return 0
-        return int((df["stato"].fillna("").astype(str).str.strip() == name).sum())
-
-    total = len(df)
-    aperti = count_status("Aperto")
-    lavorazione = count_status("In Lavorazione")
-    risolti = count_status("Risolto")
-    chiusi = count_status("Chiuso")
-
-    stat_cols = st.columns(5)
-    stats = [
-        ("TOTALE", total),
-        ("APERTI", aperti),
-        ("IN LAVORAZIONE", lavorazione),
-        ("RISOLTI", risolti),
-        ("CHIUSI", chiusi),
-    ]
-
-    for col, (label, value) in zip(stat_cols, stats):
-        with col:
-            st.markdown(
-                f"""
-                <div class="stat-card">
-                    <div class="stat-label">{label}</div>
-                    <div class="stat-value">{value}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-    st.markdown(
-        """
-        <div class="filter-panel">
-            <div class="filter-heading">🔎 FILTRA I TICKET</div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    filter_version = int(st.session_state.get("dashboard_filter_version", 0))
-
-    c1, c2, c3, c4, c5 = st.columns([2.25, 1.2, 1.2, 1.45, .65])
-
-    with c1:
-        cerca = st.text_input(
-            "Cerca",
-            placeholder="Titolo, descrizione o categoria",
-            key=f"dashboard_cerca_{filter_version}",
-        )
-
-    with c2:
-        stato = st.selectbox(
-            "Stato",
-            ["Tutti"] + STATI,
-            key=f"dashboard_stato_{filter_version}",
-        )
-
-    with c3:
-        priorita = st.selectbox(
-            "Priorità",
-            ["Tutte"] + PRIORITA,
-            key=f"dashboard_priorita_{filter_version}",
-        )
-
-    with c4:
-        if admin:
-            assegnati = sorted(
-                [
-                    str(x)
-                    for x in df.get(
-                        "assegnato_a", pd.Series(dtype=str)
-                    ).dropna().unique()
-                    if str(x).strip()
-                ]
-            )
-            assegnato = st.selectbox(
-                "Assegnato a",
-                ["Tutti"] + assegnati,
-                key=f"dashboard_assegnato_{filter_version}",
-                )
-        else:
-            assegnato = "Tutti"
-
-    with c5:
-        st.button(
-            "↺",
-            key="dashboard_reset",
-            help="Azzera tutti i filtri",
-            use_container_width=True,
-            on_click=_reset_dashboard_filters,
-        )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    filtrato = df.copy()
-
-    if cerca:
-        mask = (
-            filtrato.astype(str)
-            .apply(
-                lambda col: col.str.contains(
-                    cerca, case=False, na=False, regex=False
-                )
-            )
-            .any(axis=1)
-        )
-        filtrato = filtrato[mask]
-
-    if stato != "Tutti" and "stato" in filtrato.columns:
-        filtrato = filtrato[filtrato["stato"] == stato]
-
-    if priorita != "Tutte" and "priorita" in filtrato.columns:
-        filtrato = filtrato[filtrato["priorita"] == priorita]
-
-    if admin and assegnato != "Tutti" and "assegnato_a" in filtrato.columns:
-        filtrato = filtrato[filtrato["assegnato_a"] == assegnato]
-
-    st.markdown(
-        f'<div class="result-line"><strong>{len(filtrato)}</strong> ticket visualizzati</div>',
-        unsafe_allow_html=True,
-    )
-
-    if filtrato.empty:
-        st.markdown(
-            '<div class="empty-card">🔍<br/><br/><b>Nessun risultato</b><br/>Prova a modificare i filtri selezionati.</div>',
-            unsafe_allow_html=True,
-        )
-        return
-
-    selected = st.session_state.get("dashboard_ticket_aperto")
-
+    # --------------------------------------------------------
+    # DETTAGLIO TICKET
+    # --------------------------------------------------------
+    selected = st.session_state.get("gestisci_ticket_selezionato")
     if selected is not None:
-        if st.button("← Torna alla Dashboard", key="dashboard_back"):
-            st.session_state.pop("dashboard_ticket_aperto", None)
+        if st.button("← Torna ai ticket", key="gestisci_ticket_back", use_container_width=False):
+            st.session_state.pop("gestisci_ticket_selezionato", None)
             st.rerun()
-
         mostra_dettaglio_ticket(int(selected))
         return
 
+    if df.empty:
+        st.markdown(
+            '<div class="manage-empty">🎫<br/><br/><b>Nessun ticket da visualizzare</b><br/>Non sono presenti richieste disponibili per il tuo profilo.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
     # --------------------------------------------------------
-    # SCHEDE TICKET
+    # RIEPILOGO
     # --------------------------------------------------------
-    # Il pulsante PDF è volutamente subito dopo il blocco
-    # "Assegnato a", come richiesto.
-    for _, row in filtrato.iterrows():
+    if "stato" not in df.columns:
+        df["stato"] = ""
+    df["stato"] = df["stato"].fillna("").astype(str).str.strip()
+
+    def conta(stato):
+        return int((df["stato"] == stato).sum())
+
+    stats = [
+        ("TOTALE", len(df)),
+        ("APERTI", conta("Aperto")),
+        ("IN LAVORAZIONE", conta("In Lavorazione")),
+        ("RISOLTI", conta("Risolto")),
+        ("CHIUSI", conta("Chiuso")),
+    ]
+    cols = st.columns(5)
+    for col, (label, value) in zip(cols, stats):
+        with col:
+            st.markdown(
+                f'<div class="manage-stat"><div class="manage-stat-label">{label}</div><div class="manage-stat-value">{value}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    # --------------------------------------------------------
+    # FILTRI COMUNI
+    # --------------------------------------------------------
+    filter_version = int(st.session_state.get("gestisci_ticket_filter_version", 0))
+    st.markdown(
+        '<div class="manage-filter"><div class="manage-filter-title">🔎 FILTRA I TICKET</div>',
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3, c4 = st.columns([2.25, 1.2, 1.2, 1.45])
+    with c1:
+        cerca = st.text_input(
+            "Cerca",
+            placeholder="Titolo, descrizione, categoria o numero",
+            key=f"gestisci_cerca_{filter_version}",
+        ).strip()
+    with c2:
+        filtro_stato = st.selectbox(
+            "Stato", ["Tutti"] + STATI, key=f"gestisci_stato_{filter_version}"
+        )
+    with c3:
+        filtro_priorita = st.selectbox(
+            "Priorità", ["Tutte"] + PRIORITA, key=f"gestisci_priorita_{filter_version}"
+        )
+    with c4:
+        if admin:
+            assegnati = sorted([
+                str(x) for x in df.get("assegnato_a", pd.Series(dtype=str)).dropna().unique()
+                if str(x).strip()
+            ])
+            filtro_tecnico = st.selectbox(
+                "Assegnato a", ["Tutti"] + assegnati, key=f"gestisci_tecnico_{filter_version}"
+            )
+        else:
+            filtro_tecnico = "Tutti"
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Pulsante reset separato: evita che il cambio di versione dei widget
+    # venga interpretato come una modifica ai valori correnti.
+    if st.button("↺ Azzera filtri", key="gestisci_ticket_reset"):
+        st.session_state["gestisci_ticket_filter_version"] = filter_version + 1
+        st.rerun()
+
+    filtrato = df.copy()
+    if cerca:
+        mask = filtrato.astype(str).apply(
+            lambda col: col.str.contains(cerca, case=False, na=False, regex=False)
+        ).any(axis=1)
+        filtrato = filtrato[mask]
+    if filtro_stato != "Tutti":
+        filtrato = filtrato[filtrato["stato"] == filtro_stato]
+    if filtro_priorita != "Tutte" and "priorita" in filtrato.columns:
+        filtrato = filtrato[filtrato["priorita"] == filtro_priorita]
+    if admin and filtro_tecnico != "Tutti" and "assegnato_a" in filtrato.columns:
+        filtrato = filtrato[filtrato["assegnato_a"] == filtro_tecnico]
+
+    st.caption(f"{len(filtrato)} ticket visualizzati")
+
+    if filtrato.empty:
+        st.markdown(
+            '<div class="manage-empty">🔍<br/><br/><b>Nessun risultato</b><br/>Prova a modificare i filtri selezionati.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    # --------------------------------------------------------
+    # CARD AMMINISTRATORE
+    # --------------------------------------------------------
+    def mostra_card(row, chiave):
         ticket_id = int(row["id"])
-
         titolo = _safe(row.get("titolo")) or "SENZA TITOLO"
-        stato_val = _safe(row.get("stato")) or "—"
-        priorita_val = _safe(row.get("priorita")) or "—"
-        categoria_val = _safe(row.get("categoria")) or "—"
-        tecnico_val = _safe(row.get("assegnato_a")) or "NON ASSEGNATO"
-
+        stato = _safe(row.get("stato")) or "—"
+        priorita = _safe(row.get("priorita")) or "—"
+        categoria = _safe(row.get("categoria")) or "—"
+        tecnico = _safe(row.get("assegnato_a")) or "NON ASSEGNATO"
         descrizione = _safe(row.get("descrizione")).strip()
         if len(descrizione) > 150:
             descrizione = descrizione[:147].rstrip() + "..."
 
-        data_ticket = (
-            row.get("creato_il")
-            or row.get("created_at")
-            or row.get("data_creazione")
-            or ""
-        )
-        try:
-            data_ticket = db.format_data(data_ticket) if data_ticket else ""
-        except Exception:
-            data_ticket = _safe(data_ticket)
-
-        stato_class = {
-            "Aperto": "s-aperto",
-            "In Lavorazione": "s-lavorazione",
-            "Risolto": "s-risolto",
-            "Chiuso": "s-chiuso",
-        }.get(stato_val, "s-chiuso")
-
-        priority_class = {
-            "Bassa": "p-bassa",
-            "Media": "p-media",
-            "Alta": "p-alta",
-            "Urgente": "p-urgente",
-        }.get(priorita_val, "s-chiuso")
-
         st.markdown(
             f"""
-            <div class="ticket-card">
-                <div class="ticket-id">TICKET #{ticket_id}</div>
-                <div class="ticket-title">{_safe(titolo)}</div>
-                {f'<div class="ticket-desc">{_safe(descrizione)}</div>' if descrizione else ''}
-                <div style="height:12px"></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
-                    <div>
-                        <div class="meta-label">Stato</div>
-                        <span class="badge {stato_class}">{_safe(stato_val)}</span>
-                    </div>
-                    <div>
-                        <div class="meta-label">Priorità</div>
-                        <span class="badge {priority_class}">{_safe(priorita_val)}</span>
-                    </div>
-                    <div>
-                        <div class="meta-label">Categoria</div>
-                        <div class="meta-value">{_safe(categoria_val)}</div>
-                    </div>
-                    <div>
-                        <div class="meta-label">Assegnato a</div>
-                        <div class="meta-value">{_safe(tecnico_val)}</div>
-                    </div>
+            <div class="manage-ticket">
+                <div class="manage-ticket-id">TICKET #{ticket_id}</div>
+                <div class="manage-ticket-title">{_safe(titolo)}</div>
+                {f'<div class="manage-ticket-desc">{_safe(descrizione)}</div>' if descrizione else ''}
+                <div style="height:10px"></div>
+                <div style="color:#475569;font-size:.84rem;">
+                    <b>Stato:</b> {_safe(stato)} &nbsp;•&nbsp;
+                    <b>Priorità:</b> {_safe(priorita)} &nbsp;•&nbsp;
+                    <b>Categoria:</b> {_safe(categoria)} &nbsp;•&nbsp;
+                    <b>Assegnato a:</b> {_safe(tecnico)}
                 </div>
-                {f'<div style="margin-top:11px;color:#94A3B8;font-size:.72rem;">CREATO IL&nbsp;&nbsp; {_safe(data_ticket)}</div>' if data_ticket else ''}
             </div>
             """,
             unsafe_allow_html=True,
         )
+        if st.button(
+            "🛠️ Apri ticket",
+            key=f"gestisci_apri_{chiave}_{ticket_id}",
+            use_container_width=True,
+        ):
+            st.session_state["gestisci_ticket_selezionato"] = ticket_id
+            st.rerun()
 
-        # L'apertura del ticket è disponibile a tutti.
-        # Il download PDF resta riservato all'amministratore.
-        if admin:
-            col_open, col_pdf = st.columns([5.8, 1.2])
+    if admin:
+        for _, row in filtrato.iterrows():
+            mostra_card(row, "admin")
+        return
+
+    # --------------------------------------------------------
+    # TECNICO — AREA OPERATIVA INTEGRATA
+    # --------------------------------------------------------
+    ordine_priorita = {"Urgente": 0, "Alta": 1, "Media": 2, "Bassa": 3}
+
+    def ordina(frame):
+        frame = frame.copy()
+        if frame.empty:
+            return frame
+        if "priorita" in frame.columns:
+            frame["_ord"] = frame["priorita"].map(ordine_priorita).fillna(99)
         else:
-            col_open = st.container()
-            col_pdf = None
+            frame["_ord"] = 99
+        if "id" in frame.columns:
+            frame = frame.sort_values(["_ord", "id"], ascending=[True, False], kind="stable")
+        return frame.drop(columns=["_ord"])
 
-        with col_open:
-            if st.button(
-                "Apri ticket  ›",
-                key=f"dashboard_open_{ticket_id}",
-                use_container_width=True,
-            ):
-                st.session_state["dashboard_ticket_aperto"] = ticket_id
-                st.rerun()
+    sezioni = [
+        ("In lavorazione", "🟠", "Ticket sui quali stai già intervenendo.", "In Lavorazione", "Nessun ticket attualmente in lavorazione."),
+        ("Da prendere in carico", "🟡", "Ticket assegnati a te che non sono ancora in lavorazione.", "Aperto", "Non hai ticket aperti da prendere in carico."),
+        ("Risolti — in attesa di chiusura", "🟢", "Hai completato l'intervento. Il ticket resta disponibile fino alla chiusura amministrativa.", "Risolto", "Non ci sono ticket risolti in attesa di chiusura."),
+        ("Storico ticket chiusi", "⚪", "I ticket chiusi sono consultabili come storico.", "Chiuso", "Nessun ticket chiuso nello storico."),
+    ]
 
-        if admin and col_pdf is not None:
-            with col_pdf:
-                try:
-                    ticket_completo = db.get_ticket(ticket_id)
-                    if not ticket_completo:
-                        st.button(
-                            "📄",
-                            key=f"dashboard_pdf_disabled_{ticket_id}",
-                            help="Ticket non disponibile",
-                            disabled=True,
-                            use_container_width=True,
-                        )
-                    else:
-                        pdf_bytes = pdf_generator.genera_pdf(ticket_completo)
-                        st.download_button(
-                            "📄",
-                            data=pdf_bytes,
-                            file_name=f"ticket_{ticket_id}.pdf",
-                            mime="application/pdf",
-                            key=f"dashboard_pdf_{ticket_id}",
-                            help=f"Scarica PDF del ticket #{ticket_id}",
-                            use_container_width=True,
-                        )
-                except Exception as e:
-                    st.error(f"PDF #{ticket_id}: {e}")
+    for titolo_sezione, emoji, descrizione_sezione, stato_sezione, vuoto in sezioni:
+        if filtro_stato != "Tutti" and filtro_stato != stato_sezione:
+            continue
+        frame = filtrato[filtrato["stato"] == stato_sezione].copy()
+        frame = ordina(frame)
+
+        if stato_sezione == "Chiuso":
+            with st.expander(f"{emoji} {titolo_sezione} ({len(frame)})", expanded=False):
+                st.caption(descrizione_sezione)
+                if frame.empty:
+                    st.info(vuoto)
+                else:
+                    for _, row in frame.iterrows():
+                        mostra_card(row, "chiuso")
+        else:
+            st.markdown(f'<div class="manage-section-title">{emoji} {titolo_sezione}</div>', unsafe_allow_html=True)
+            st.caption(descrizione_sezione)
+            if frame.empty:
+                st.info(vuoto)
+            else:
+                for _, row in frame.iterrows():
+                    mostra_card(row, stato_sezione.replace(" ", "_"))
+            st.divider()
+
+
+def pagina_dashboard():
+    """Compatibilità con eventuali chiamate residue: usa la pagina unica."""
+    pagina_gestisci_ticket()
 
 
 def pagina_nuovo_ticket():
@@ -1164,9 +1006,22 @@ def mostra_dettaglio_ticket(ticket_id):
                 st.write("**Ultimo intervento:**")
                 st.write(_safe(ultimo_intervento.get("descrizione")))
 
-            col_pdf, col_close = st.columns(2)
+            if stato_attuale == "Risolto":
+                st.info("Il tecnico ha risolto il ticket. Puoi procedere con la chiusura amministrativa.")
+                if st.button(
+                    "🔒 Chiudi ticket",
+                    key=f"close_{ticket_id}",
+                    use_container_width=True,
+                ):
+                    try:
+                        if db.chiudi_ticket(ticket_id, username):
+                            st.success("Ticket chiuso.")
+                            st.rerun()
+                    except Exception as e:
+                        st.error("Errore nella chiusura del ticket.")
+                        st.exception(e)
 
-            with col_pdf:
+            elif stato_attuale == "Chiuso":
                 try:
                     pdf_bytes = pdf_generator.genera_pdf(ticket)
                     st.download_button(
@@ -1181,20 +1036,11 @@ def mostra_dettaglio_ticket(ticket_id):
                     st.error("Errore nella generazione PDF.")
                     st.exception(e)
 
-            with col_close:
-                if stato_attuale != "Chiuso":
-                    if st.button(
-                        "🔒 Chiudi ticket",
-                        key=f"close_{ticket_id}",
-                        use_container_width=True,
-                    ):
-                        try:
-                            if db.chiudi_ticket(ticket_id, username):
-                                st.success("Ticket chiuso.")
-                                st.rerun()
-                        except Exception as e:
-                            st.error("Errore nella chiusura del ticket.")
-                            st.exception(e)
+            else:
+                st.info(
+                    "Il ticket potrà essere chiuso dall'amministratore quando "
+                    "sarà portato a Risolto dal tecnico."
+                )
 
         return
 
@@ -1350,451 +1196,9 @@ def mostra_dettaglio_ticket(ticket_id):
 
 
 def pagina_gestione_interventi():
-    """Area operativa dedicata al lavoro del tecnico."""
-    admin = is_admin()
-    username = st.session_state.get("username", "")
+    """Compatibilità con eventuali chiamate residue: la gestione è ora unificata."""
+    pagina_gestisci_ticket()
 
-    tickets = db.get_tickets() if admin else db.get_tickets_tecnico(username)
-
-    if not tickets:
-        st.title("🛠️ Gestisci gli interventi")
-        st.info("Non ci sono ticket disponibili per la gestione degli interventi.")
-        return
-
-    df = pd.DataFrame(tickets)
-
-    # ========================================================
-    # DETTAGLIO TICKET
-    # ========================================================
-    selected = st.session_state.get("gestione_interventi_ticket")
-
-    if selected is not None:
-        if st.button(
-            "← Torna alla mia area di lavoro",
-            key="gestione_interventi_back",
-        ):
-            st.session_state.pop("gestione_interventi_ticket", None)
-            st.rerun()
-
-        mostra_dettaglio_ticket(int(selected))
-        return
-
-    # ========================================================
-    # AMMINISTRATORE
-    # ========================================================
-    # Per l'amministratore manteniamo la gestione generale degli
-    # interventi, mentre la nuova area operativa è dedicata al tecnico.
-    if admin:
-        st.title("🛠️ Gestisci gli interventi")
-        st.caption(
-            "Consulta lo storico degli interventi e gestisci i ticket."
-        )
-
-        stati = (
-            df["stato"].fillna("")
-            if "stato" in df.columns
-            else pd.Series(dtype=str)
-        )
-
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Ticket", len(df))
-        c2.metric("Aperti", int((stati == "Aperto").sum()))
-        c3.metric("In lavorazione", int((stati == "In Lavorazione").sum()))
-        c4.metric("Risolti", int((stati == "Risolto").sum()))
-
-        with st.container(border=True):
-            st.markdown("### 🔎 Filtra ticket")
-            f1, f2, f3 = st.columns([2, 1.2, 1.2])
-
-            with f1:
-                ricerca = st.text_input(
-                    "Cerca",
-                    placeholder="Numero, titolo, descrizione...",
-                    key="gestione_interventi_cerca",
-                ).strip()
-
-            with f2:
-                filtro_stato = st.selectbox(
-                    "Stato",
-                    ["Tutti", "Aperto", "In Lavorazione", "Risolto", "Chiuso"],
-                    key="gestione_interventi_stato",
-                )
-
-            with f3:
-                presenti = []
-                if "priorita" in df.columns:
-                    presenti = [
-                        str(x)
-                        for x in df["priorita"].dropna().unique()
-                        if str(x)
-                    ]
-                priorita_disponibili = ["Tutte"] + [
-                    x for x in PRIORITA if x in presenti
-                ]
-                for x in presenti:
-                    if x not in priorita_disponibili:
-                        priorita_disponibili.append(x)
-
-                filtro_priorita = st.selectbox(
-                    "Priorità",
-                    priorita_disponibili,
-                    key="gestione_interventi_priorita",
-                )
-
-        filtrato = df.copy()
-
-        if ricerca:
-            mask = filtrato.astype(str).apply(
-                lambda col: col.str.contains(
-                    ricerca,
-                    case=False,
-                    na=False,
-                    regex=False,
-                )
-            ).any(axis=1)
-            filtrato = filtrato[mask]
-
-        if filtro_stato != "Tutti" and "stato" in filtrato.columns:
-            filtrato = filtrato[filtrato["stato"] == filtro_stato]
-
-        if filtro_priorita != "Tutte" and "priorita" in filtrato.columns:
-            filtrato = filtrato[filtrato["priorita"] == filtro_priorita]
-
-        st.caption(f"{len(filtrato)} ticket visualizzati")
-
-        if filtrato.empty:
-            st.info("Nessun ticket corrisponde ai filtri selezionati.")
-            return
-
-        for _, row in filtrato.iterrows():
-            ticket_id = int(row["id"])
-            titolo = _safe(row.get("titolo")) or "Senza titolo"
-            stato = _safe(row.get("stato")) or "—"
-            priorita = _safe(row.get("priorita")) or "—"
-            categoria = _safe(row.get("categoria")) or "—"
-            tecnico = _safe(row.get("assegnato_a")) or "Non assegnato"
-
-            interventi = db.get_interventi(ticket_id)
-            ultimo = interventi[-1] if interventi else None
-
-            with st.container(border=True):
-                c1, c2 = st.columns([4, 1.2])
-                with c1:
-                    st.markdown(f"### 🎫 #{ticket_id} — {titolo}")
-                    st.write(
-                        f"**Stato:** {stato}  •  **Priorità:** {priorita}  •  "
-                        f"**Categoria:** {categoria}"
-                    )
-                    st.caption(
-                        f"👷 Tecnico: {tecnico}  •  "
-                        f"🛠️ Interventi registrati: {len(interventi)}"
-                    )
-                    if ultimo:
-                        st.write(
-                            f"**Ultimo intervento:** "
-                            f"{_safe(ultimo.get('descrizione'))}"
-                        )
-                        st.caption(
-                            f"{_safe(ultimo.get('tecnico'))} • "
-                            f"{db.format_data(ultimo.get('data_intervento'))} • "
-                            f"{_safe(ultimo.get('stato'))}"
-                        )
-                with c2:
-                    if st.button(
-                        "🛠️ Gestisci",
-                        key=f"gestisci_interventi_{ticket_id}",
-                        use_container_width=True,
-                    ):
-                        st.session_state["gestione_interventi_ticket"] = ticket_id
-                        st.rerun()
-
-        return
-
-    # ========================================================
-    # TECNICO — VERA AREA DI LAVORO
-    # ========================================================
-    user_label = username.replace("_", " ").title() if username else "Tecnico"
-
-    stati = (
-        df["stato"].fillna("").astype(str).str.strip()
-        if "stato" in df.columns
-        else pd.Series(dtype=str)
-    )
-
-    aperti = df[stati == "Aperto"].copy()
-    lavorazione = df[stati == "In Lavorazione"].copy()
-    risolti = df[stati == "Risolto"].copy()
-    chiusi = df[stati == "Chiuso"].copy()
-
-    # Priorità operative: Urgente → Alta → Media → Bassa.
-    ordine_priorita = {
-        "Urgente": 0,
-        "Alta": 1,
-        "Media": 2,
-        "Bassa": 3,
-    }
-
-    def ordina_operativi(frame):
-        frame = frame.copy()
-        if frame.empty:
-            return frame
-
-        if "priorita" in frame.columns:
-            frame["_ordine_priorita"] = (
-                frame["priorita"]
-                .fillna("")
-                .map(ordine_priorita)
-                .fillna(99)
-            )
-        else:
-            frame["_ordine_priorita"] = 99
-
-        if "id" in frame.columns:
-            frame = frame.sort_values(
-                by=["_ordine_priorita", "id"],
-                ascending=[True, False],
-                kind="stable",
-            )
-        else:
-            frame = frame.sort_values(
-                by=["_ordine_priorita"],
-                ascending=[True],
-                kind="stable",
-            )
-
-        return frame.drop(columns=["_ordine_priorita"])
-
-    aperti = ordina_operativi(aperti)
-    lavorazione = ordina_operativi(lavorazione)
-    risolti = ordina_operativi(risolti)
-    chiusi = ordina_operativi(chiusi)
-
-    # --------------------------------------------------------
-    # INTESTAZIONE
-    # --------------------------------------------------------
-    st.markdown(
-        f"""
-        <div style="
-            background: linear-gradient(135deg, #17365D, #245B8F);
-            border-radius: 18px;
-            padding: 24px 28px;
-            margin-bottom: 18px;
-            color: white;
-        ">
-            <div style="font-size: 2rem; font-weight: 800;">
-                🛠️ La mia area di lavoro
-            </div>
-            <div style="font-size: 1rem; opacity: .92; margin-top: 6px;">
-                Ciao <b>{_safe(user_label)}</b> — qui trovi i ticket assegnati
-                e le attività che richiedono il tuo intervento.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # --------------------------------------------------------
-    # RIEPILOGO OPERATIVO
-    # --------------------------------------------------------
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("🎫 Totali", len(df))
-    c2.metric("🟡 Da lavorare", len(aperti))
-    c3.metric("🟠 In lavorazione", len(lavorazione))
-    c4.metric("🟢 Risolti", len(risolti))
-
-    st.markdown("")
-
-    # --------------------------------------------------------
-    # FILTRI
-    # --------------------------------------------------------
-    with st.container(border=True):
-        st.markdown("### 🔎 Cerca nella mia area")
-
-        f1, f2 = st.columns([2.5, 1])
-
-        with f1:
-            ricerca = st.text_input(
-                "Cerca ticket",
-                placeholder="Numero, titolo, descrizione, categoria...",
-                key="gestione_interventi_cerca",
-            ).strip()
-
-        with f2:
-            priorita_filtro = st.selectbox(
-                "Priorità",
-                ["Tutte"] + list(PRIORITA),
-                key="gestione_interventi_priorita",
-            )
-
-    def applica_filtri(frame):
-        if frame.empty:
-            return frame
-
-        risultato = frame.copy()
-
-        if ricerca:
-            mask = risultato.astype(str).apply(
-                lambda col: col.str.contains(
-                    ricerca,
-                    case=False,
-                    na=False,
-                    regex=False,
-                )
-            ).any(axis=1)
-            risultato = risultato[mask]
-
-        if (
-            priorita_filtro != "Tutte"
-            and "priorita" in risultato.columns
-        ):
-            risultato = risultato[
-                risultato["priorita"] == priorita_filtro
-            ]
-
-        return risultato
-
-    aperti = applica_filtri(aperti)
-    lavorazione = applica_filtri(lavorazione)
-    risolti = applica_filtri(risolti)
-    chiusi = applica_filtri(chiusi)
-
-    # --------------------------------------------------------
-    # CARD TICKET
-    # --------------------------------------------------------
-    def mostra_card_ticket(row, tipo):
-        ticket_id = int(row["id"])
-        titolo = _safe(row.get("titolo")) or "Senza titolo"
-        stato = _safe(row.get("stato")) or "—"
-        priorita = _safe(row.get("priorita")) or "—"
-        categoria = _safe(row.get("categoria")) or "—"
-
-        interventi = db.get_interventi(ticket_id)
-        ultimo = interventi[-1] if interventi else None
-
-        icone_stato = {
-            "Aperto": "🟡",
-            "In Lavorazione": "🟠",
-            "Risolto": "🟢",
-            "Chiuso": "⚪",
-        }
-        icona = icone_stato.get(stato, "🎫")
-
-        st.markdown(
-            f"""
-            <div style="
-                border: 1px solid #E2E8F0;
-                border-radius: 14px;
-                padding: 16px 18px 12px 18px;
-                margin-bottom: 8px;
-                background: #FFFFFF;
-            ">
-                <div style="font-size: 1.12rem; font-weight: 800; color: #17365D;">
-                    {icona} #{ticket_id} — {_safe(titolo)}
-                </div>
-                <div style="margin-top: 7px; color: #475569; font-size: .88rem;">
-                    <b>Stato:</b> {_safe(stato)}
-                    &nbsp; • &nbsp;
-                    <b>Priorità:</b> {_safe(priorita)}
-                    &nbsp; • &nbsp;
-                    <b>Categoria:</b> {_safe(categoria)}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        c1, c2 = st.columns([4, 1])
-
-        with c1:
-            if ultimo:
-                st.caption(
-                    f"🛠️ Ultimo intervento: "
-                    f"{_safe(ultimo.get('descrizione'))}"
-                )
-                st.caption(
-                    f"{_safe(ultimo.get('tecnico'))} • "
-                    f"{db.format_data(ultimo.get('data_intervento'))} • "
-                    f"{_safe(ultimo.get('stato'))} • "
-                    f"Interventi totali: {len(interventi)}"
-                )
-            else:
-                st.caption(
-                    "🆕 Nessun intervento ancora registrato."
-                )
-
-        with c2:
-            if st.button(
-                "🛠️ Apri ticket",
-                key=f"area_tecnico_ticket_{tipo}_{ticket_id}",
-                use_container_width=True,
-            ):
-                st.session_state["gestione_interventi_ticket"] = ticket_id
-                st.rerun()
-
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-
-    # --------------------------------------------------------
-    # SEZIONE OPERATIVA
-    # --------------------------------------------------------
-    def mostra_sezione(frame, titolo, descrizione, emoji, empty_text):
-        st.markdown(f"### {emoji} {titolo}")
-        st.caption(descrizione)
-
-        if frame.empty:
-            st.info(empty_text)
-            return
-
-        st.caption(f"{len(frame)} ticket")
-        for _, row in frame.iterrows():
-            mostra_card_ticket(row, titolo)
-
-    mostra_sezione(
-        lavorazione,
-        "In lavorazione",
-        "Ticket sui quali stai già intervenendo.",
-        "🟠",
-        "Nessun ticket attualmente in lavorazione.",
-    )
-
-    st.divider()
-
-    mostra_sezione(
-        aperti,
-        "Da prendere in carico",
-        "Ticket assegnati a te che non sono ancora in lavorazione.",
-        "🟡",
-        "Non hai ticket aperti da prendere in carico.",
-    )
-
-    st.divider()
-
-    mostra_sezione(
-        risolti,
-        "Risolti — in attesa di chiusura",
-        "Hai completato l'intervento. Il ticket resta disponibile fino alla chiusura amministrativa.",
-        "🟢",
-        "Non ci sono ticket risolti in attesa di chiusura.",
-    )
-
-    # --------------------------------------------------------
-    # STORICO CHIUSI
-    # --------------------------------------------------------
-    st.divider()
-
-    with st.expander(
-        f"📁 Storico ticket chiusi ({len(chiusi)})",
-        expanded=False,
-    ):
-        st.caption(
-            "I ticket chiusi sono consultabili come storico e non "
-            "compaiono più nella parte operativa principale."
-        )
-
-        if chiusi.empty:
-            st.info("Nessun ticket chiuso nello storico.")
-        else:
-            for _, row in chiusi.iterrows():
-                mostra_card_ticket(row, "chiuso")
 
 def pagina_statistiche():
     if not is_admin():
