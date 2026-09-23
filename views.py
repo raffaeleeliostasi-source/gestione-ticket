@@ -5,6 +5,28 @@ from datetime import date
 import pandas as pd
 import altair as alt
 import streamlit as st
+def applica_stile_globale():
+    st.markdown("""
+    <style>
+        /* Stile arancione globale per tutti i pulsanti primari dell'applicazione */
+        div[data-testid="stButton"] button[kind="primary"] {
+            background: linear-gradient(135deg, #F97316 0%, #EA580C 100%) !important;
+            color: #FFFFFF !important;
+            border: 1px solid #C2410C !important;
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+            min-height: 48px !important;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3) !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        
+        div[data-testid="stButton"] button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #FB923C 0%, #F97316 100%) !important;
+            box-shadow: 0 6px 16px rgba(249, 115, 22, 0.45) !important;
+            transform: translateY(-1px);
+        }
+    </style>
+    """, unsafe_allow_html=True)
 import time
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
@@ -367,40 +389,102 @@ def pagina_gestisci_ticket():
             padding: 15px 18px 6px 18px; margin: 18px 0 14px 0;
         }
         .manage-filter-title { color: #17365D; font-size: 1rem; font-weight: 800; margin-bottom: 8px; }
+        /* Card ticket: grafica chiara e compatta come da riferimento */
         .manage-ticket {
-            background: white; border: 1px solid #E2E8F0; border-radius: 15px;
-            padding: 17px 19px 14px 19px; margin: 0 0 11px 0;
-            box-shadow: 0 3px 12px rgba(15,23,42,.045);
+            background: #DCEAF7;
+            border: 0 !important;
+            border-radius: 20px;
+            padding: 17px 19px 15px 19px;
+            margin: 0 0 9px 0;
+            box-shadow: 7px 7px 12px rgba(0, 0, 0, .20);
         }
-        .manage-ticket-id { color: #2F75B5; font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-        .manage-ticket-title { color: #17365D; font-size: 1.08rem; font-weight: 800; margin-top: 2px; line-height: 1.25; }
-        .manage-ticket-desc { color: #64748B; font-size: .84rem; line-height: 1.4; margin-top: 8px; }
-        .manage-empty { background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 15px; padding: 30px; text-align: center; color: #64748B; }
-        .manage-section-title { color: #17365D; font-size: 1.15rem; font-weight: 800; margin-top: 18px; }
+        .manage-ticket-id {
+            color: #D56A1F;
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+        }
+        .manage-ticket-title {
+            color: #111827;
+            font-size: 1.08rem;
+            font-weight: 800;
+            margin-top: 2px;
+            line-height: 1.25;
+        }
+        .manage-ticket-desc {
+            color: #737373;
+            font-size: .84rem;
+            line-height: 1.35;
+            margin-top: 7px;
+        }
+        .manage-ticket-meta {
+            color: #303030;
+            font-size: .84rem;
+            line-height: 1.25;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .manage-ticket-meta .label { color: #222222; }
+        .manage-ticket-meta .stato { color: #00A651; }
+        .manage-ticket-meta .priorita { color: #FF0000; }
+        .manage-ticket-meta .categoria,
+        .manage-ticket-meta .tecnico { color: #6F6F6F; }
 
-        /* Pulsante principale "Apri ticket" - bordeaux */
-        div[data-testid="stButton"] button[kind="primary"] {
-            background: linear-gradient(180deg, #B3263A 0%, #971D30 100%) !important;
-            border: 1px solid #8F1B2D !important;
-            color: #FFFFFF !important;
-            border-radius: 10px !important;
-            min-height: 48px !important;
+        .manage-empty {
+            background: #F8FAFC;
+            border: 1px dashed #CBD5E1;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            color: #64748B;
+        }
+        .manage-section-title {
+            color: #17365D;
+            font-size: 1.15rem;
+            font-weight: 800;
+            margin-top: 18px;
+        }
+
+        /* "Apri ticket": testo semplice arancione, senza riquadro */
+        div[data-testid="stButton"] button[kind="primary"],
+        div[data-testid="stButton"] button {
+            background: transparent !important;
+            border: 0 !important;
+            color: #F28C00 !important;
+            border-radius: 0 !important;
+            min-height: 42px !important;
             font-weight: 700 !important;
-            box-shadow: 0 4px 10px rgba(151, 29, 48, .18) !important;
+            font-size: 1.02rem !important;
+            box-shadow: none !important;
             transition: all .15s ease-in-out !important;
         }
 
-        div[data-testid="stButton"] button[kind="primary"]:hover {
-            background: linear-gradient(180deg, #C02A40 0%, #A32035 100%) !important;
-            border-color: #8F1B2D !important;
-            box-shadow: 0 6px 14px rgba(151, 29, 48, .24) !important;
+        div[data-testid="stButton"] button[kind="primary"]:hover,
+        div[data-testid="stButton"] button:hover {
+            background: transparent !important;
+            color: #D97700 !important;
+            box-shadow: none !important;
+            transform: none !important;
         }
 
-        /* Pulsante PDF secondario */
+        /* PDF: piccolo comando grafico sulla destra */
         div[data-testid="stDownloadButton"] button {
-            border-radius: 10px !important;
-            min-height: 48px !important;
-            font-weight: 600 !important;
+            background: transparent !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            min-height: 42px !important;
+            padding: 2px 6px !important;
+            font-size: 1.55rem !important;
+            font-weight: 800 !important;
+            color: #E00000 !important;
+            box-shadow: none !important;
+        }
+
+        div[data-testid="stDownloadButton"] button:hover {
+            background: transparent !important;
+            color: #B00000 !important;
+            box-shadow: none !important;
         }
         </style>
         """,
@@ -558,12 +642,19 @@ def pagina_gestisci_ticket():
                 <div class="manage-ticket-id">TICKET #{ticket_id}</div>
                 <div class="manage-ticket-title">{_safe(titolo)}</div>
                 {f'<div class="manage-ticket-desc">{_safe(descrizione)}</div>' if descrizione else ''}
-                <div style="height:10px"></div>
-                <div style="color:#475569;font-size:.84rem;">
-                    <b>Stato:</b> {_safe(stato)} &nbsp;•&nbsp;
-                    <b>Priorità:</b> {_safe(priorita)} &nbsp;•&nbsp;
-                    <b>Categoria:</b> {_safe(categoria)} &nbsp;•&nbsp;
-                    <b>Assegnato a:</b> {_safe(tecnico)}
+                <div style="height:9px"></div>
+                <div class="manage-ticket-meta">
+                    <span class="label">Stato:</span>
+                    <span class="stato">{_safe(stato)}</span>
+                    <span>&nbsp;&nbsp;&nbsp;</span>
+                    <span class="label">Priorità:</span>
+                    <span class="priorita">{_safe(priorita)}</span>
+                    <span>&nbsp;&nbsp;&nbsp;</span>
+                    <span class="label">Categoria:</span>
+                    <span class="categoria">{_safe(categoria)}</span>
+                    <span>&nbsp;&nbsp;&nbsp;</span>
+                    <span class="label">Assegnato a:</span>
+                    <span class="tecnico">{_safe(tecnico)}</span>
                 </div>
             </div>
             """,
@@ -576,7 +667,7 @@ def pagina_gestisci_ticket():
 
             with col_apri:
                 if st.button(
-                    "🛠️ Apri ticket",
+                    "📝 Apri ticket",
                     key=f"gestisci_apri_{chiave}_{ticket_id}",
                     use_container_width=True,
                     type="primary",
@@ -589,7 +680,7 @@ def pagina_gestisci_ticket():
                     ticket_pdf = db.get_ticket(ticket_id)
                     pdf_bytes = pdf_generator.genera_pdf(ticket_pdf)
                     st.download_button(
-                        "📄 PDF",
+                        "📄",
                         data=pdf_bytes,
                         file_name=f"ticket_{ticket_id}.pdf",
                         mime="application/pdf",
@@ -601,7 +692,7 @@ def pagina_gestisci_ticket():
                     st.error("PDF non disponibile")
         else:
             if st.button(
-                "🛠️ Apri ticket",
+                "📝 Apri ticket",
                 key=f"gestisci_apri_{chiave}_{ticket_id}",
                 use_container_width=True,
             ):
