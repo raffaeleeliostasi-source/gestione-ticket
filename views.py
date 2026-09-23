@@ -1282,6 +1282,42 @@ def pagina_gestione_interventi():
     pagina_gestisci_ticket()
 
 def pagina_statistiche():
+def pagina_statistiche():
+    # --- INIZIO STILE PERSONALIZZATO BLU/GRIGIO ---
+    st.markdown("""
+    <style>
+        div[data-testid="stButton"] button[kind="primary"] {
+            background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%) !important;
+            color: #FFFFFF !important;
+            border: 1px solid #1E40AF !important;
+            border-radius: 10px !important;
+            font-weight: 700 !important;
+            min-height: 46px !important;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25) !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        div[data-testid="stButton"] button[kind="primary"]:hover {
+            background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%) !important;
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35) !important;
+            transform: translateY(-1px);
+        }
+        div[data-testid="stMetric"] {
+            background-color: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    # --- FINE STILE PERSONALIZZATO ---
+
+    st.title("📊 Statistiche e Report")
+    
+    # [Qui resta tutto il codice originale della tua funzione per i grafici, tabelle e KPI]
+    # ...
+
+    
 def pagina_nuovo_ticket():
     # --- INIZIO STILE PERSONALIZZATO ARANCIONE ---
     st.markdown("""
