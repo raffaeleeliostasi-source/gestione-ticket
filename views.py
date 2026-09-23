@@ -668,29 +668,7 @@ def pagina_dashboard():
 
 
 def pagina_nuovo_ticket():
-        """
-    <div style="
-        display:flex;
-        align-items:center;
-        gap:10px;
-        margin-bottom:0.5rem;
-    ">
-        <span style="
-            color:#2E8B57;
-            font-size:2rem;
-            font-weight:700;
-            line-height:1;
-        ">➕</span>
-        <span style="
-            color:inherit;
-            font-size:2rem;
-            font-weight:700;
-            line-height:1;
-        ">Nuovo Ticket</span>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+    st.title("➕ Nuovo Ticket")
     st.markdown("Compila i campi sottostanti per aprire una nuova segnalazione nel sistema.")
 
     messaggio_ticket = st.session_state.pop("ticket_creato_msg", None)
