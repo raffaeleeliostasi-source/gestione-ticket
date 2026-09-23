@@ -377,6 +377,31 @@ def pagina_gestisci_ticket():
         .manage-ticket-desc { color: #64748B; font-size: .84rem; line-height: 1.4; margin-top: 8px; }
         .manage-empty { background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 15px; padding: 30px; text-align: center; color: #64748B; }
         .manage-section-title { color: #17365D; font-size: 1.15rem; font-weight: 800; margin-top: 18px; }
+
+        /* Pulsante principale "Apri ticket" - bordeaux */
+        div[data-testid="stButton"] button[kind="primary"] {
+            background: linear-gradient(180deg, #B3263A 0%, #971D30 100%) !important;
+            border: 1px solid #8F1B2D !important;
+            color: #FFFFFF !important;
+            border-radius: 10px !important;
+            min-height: 48px !important;
+            font-weight: 700 !important;
+            box-shadow: 0 4px 10px rgba(151, 29, 48, .18) !important;
+            transition: all .15s ease-in-out !important;
+        }
+
+        div[data-testid="stButton"] button[kind="primary"]:hover {
+            background: linear-gradient(180deg, #C02A40 0%, #A32035 100%) !important;
+            border-color: #8F1B2D !important;
+            box-shadow: 0 6px 14px rgba(151, 29, 48, .24) !important;
+        }
+
+        /* Pulsante PDF secondario */
+        div[data-testid="stDownloadButton"] button {
+            border-radius: 10px !important;
+            min-height: 48px !important;
+            font-weight: 600 !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -547,7 +572,7 @@ def pagina_gestisci_ticket():
         # Per i ticket chiusi mostriamo, affiancato ad "Apri ticket",
         # anche il download diretto del PDF ufficiale.
         if stato == "Chiuso":
-            col_apri, col_pdf = st.columns(2)
+            col_apri, col_pdf = st.columns([3, 1])
 
             with col_apri:
                 if st.button(
@@ -564,7 +589,7 @@ def pagina_gestisci_ticket():
                     ticket_pdf = db.get_ticket(ticket_id)
                     pdf_bytes = pdf_generator.genera_pdf(ticket_pdf)
                     st.download_button(
-                        "📄 Scarica PDF",
+                        "📄 PDF",
                         data=pdf_bytes,
                         file_name=f"ticket_{ticket_id}.pdf",
                         mime="application/pdf",
