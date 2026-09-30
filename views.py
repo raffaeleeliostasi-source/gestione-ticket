@@ -453,9 +453,9 @@ def pagina_gestisci_ticket():
             color: #FFFFFF !important;
             border-radius: 8px !important;
             min-height: 42px !important;
-            padding: 7px 18px !important;
+            padding: 6px 12px !important;
             font-weight: 800 !important;
-            font-size: .94rem !important;
+            font-size: .88rem !important;
             box-shadow: 0 4px 10px rgba(120, 25, 32, .18) !important;
             transition: all .15s ease-in-out !important;
         }
@@ -473,7 +473,7 @@ def pagina_gestisci_ticket():
             color: #B51F2B !important;
             border-radius: 8px !important;
             min-height: 42px !important;
-            padding: 6px 16px !important;
+            padding: 6px 12px !important;
             font-size: .94rem !important;
             font-weight: 800 !important;
             box-shadow: 0 3px 9px rgba(120, 25, 32, .12) !important;
@@ -670,13 +670,13 @@ def pagina_gestisci_ticket():
         # Per i ticket chiusi: "Apri ticket" a sinistra e PDF subito a destra.
         if stato == "Chiuso":
             st.markdown('<div class="manage-action-row">', unsafe_allow_html=True)
-            col_apri, col_pdf = st.columns([1.25, 1])
+            col_apri, col_pdf, col_spazio = st.columns([1.0, 0.75, 4.25])
 
             with col_apri:
                 if st.button(
                     "📝 Apri ticket",
                     key=f"gestisci_apri_{chiave}_{ticket_id}",
-                    use_container_width=True,
+                    use_container_width=False,
                     type="primary",
                 ):
                     st.session_state["gestisci_ticket_selezionato"] = ticket_id
@@ -692,7 +692,7 @@ def pagina_gestisci_ticket():
                         file_name=f"ticket_{ticket_id}.pdf",
                         mime="application/pdf",
                         key=f"gestisci_pdf_{chiave}_{ticket_id}",
-                        use_container_width=True,
+                        use_container_width=False,
                         type="secondary",
                     )
                 except Exception:
