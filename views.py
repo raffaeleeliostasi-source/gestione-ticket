@@ -446,45 +446,52 @@ def pagina_gestisci_ticket():
             margin-top: 18px;
         }
 
-        /* "Apri ticket": testo semplice arancione, senza riquadro */
-        div[data-testid="stButton"] button[kind="primary"],
-        div[data-testid="stButton"] button {
-            background: transparent !important;
+        /* Pulsanti della Gestione Ticket */
+        div[data-testid="stButton"] button[kind="primary"] {
+            background: linear-gradient(180deg, #B51F2B 0%, #971520 100%) !important;
             border: 0 !important;
-            color: #F28C00 !important;
-            border-radius: 0 !important;
+            color: #FFFFFF !important;
+            border-radius: 8px !important;
             min-height: 42px !important;
-            font-weight: 700 !important;
-            font-size: 1.02rem !important;
-            box-shadow: none !important;
+            padding: 7px 18px !important;
+            font-weight: 800 !important;
+            font-size: .94rem !important;
+            box-shadow: 0 4px 10px rgba(120, 25, 32, .18) !important;
             transition: all .15s ease-in-out !important;
         }
 
-        div[data-testid="stButton"] button[kind="primary"]:hover,
-        div[data-testid="stButton"] button:hover {
-            background: transparent !important;
-            color: #D97700 !important;
-            box-shadow: none !important;
-            transform: none !important;
+        div[data-testid="stButton"] button[kind="primary"]:hover {
+            background: linear-gradient(180deg, #C32632 0%, #A31622 100%) !important;
+            box-shadow: 0 6px 13px rgba(120, 25, 32, .24) !important;
+            transform: translateY(-1px);
         }
 
-        /* PDF: piccolo comando grafico sulla destra */
+        /* Pulsante PDF: più evidente e immediatamente accanto ad "Apri ticket" */
         div[data-testid="stDownloadButton"] button {
-            background: transparent !important;
-            border: 0 !important;
-            border-radius: 0 !important;
+            background: #FFFFFF !important;
+            border: 2px solid #B51F2B !important;
+            color: #B51F2B !important;
+            border-radius: 8px !important;
             min-height: 42px !important;
-            padding: 2px 6px !important;
-            font-size: 1.55rem !important;
+            padding: 6px 16px !important;
+            font-size: .94rem !important;
             font-weight: 800 !important;
-            color: #E00000 !important;
-            box-shadow: none !important;
+            box-shadow: 0 3px 9px rgba(120, 25, 32, .12) !important;
+            transition: all .15s ease-in-out !important;
         }
 
         div[data-testid="stDownloadButton"] button:hover {
-            background: transparent !important;
-            color: #B00000 !important;
-            box-shadow: none !important;
+            background: #FFF5F6 !important;
+            border-color: #971520 !important;
+            color: #971520 !important;
+            box-shadow: 0 5px 12px rgba(120, 25, 32, .20) !important;
+            transform: translateY(-1px);
+        }
+
+        /* Mantiene i due comandi compatti e ravvicinati sotto la card */
+        .manage-action-row {
+            margin-top: 4px;
+            margin-bottom: 8px;
         }
         </style>
         """,
@@ -660,10 +667,10 @@ def pagina_gestisci_ticket():
             """,
             unsafe_allow_html=True,
         )
-        # Per i ticket chiusi mostriamo, affiancato ad "Apri ticket",
-        # anche il download diretto del PDF ufficiale.
+        # Per i ticket chiusi: "Apri ticket" a sinistra e PDF subito a destra.
         if stato == "Chiuso":
-            col_apri, col_pdf = st.columns([3, 1])
+            st.markdown('<div class="manage-action-row">', unsafe_allow_html=True)
+            col_apri, col_pdf = st.columns([1.25, 1])
 
             with col_apri:
                 if st.button(
@@ -680,7 +687,7 @@ def pagina_gestisci_ticket():
                     ticket_pdf = db.get_ticket(ticket_id)
                     pdf_bytes = pdf_generator.genera_pdf(ticket_pdf)
                     st.download_button(
-                        "📄",
+                        "📄 PDF",
                         data=pdf_bytes,
                         file_name=f"ticket_{ticket_id}.pdf",
                         mime="application/pdf",
@@ -690,14 +697,19 @@ def pagina_gestisci_ticket():
                     )
                 except Exception:
                     st.error("PDF non disponibile")
+
+            st.markdown('</div>', unsafe_allow_html=True)
         else:
+            st.markdown('<div class="manage-action-row">', unsafe_allow_html=True)
             if st.button(
                 "📝 Apri ticket",
                 key=f"gestisci_apri_{chiave}_{ticket_id}",
-                use_container_width=True,
+                use_container_width=False,
+                type="primary",
             ):
                 st.session_state["gestisci_ticket_selezionato"] = ticket_id
                 st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
     if admin:
         for _, row in filtrato.iterrows():
